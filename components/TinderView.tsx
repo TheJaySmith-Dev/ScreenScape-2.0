@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { Movie } from '../types';
 import { getPopularMovies, getSimilarMovies } from '../services/tmdbService';
@@ -89,7 +91,8 @@ const TinderView: React.FC<TinderViewProps> = ({ apiKey }) => {
             let newMovies: Movie[] = [];
             if (likedIds.size > 0 && Math.random() > 0.3) {
                 const lastLikedId = Array.from(likedIds).pop();
-                if (lastLikedId) {
+                // FIX: Add type guard to ensure lastLikedId is a number, as its value from localStorage could be of an unknown type.
+                if (typeof lastLikedId === 'number') {
                     const res = await getSimilarMovies(apiKey, lastLikedId);
                     newMovies = res.results.filter(m => !hasRated(m.id));
                 }
@@ -141,19 +144,19 @@ const TinderView: React.FC<TinderViewProps> = ({ apiKey }) => {
                     const isTop = index === 0;
                     return (
                         isTop ? <TinderCard key={movie.id} movie={movie} onSwipe={handleSwipe} /> :
-                        <div key={movie.id} className="absolute w-full h-full rounded-3xl bg-zinc-800" style={{ transform: `scale(${1 - 0.05 * index}) translateY(${index * -10}px)`, zIndex: -index, filter: `blur(${index*2}px)` }}>
-                             <img src={`https://image.tmdb.org/t/p/w780${movie.backdrop_path}`} alt={movie.title} className="w-full h-full object-cover rounded-3xl" />
+                        <div key={movie.id} className="absolute w-full h-full rounded-3xl bg-primary border border-glass-edge" style={{ transform: `scale(${1 - 0.05 * index}) translateY(${index * -10}px)`, zIndex: -index, filter: `blur(${index*2}px)` }}>
+                             <img src={`https://image.tmdb.org/t/p/w780${movie.backdrop_path}`} alt={movie.title} className="w-full h-full object-cover rounded-3xl opacity-50" />
                         </div>
                     )
                 })}
             </div>
             {currentMovie && (
                 <div className="flex items-center space-x-4 md:space-x-8 mt-6 md:mt-8">
-                    <button onClick={() => handleSwipe('left')} className="p-4 md:p-5 rounded-full bg-white/10 backdrop-blur-xl border border-glass-edge hover:bg-red-500/30 transition-all duration-300">
+                    <button onClick={() => handleSwipe('left')} className="p-4 md:p-5 rounded-full bg-secondary/10 backdrop-blur-xl border border-glass-edge hover:bg-red-500/30 transition-all duration-300 shadow-glow">
                         <XIcon className="w-6 h-6 md:w-8 md:h-8 text-red-400" />
                     </button>
-                    <button onClick={() => handleSwipe('right')} className="p-4 md:p-5 rounded-full bg-white/10 backdrop-blur-xl border border-glass-edge hover:bg-green-500/30 transition-all duration-300">
-                        <HeartIcon className="w-6 h-6 md:w-8 md:h-8 text-green-400" />
+                    <button onClick={() => handleSwipe('right')} className="p-4 md:p-5 rounded-full bg-secondary/10 backdrop-blur-xl border border-glass-edge hover:bg-secondary/30 transition-all duration-300 shadow-glow">
+                        <HeartIcon className="w-6 h-6 md:w-8 md:h-8 text-secondary" />
                     </button>
                 </div>
             )}

@@ -44,7 +44,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, setView, searchQuery, setS
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search for titles..."
-                      className="block w-full rounded-full border-0 bg-black/30 backdrop-blur-2xl py-2.5 pl-11 pr-3 text-white shadow-sm ring-1 ring-inset ring-glass-edge placeholder:text-zinc-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm sm:leading-6 transition-all"
+                      className="block w-full rounded-full border-0 bg-primary/30 backdrop-blur-2xl py-2.5 pl-11 pr-3 text-white shadow-sm ring-1 ring-inset ring-glass-edge placeholder:text-zinc-400 focus:ring-2 focus:ring-inset focus:ring-secondary sm:text-sm sm:leading-6 transition-all"
                   />
               </div>
           </div>
@@ -60,15 +60,15 @@ const Header: React.FC<HeaderProps> = ({ currentView, setView, searchQuery, setS
                     <SearchIcon className="w-6 h-6" />
                 </button>
             )}
-            <nav className="flex items-center p-1 sm:p-1.5 space-x-1 sm:space-x-2 bg-black/30 backdrop-blur-2xl rounded-full border border-glass-edge shadow-lg">
+            <nav className="flex items-center p-1 sm:p-1.5 space-x-1 sm:space-x-2 bg-primary/30 backdrop-blur-2xl rounded-full border border-glass-edge shadow-lg shadow-glow">
                 {navItems.map((item) => (
                 <button
                     key={item.type}
                     onClick={() => handleSetView(item.type)}
                     className={`flex items-center space-x-2 px-3 sm:px-4 py-2 text-sm font-medium rounded-full transition-all duration-300 ${
                     currentView === item.type
-                        ? 'bg-indigo-600 text-white'
-                        : 'text-zinc-300 hover:bg-white/10'
+                        ? 'bg-secondary text-primary'
+                        : 'text-secondary/80 hover:bg-secondary/20'
                     }`}
                 >
                     {item.icon}
@@ -80,7 +80,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, setView, searchQuery, setS
       </header>
 
       {isMobileSearchOpen && (
-        <div className="fixed inset-0 bg-zinc-900/90 backdrop-blur-md z-[60] p-4 animate-text-focus-in">
+        <div className="fixed inset-0 bg-primary/90 backdrop-blur-md z-[60] p-4 animate-text-focus-in">
           <div className="relative w-full max-w-lg mx-auto mt-20">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
                 <SearchIcon className="h-5 w-5 text-zinc-400" />
@@ -91,7 +91,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, setView, searchQuery, setS
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search for titles..."
-              className="block w-full rounded-full border-0 bg-black/30 backdrop-blur-2xl py-3 pl-11 pr-11 text-white shadow-sm ring-1 ring-inset ring-glass-edge placeholder:text-zinc-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm sm:leading-6 transition-all"
+              className="block w-full rounded-full border-0 bg-primary/30 backdrop-blur-2xl py-3 pl-11 pr-11 text-white shadow-sm ring-1 ring-inset ring-glass-edge placeholder:text-zinc-400 focus:ring-2 focus:ring-inset focus:ring-secondary sm:text-sm sm:leading-6 transition-all"
             />
              <button
                 onClick={() => setIsMobileSearchOpen(false)}

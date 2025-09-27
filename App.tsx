@@ -40,14 +40,14 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-black">
+      <div className="h-screen w-screen flex items-center justify-center bg-primary">
         {/* Can add a loader here if needed */}
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white font-sans">
+    <div className="min-h-screen bg-primary text-white font-sans">
       {!apiKey ? (
         <ApiKeySetup onSave={handleApiKeySave} />
       ) : (

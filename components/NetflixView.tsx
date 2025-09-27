@@ -1,12 +1,10 @@
-
-
 import React, { useState, useEffect } from 'react';
 import type { Movie, MovieDetails, CreditsResponse, LogoImage } from '../types';
 import { getPopularMovies, getTrendingMovies, searchMovies, getGenres, getMovieVideos, getMovieDetails, getMovieCredits, getMovieImages } from '../services/tmdbService';
 import { usePreferences } from '../hooks/usePreferences';
 import Loader from './Loader';
 import VideoPlayer from './VideoPlayer';
-import { PlayIcon, HeartIcon, XIcon, HeartIconSolid } from './Icons';
+import { PlayIcon, HeartIcon, XIcon, HeartIconSolid, PauseIcon } from './Icons';
 
 interface NetflixViewProps {
   apiKey: string;
@@ -47,6 +45,7 @@ const MovieModal: React.FC<{
     const [videoKey, setVideoKey] = useState<string | null>(null);
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isTrailerPlaying, setIsTrailerPlaying] = useState(false);
 
     useEffect(() => {
         const fetchAllDetails = async () => {
@@ -61,7 +60,13 @@ const MovieModal: React.FC<{
                 
                 setDetails(detailsRes);
                 setCredits(creditsRes);
-                if(videoRes) setVideoKey(videoRes.key);
+                if(videoRes) {
+                    setVideoKey(videoRes.key);
+                    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+                    if (!isTouchDevice) {
+                        setIsTrailerPlaying(true);
+                    }
+                }
 
                 const bestLogo = imagesRes.logos?.find(l => l.iso_639_1 === 'en' && l.aspect_ratio > 2) || imagesRes.logos?.[0];
                 if (bestLogo) {
@@ -75,6 +80,15 @@ const MovieModal: React.FC<{
         };
         fetchAllDetails();
     }, [apiKey, movie.id]);
+
+    const handlePlayerStateChange = (state: number) => {
+        // Player state codes: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued).
+        if (state === 1) { // playing
+            setIsTrailerPlaying(true);
+        } else if (state === 2 || state === 0 || state === -1) { // paused, ended, or unstarted
+            setIsTrailerPlaying(false);
+        }
+    };
 
     const formatRuntime = (runtime: number) => {
         const hours = Math.floor(runtime / 60);
@@ -95,7 +109,7 @@ const MovieModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center animate-scale-up-center" onClick={onClose}>
-            <div className="bg-zinc-900 rounded-2xl overflow-hidden w-full max-w-4xl h-[90vh] shadow-2xl relative border border-glass-edge mx-2 sm:mx-4" onClick={e => e.stopPropagation()}>
+            <div className="bg-primary rounded-2xl overflow-hidden w-full max-w-4xl h-[90vh] shadow-2xl relative border border-glass-edge mx-2 sm:mx-4" onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-3 right-3 z-20 text-white bg-black/50 rounded-full p-2 hover:bg-white/20 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -103,11 +117,19 @@ const MovieModal: React.FC<{
                 </button>
                 
                 <div className="absolute inset-0 z-0">
-                    {videoKey ? <VideoPlayer videoKey={videoKey} /> : <img src={`https://image.tmdb.org/t/p/original${movie.backdrop_path}`} alt="" className="w-full h-full object-cover"/> }
+                    {videoKey ? (
+                      <VideoPlayer 
+                          videoKey={videoKey} 
+                          isPlaying={isTrailerPlaying}
+                          onStateChange={handlePlayerStateChange}
+                      />
+                    ) : (
+                      <img src={`https://image.tmdb.org/t/p/original${movie.backdrop_path}`} alt="" className="w-full h-full object-cover"/>
+                    )}
                 </div>
 
                 <div className="absolute inset-0 z-10 overflow-y-auto scrollbar-hide">
-                    <div className="absolute inset-x-0 top-0 h-full bg-gradient-to-t from-zinc-900 via-zinc-900/80 to-transparent pointer-events-none"></div>
+                    <div className="absolute inset-x-0 top-0 h-full bg-gradient-to-t from-primary via-primary/80 to-transparent pointer-events-none"></div>
                     <div className="relative z-10 p-6 md:p-12">
                        <div className="h-[55vh] sm:h-[40vh]"></div> {/* Spacer */}
 
@@ -120,15 +142,22 @@ const MovieModal: React.FC<{
                         {isLoading ? <Loader /> : details && (
                             <div className="space-y-8">
                                 <div className="flex items-center space-x-4 text-sm md:text-base">
-                                    <span className="text-green-400 font-semibold">{(details.vote_average * 10).toFixed(0)}% Match</span>
+                                    <span className="text-secondary font-semibold">{(details.vote_average * 10).toFixed(0)}% Match</span>
                                     <span className="text-zinc-400">{details.release_date.split('-')[0]}</span>
                                     <span className="text-zinc-400">{formatRuntime(details.runtime)}</span>
                                 </div>
                                 <div className="flex items-center space-x-4 mt-4">
-                                     <button onClick={() => likeMovie(movie.id)} className={`p-3 rounded-full transition-all duration-300 ${isLiked ? 'bg-green-500/30' : 'bg-white/10 backdrop-blur-xl border border-glass-edge hover:bg-green-500/30'}`}>
-                                        {isLiked ? <HeartIconSolid className="w-6 h-6 text-green-400" /> : <HeartIcon className="w-6 h-6 text-green-400" />}
+                                    <button 
+                                        onClick={() => setIsTrailerPlaying(p => !p)} 
+                                        className="p-4 rounded-full bg-secondary/20 backdrop-blur-xl border border-glass-edge hover:bg-secondary/40 transition-all duration-300 shadow-glow"
+                                        aria-label={isTrailerPlaying ? "Pause trailer" : "Play trailer"}
+                                    >
+                                        {isTrailerPlaying ? <PauseIcon className="w-7 h-7 text-secondary" /> : <PlayIcon className="w-7 h-7 text-secondary" />}
                                     </button>
-                                    <button onClick={handleDislike} className="p-3 rounded-full bg-white/10 backdrop-blur-xl border border-glass-edge hover:bg-red-500/30 transition-all duration-300">
+                                     <button onClick={() => likeMovie(movie.id)} className={`p-3 rounded-full transition-all duration-300 shadow-glow ${isLiked ? 'bg-secondary/30' : 'bg-secondary/10 backdrop-blur-xl border border-glass-edge hover:bg-secondary/30'}`}>
+                                        {isLiked ? <HeartIconSolid className="w-6 h-6 text-secondary" /> : <HeartIcon className="w-6 h-6 text-secondary" />}
+                                    </button>
+                                    <button onClick={handleDislike} className="p-3 rounded-full bg-white/10 backdrop-blur-xl border border-glass-edge hover:bg-red-500/30 transition-all duration-300 shadow-glow">
                                         <XIcon className="w-6 h-6 text-red-400" />
                                     </button>
                                 </div>
@@ -259,14 +288,23 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery }) => {
           <div className="absolute inset-0">
             {heroVideoKey ? (
               <div className="absolute inset-0 h-[150%] -top-[25%] pointer-events-none">
-                 <VideoPlayer videoKey={heroVideoKey} isMuted={true} />
+                 <VideoPlayer videoKey={heroVideoKey} isMuted={true} isPlaying={true} />
               </div>
             ) : (
               <img src={`https://image.tmdb.org/t/p/original${heroMovie.backdrop_path}`} alt={heroMovie.title} className="w-full h-full object-cover" />
             )}
           </div>
-          <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/60 to-transparent"></div>
-          <div className="absolute bottom-10 left-6 md:left-12 max-w-lg">
+          <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/60 to-transparent"></div>
+          <div className="absolute inset-0 flex items-center justify-center z-10">
+              <button
+                  onClick={() => handleSelectMovie(heroMovie)}
+                  className="p-4 bg-black/30 rounded-full text-white backdrop-blur-sm hover:bg-black/50 transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-secondary shadow-glow"
+                  aria-label={`Play trailer for ${heroMovie.title}`}
+              >
+                  <PlayIcon className="w-12 h-12 md:w-16 md:h-16" />
+              </button>
+          </div>
+          <div className="absolute bottom-10 left-6 md:left-12 max-w-lg z-20">
             <h1 className="text-3xl md:text-6xl font-black text-white">{heroMovie.title}</h1>
             <p className="mt-4 text-sm text-zinc-200 line-clamp-3">{heroMovie.overview}</p>
             <div className="flex space-x-2 mt-2">
@@ -274,8 +312,7 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery }) => {
                 genres.get(id) ? <span key={id} className="text-xs text-zinc-400">{genres.get(id)}</span> : null
               ))}
             </div>
-            <button onClick={() => handleSelectMovie(heroMovie)} className="mt-6 flex items-center space-x-2 bg-white text-black font-bold px-6 py-3 rounded hover:bg-zinc-200 transition-colors">
-              <PlayIcon className="w-6 h-6" />
+            <button onClick={() => handleSelectMovie(heroMovie)} className="mt-6 flex items-center space-x-2 bg-secondary/20 border border-secondary text-secondary hover:bg-secondary hover:text-primary font-bold px-6 py-3 rounded-full shadow-glow hover:shadow-lg transition-all">
               <span>More Info</span>
             </button>
           </div>

@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Movie, Video } from '../types';
 import { getPopularMovies, getSimilarMovies, getMovieVideos } from '../services/tmdbService';
@@ -20,7 +22,7 @@ const TikTokCard: React.FC<{
 }> = ({ movie, apiKey, onLike, onDislike, isActive }) => {
     const [video, setVideo] = useState<Video | null>(null);
     const [player, setPlayer] = useState<any>(null);
-    const [isMuted, setIsMuted] = useState(false);
+    const [isMuted, setIsMuted] = useState(true);
     const playerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -55,6 +57,7 @@ const TikTokCard: React.FC<{
                     cc_load_policy: 0,
                     iv_load_policy: 3,
                     autohide: 1,
+                    mute: 1,
                 },
                 events: {
                     'onReady': onPlayerReady,
@@ -102,13 +105,13 @@ const TikTokCard: React.FC<{
                 </div>
                 <div className="flex flex-col space-y-4 sm:space-y-6">
                     <button onClick={() => onLike(movie.id)} className="flex flex-col items-center space-y-1 text-center">
-                        <div className="p-2 sm:p-3 bg-white/10 rounded-full backdrop-blur-lg"><HeartIcon className="w-6 h-6 sm:w-7 sm:h-7" /></div>
+                        <div className="p-2 sm:p-3 bg-secondary/10 rounded-full backdrop-blur-lg"><HeartIcon className="w-6 h-6 sm:w-7 sm:h-7" /></div>
                     </button>
                      <button onClick={() => onDislike(movie.id)} className="flex flex-col items-center space-y-1 text-center">
-                        <div className="p-2 sm:p-3 bg-white/10 rounded-full backdrop-blur-lg"><XIcon className="w-6 h-6 sm:w-7 sm:h-7" /></div>
+                        <div className="p-2 sm:p-3 bg-secondary/10 rounded-full backdrop-blur-lg"><XIcon className="w-6 h-6 sm:w-7 sm:h-7" /></div>
                     </button>
                     <button onClick={toggleMute} className="flex flex-col items-center space-y-1 text-center">
-                        <div className="p-2 sm:p-3 bg-white/10 rounded-full backdrop-blur-lg">
+                        <div className="p-2 sm:p-3 bg-secondary/10 rounded-full backdrop-blur-lg">
                             {isMuted ? <MuteIcon className="w-6 h-6 sm:w-7 sm:h-7" /> : <UnmuteIcon className="w-6 h-6 sm:w-7 sm:h-7" />}
                         </div>
                     </button>
@@ -132,7 +135,8 @@ const TikTokView: React.FC<TikTokViewProps> = ({ apiKey }) => {
         try {
             let newMovies: Movie[] = [];
             const lastLikedId = Array.from(likedIds).pop();
-            if (lastLikedId && Math.random() > 0.3) {
+            // FIX: Add type guard to ensure lastLikedId is a number, as its value from localStorage could be of an unknown type.
+            if (typeof lastLikedId === 'number' && Math.random() > 0.3) {
                  const res = await getSimilarMovies(apiKey, lastLikedId);
                  newMovies = res.results.filter(m => !hasRated(m.id));
             }
