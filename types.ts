@@ -1,3 +1,4 @@
+import { type } from "@google/genai";
 
 export enum ViewType {
   NETFLIX = 'NETFLIX',
@@ -72,33 +73,4 @@ export interface LogoImage {
 export interface ImageResponse {
     id: number;
     logos: LogoImage[];
-}
-
-// Auth & Account Types
-export interface RequestTokenResponse {
-    success: boolean;
-    expires_at: string;
-    request_token: string;
-}
-
-export interface SessionResponse {
-    success: boolean;
-    session_id: string;
-}
-
-export interface AccountDetails {
-    avatar: {
-        gravatar: {
-            hash: string;
-        };
-        tmdb: {
-            avatar_path: string | null;
-        }
-    };
-    id: number;
-    iso_639_1: string;
-    iso_3166_1: string;
-    name: string;
-    include_adult: boolean;
-    username: string;
 }

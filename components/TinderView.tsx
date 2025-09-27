@@ -1,118 +1,161 @@
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-// FIX: Import AccountDetails type
-import { Movie, AccountDetails } from '../types';
-import { getPopularMovies } from '../services/tmdbService';
-import { useTMDbAccount } from '../hooks/useTMDbAccount';
-import TinderCard from 'react-tinder-card';
-import { HeartIcon, XIcon } from './Icons';
+import type { Movie } from '../types';
+import { getPopularMovies, getSimilarMovies } from '../services/tmdbService';
 import Loader from './Loader';
+import { usePreferences } from '../hooks/usePreferences';
+import { HeartIcon, XIcon } from './Icons';
 
 interface TinderViewProps {
-  apiKey: string;
-  sessionId: string;
-  // FIX: Use the full AccountDetails type for the account prop.
-  account: AccountDetails;
+    apiKey: string;
 }
 
-const TinderView: React.FC<TinderViewProps> = ({ apiKey, sessionId, account }) => {
+const TinderCard: React.FC<{
+    movie: Movie;
+    onSwipe: (direction: 'left' | 'right') => void;
+}> = ({ movie, onSwipe }) => {
+    const cardRef = useRef<HTMLDivElement>(null);
+    const [style, setStyle] = useState({});
+    const [startPos, setStartPos] = useState<{ x: number, y: number } | null>(null);
+
+    const handleMove = (x: number, y: number) => {
+        if (!startPos) return;
+        const dx = x - startPos.x;
+        const dy = y - startPos.y;
+        const rotate = dx * 0.1;
+        setStyle({
+            transform: `translate(${dx}px, ${dy}px) rotate(${rotate}deg)`,
+            transition: 'none',
+        });
+    };
+
+    const handleEnd = () => {
+        if (!cardRef.current) return;
+        const { x, width } = cardRef.current.getBoundingClientRect();
+        const screenWidth = window.innerWidth;
+        const decisionBoundary = screenWidth * 0.4;
+        
+        if (x + width < decisionBoundary) {
+            onSwipe('left');
+        } else if (x > screenWidth - decisionBoundary) {
+            onSwipe('right');
+        } else {
+            setStyle({ transform: 'translate(0px, 0px) rotate(0deg)', transition: 'transform 0.3s ease' });
+        }
+        setStartPos(null);
+    };
+
+    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => setStartPos({ x: e.clientX, y: e.clientY });
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => handleMove(e.clientX, e.clientY);
+
+    const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => setStartPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => handleMove(e.touches[0].clientX, e.touches[0].clientY);
+
+    return (
+        <div
+            ref={cardRef}
+            style={style}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleEnd}
+            onMouseLeave={handleEnd}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleEnd}
+            className="absolute w-full h-full cursor-grab active:cursor-grabbing"
+        >
+            <div className="relative w-full h-full rounded-3xl overflow-hidden shadow-2xl border border-glass-edge">
+                <img src={`https://image.tmdb.org/t/p/w780${movie.backdrop_path}`} alt={movie.title} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+                <div className="absolute bottom-0 p-4 sm:p-6 text-white">
+                    <h2 className="text-2xl sm:text-3xl font-bold">{movie.title}</h2>
+                    <p className="mt-2 text-xs sm:text-sm text-zinc-300 line-clamp-3">{movie.overview}</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+const TinderView: React.FC<TinderViewProps> = ({ apiKey }) => {
     const [movies, setMovies] = useState<Movie[]>([]);
-    const [page, setPage] = useState(1);
     const [isLoading, setIsLoading] = useState(true);
-    const { hasRated, likeMovie, dislikeMovie, isLoading: isLoadingPreferences } = useTMDbAccount({ apiKey, sessionId, account });
+    const { likedIds, dislikedIds, likeMovie, dislikeMovie, hasRated } = usePreferences();
+    const [page, setPage] = useState(1);
 
-    const currentIndexRef = useRef(0);
-
-    const fetchMovies = useCallback(async (pageNum: number) => {
+    const fetchAndSetMovies = useCallback(async () => {
         setIsLoading(true);
         try {
-            const data = await getPopularMovies(apiKey, pageNum);
-            const unratedMovies = data.results.filter(movie => !hasRated(movie.id));
-            setMovies(prev => [...prev, ...unratedMovies]);
-            if (unratedMovies.length === 0 && data.page < data.total_pages) {
-                // If all movies on this page were rated, fetch next page
-                setPage(p => p + 1);
+            let newMovies: Movie[] = [];
+            if (likedIds.size > 0 && Math.random() > 0.3) {
+                const lastLikedId = Array.from(likedIds).pop();
+                if (lastLikedId) {
+                    const res = await getSimilarMovies(apiKey, lastLikedId);
+                    newMovies = res.results.filter(m => !hasRated(m.id));
+                }
             }
+            
+            if (newMovies.length < 5) {
+                const res = await getPopularMovies(apiKey, page);
+                setPage(p => p + 1);
+                newMovies.push(...res.results.filter(m => !hasRated(m.id)));
+            }
+
+            setMovies(prev => [...prev, ...newMovies.filter(nm => !prev.find(pm => pm.id === nm.id))]);
         } catch (error) {
-            console.error("Failed to fetch movies for swiping:", error);
+            console.error('Failed to fetch movies:', error);
         } finally {
             setIsLoading(false);
         }
-    }, [apiKey, hasRated]);
+    }, [apiKey, likedIds, hasRated, page]);
 
     useEffect(() => {
-        if (!isLoadingPreferences) {
-            fetchMovies(page);
-        }
-    }, [page, fetchMovies, isLoadingPreferences]);
+        fetchAndSetMovies();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-    const swiped = (direction: string, movie: Movie) => {
+    const currentMovie = useMemo(() => movies[0], [movies]);
+
+    const handleSwipe = useCallback((direction: 'left' | 'right') => {
+        if (!currentMovie) return;
         if (direction === 'right') {
-            likeMovie(movie.id);
-        } else if (direction === 'left') {
-            dislikeMovie(movie.id);
+            likeMovie(currentMovie.id);
+        } else {
+            dislikeMovie(currentMovie.id);
         }
-        currentIndexRef.current += 1;
-        if (currentIndexRef.current >= movies.length - 2) {
-            setPage(p => p + 1);
-        }
-    };
-    
-    const childRefs = useMemo(() => Array(movies.length).fill(0).map(() => React.createRef<any>()), [movies]);
+        setMovies(prev => prev.slice(1));
+    }, [currentMovie, likeMovie, dislikeMovie]);
 
-    const swipe = async (dir: 'left' | 'right') => {
-        if (movies.length > 0 && currentIndexRef.current < movies.length) {
-            await childRefs[currentIndexRef.current].current.swipe(dir);
+    useEffect(() => {
+        if (movies.length < 5) {
+            fetchAndSetMovies();
         }
-    };
+    }, [movies.length, fetchAndSetMovies]);
 
-    if (isLoadingPreferences || (isLoading && movies.length === 0)) {
-        return <Loader />;
-    }
-    
     return (
-        <div className="h-screen w-screen flex flex-col items-center justify-center -mt-24">
-            <div className="relative w-[300px] h-[500px] md:w-[350px] md:h-[550px]">
-                {movies.map((movie, index) => (
-                     <TinderCard
-                        ref={childRefs[index]}
-                        className="absolute"
-                        key={movie.id}
-                        onSwipe={(dir) => swiped(dir, movie)}
-                        preventSwipe={['up', 'down']}
-                    >
-                        <div className="relative w-full h-full rounded-xl overflow-hidden shadow-2xl bg-zinc-800">
-                           {movie.poster_path ? (
-                             <img
-                                className="w-full h-full object-cover"
-                                src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
-                                alt={movie.title}
-                            />
-                           ) : (
-                             <div className="w-full h-full flex items-center justify-center text-zinc-400">No Image</div>
-                           )}
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
-                                <h3 className="text-white text-2xl font-bold">{movie.title}</h3>
-                                <p className="text-zinc-300 text-sm">{new Date(movie.release_date).getFullYear()}</p>
-                            </div>
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)] w-full px-4">
+            <div className="relative w-full max-w-sm h-full max-h-[600px] -mt-10">
+                {isLoading && !currentMovie ? <Loader /> : null}
+                {movies.map((movie, index) => {
+                    if (index > 1) return null;
+                    const isTop = index === 0;
+                    return (
+                        isTop ? <TinderCard key={movie.id} movie={movie} onSwipe={handleSwipe} /> :
+                        <div key={movie.id} className="absolute w-full h-full rounded-3xl bg-zinc-800" style={{ transform: `scale(${1 - 0.05 * index}) translateY(${index * -10}px)`, zIndex: -index, filter: `blur(${index*2}px)` }}>
+                             <img src={`https://image.tmdb.org/t/p/w780${movie.backdrop_path}`} alt={movie.title} className="w-full h-full object-cover rounded-3xl" />
                         </div>
-                    </TinderCard>
-                ))}
-                 {movies.length > 0 && currentIndexRef.current >= movies.length && (
-                    <div className="text-center p-8">
-                        <h2 className="text-xl font-bold">No more movies to swipe!</h2>
-                        <p>Come back later for more.</p>
-                    </div>
-                )}
+                    )
+                })}
             </div>
-            {movies.length > 0 && currentIndexRef.current < movies.length && (
-              <div className="flex gap-8 mt-8">
-                  <button onClick={() => swipe('left')} className="bg-white p-4 rounded-full shadow-lg transform hover:scale-110 transition-transform">
-                      <XIcon className="h-8 w-8 text-red-500" />
-                  </button>
-                  <button onClick={() => swipe('right')} className="bg-white p-4 rounded-full shadow-lg transform hover:scale-110 transition-transform">
-                      <HeartIcon className="h-8 w-8 text-green-500" />
-                  </button>
-              </div>
+            {currentMovie && (
+                <div className="flex items-center space-x-4 md:space-x-8 mt-6 md:mt-8">
+                    <button onClick={() => handleSwipe('left')} className="p-4 md:p-5 rounded-full bg-white/10 backdrop-blur-xl border border-glass-edge hover:bg-red-500/30 transition-all duration-300">
+                        <XIcon className="w-6 h-6 md:w-8 md:h-8 text-red-400" />
+                    </button>
+                    <button onClick={() => handleSwipe('right')} className="p-4 md:p-5 rounded-full bg-white/10 backdrop-blur-xl border border-glass-edge hover:bg-green-500/30 transition-all duration-300">
+                        <HeartIcon className="w-6 h-6 md:w-8 md:h-8 text-green-400" />
+                    </button>
+                </div>
             )}
         </div>
     );

@@ -1,10 +1,12 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 
 interface VideoPlayerProps {
   videoKey: string;
+  isMuted?: boolean;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted = false }) => {
   const playerRef = useRef<HTMLDivElement>(null);
   const playerInstance = useRef<any>(null);
 
@@ -12,6 +14,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey }) => {
     if (!videoKey || !playerRef.current) return;
     
     const onPlayerReady = (event: any) => {
+        if (isMuted) {
+          event.target.mute();
+        }
         event.target.playVideo();
     };
 
@@ -24,6 +29,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey }) => {
         rel: 0,
         showinfo: 0,
         modestbranding: 1,
+        mute: isMuted ? 1 : 0,
       },
       events: {
         'onReady': onPlayerReady,
@@ -35,7 +41,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey }) => {
         playerInstance.current.destroy();
       }
     };
-  }, [videoKey]);
+  }, [videoKey, isMuted]);
 
   return (
     <div className="w-full h-full">
