@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Movie } from '../types';
+// FIX: Import AccountDetails type
+import { Movie, AccountDetails } from '../types';
 import { getPopularMovies } from '../services/tmdbService';
 import { useTMDbAccount } from '../hooks/useTMDbAccount';
 import TinderCard from 'react-tinder-card';
@@ -9,7 +10,8 @@ import Loader from './Loader';
 interface TinderViewProps {
   apiKey: string;
   sessionId: string;
-  account: { id: number; username: string };
+  // FIX: Use the full AccountDetails type for the account prop.
+  account: AccountDetails;
 }
 
 const TinderView: React.FC<TinderViewProps> = ({ apiKey, sessionId, account }) => {

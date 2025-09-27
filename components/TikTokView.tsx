@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Movie, Video } from '../types';
+// FIX: Import AccountDetails type
+import { Movie, Video, AccountDetails } from '../types';
 import { getPopularMovies, getMovieVideos } from '../services/tmdbService';
 import Loader from './Loader';
 import { useTMDbAccount } from '../hooks/useTMDbAccount';
@@ -9,7 +10,8 @@ import VideoPlayer from './VideoPlayer';
 interface TikTokViewProps {
   apiKey: string;
   sessionId: string;
-  account: { id: number; username: string };
+  // FIX: Use the full AccountDetails type for the account prop.
+  account: AccountDetails;
 }
 
 interface MovieWithVideo extends Movie {
