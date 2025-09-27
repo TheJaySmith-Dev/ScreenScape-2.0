@@ -1,11 +1,4 @@
-import { type } from "@google/genai";
-
-export enum ViewType {
-  NETFLIX = 'NETFLIX',
-  TINDER = 'TINDER',
-  TIKTOK = 'TIKTOK',
-}
-
+// Raw API response type for a movie
 export interface Movie {
   id: number;
   title: string;
@@ -15,12 +8,72 @@ export interface Movie {
   release_date: string;
   vote_average: number;
   genre_ids: number[];
+  media_type?: 'movie';
+}
+
+// Raw API response type for a TV show
+export interface TVShow {
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  first_air_date: string;
+  vote_average: number;
+  genre_ids: number[];
+  media_type?: 'tv';
+}
+
+// Normalized type for use throughout the UI components
+export interface MediaItem {
+  id: number;
+  title: string; // Normalized from movie.title or tv.name
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  release_date: string; // Normalized from movie.release_date or tv.first_air_date
+  vote_average: number;
+  genre_ids: number[];
+  media_type: 'movie' | 'tv';
 }
 
 export interface MovieDetails extends Movie {
     genres: { id: number, name: string }[];
     runtime: number;
 }
+
+export interface NextEpisodeToAir {
+    id: number;
+    name: string;
+    overview: string;
+    vote_average: number;
+    vote_count: number;
+    air_date: string;
+    episode_number: number;
+    production_code: string;
+    runtime: number;
+    season_number: number;
+    show_id: number;
+    still_path: string | null;
+}
+
+export interface TVShowDetails extends TVShow {
+    genres: { id: number, name: string }[];
+    episode_run_time: number[];
+    number_of_seasons: number;
+    next_episode_to_air: NextEpisodeToAir | null;
+}
+
+export interface Episode {
+    air_date: string;
+    episode_number: number;
+    id: number;
+    name: string;
+    overview: string;
+    season_number: number;
+    still_path: string | null;
+}
+
 
 export interface Video {
   id: string;

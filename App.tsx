@@ -2,13 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ApiKeySetup from './components/ApiKeySetup';
 import Header from './components/Header';
 import NetflixView from './components/NetflixView';
-import TinderView from './components/TinderView';
-import TikTokView from './components/TikTokView';
-import { ViewType } from './types';
 
 const App: React.FC = () => {
   const [apiKey, setApiKey] = useState<string | null>(null);
-  const [viewType, setViewType] = useState<ViewType>(ViewType.NETFLIX);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -25,40 +21,33 @@ const App: React.FC = () => {
     setApiKey(key);
   }, []);
 
-  const renderView = () => {
-    if (!apiKey) return null;
-    switch (viewType) {
-      case ViewType.TINDER:
-        return <TinderView apiKey={apiKey} />;
-      case ViewType.TIKTOK:
-        return <TikTokView apiKey={apiKey} />;
-      case ViewType.NETFLIX:
-      default:
-        return <NetflixView apiKey={apiKey} searchQuery={searchQuery} />;
-    }
-  };
+  const handleInvalidApiKey = useCallback(() => {
+    console.error("Invalid API Key detected. Clearing key and prompting for new one.");
+    localStorage.removeItem('tmdbApiKey');
+    setApiKey(null);
+  }, []);
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-primary">
+      <div className="h-screen w-screen flex items-center justify-center bg-black">
         {/* Can add a loader here if needed */}
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-primary text-white font-sans">
+    <div className="min-h-screen bg-zinc-900 text-white font-sans">
       {!apiKey ? (
         <ApiKeySetup onSave={handleApiKeySave} />
       ) : (
         <>
           <Header
-            currentView={viewType}
-            setView={setViewType}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
           />
-          <main className="pt-24">{renderView()}</main>
+          <main className="pt-24">
+            <NetflixView apiKey={apiKey} searchQuery={searchQuery} onInvalidApiKey={handleInvalidApiKey} />
+          </main>
         </>
       )}
     </div>

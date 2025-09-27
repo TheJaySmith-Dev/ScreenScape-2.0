@@ -16,8 +16,8 @@ const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onSave }) => {
   };
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-primary animate-text-focus-in p-4">
-      <div className="w-full max-w-md p-6 sm:p-8 space-y-8 bg-primary/30 backdrop-blur-2xl rounded-3xl shadow-2xl border border-glass-edge shadow-glow">
+    <div className="h-screen w-screen flex items-center justify-center bg-zinc-900 animate-text-focus-in p-4">
+      <div className="w-full max-w-md p-6 sm:p-8 space-y-8 bg-black/30 backdrop-blur-2xl rounded-3xl shadow-2xl border border-glass-edge">
         <div className="text-center">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">Welcome to ScreenScape</h1>
           <p className="mt-2 text-sm sm:text-base text-zinc-400">Please enter your TMDb API key to begin.</p>
@@ -36,14 +36,14 @@ const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onSave }) => {
               required
               value={key}
               onChange={(e) => setKey(e.target.value)}
-              className="block w-full rounded-xl border-0 bg-white/5 py-3 pl-10 text-white shadow-sm ring-1 ring-inset ring-glass-edge placeholder:text-zinc-500 focus:ring-2 focus:ring-inset focus:ring-secondary sm:text-sm sm:leading-6 transition-all"
+              className="block w-full rounded-xl border-0 bg-white/5 py-3 pl-10 text-white shadow-sm ring-1 ring-inset ring-white/10 placeholder:text-zinc-500 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm sm:leading-6 transition-all"
               placeholder="TMDb API Key"
             />
           </div>
           <div>
             <button
               type="submit"
-              className="flex w-full justify-center rounded-xl bg-secondary px-3 py-2.5 text-sm font-semibold leading-6 text-primary shadow-sm hover:bg-opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary transition-colors duration-300"
+              className="flex w-full justify-center rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-colors duration-300"
             >
               Save & Continue
             </button>
