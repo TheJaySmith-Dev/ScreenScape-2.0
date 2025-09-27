@@ -1,204 +1,146 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { Movie, Video, AccountDetails } from '../types';
-import { getPopularMovies, getSimilarMovies, getMovieVideos } from '../services/tmdbService';
+import { Movie, Video } from '../types';
+import { getPopularMovies, getMovieVideos } from '../services/tmdbService';
 import Loader from './Loader';
 import { useTMDbAccount } from '../hooks/useTMDbAccount';
-import { HeartIcon, XIcon, PlayIcon, MuteIcon, UnmuteIcon } from './Icons';
+import { HeartIcon, XIcon } from './Icons';
+import VideoPlayer from './VideoPlayer';
 
 interface TikTokViewProps {
-    apiKey: string;
-    sessionId: string;
-    account: AccountDetails;
+  apiKey: string;
+  sessionId: string;
+  account: { id: number; username: string };
 }
 
-const TikTokCard: React.FC<{
-    movie: Movie;
-    apiKey: string;
-    onLike: (id: number) => void;
-    onDislike: (id: number) => void;
-    isActive: boolean;
-}> = ({ movie, apiKey, onLike, onDislike, isActive }) => {
-    const [video, setVideo] = useState<Video | null>(null);
-    const [player, setPlayer] = useState<any>(null);
-    const [isMuted, setIsMuted] = useState(true);
-    const playerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (isActive) {
-            getMovieVideos(apiKey, movie.id).then(setVideo);
-        } else {
-            setVideo(null);
-            if(player) player.destroy();
-            setPlayer(null);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isActive, apiKey, movie.id]);
-
-    const onPlayerReady = (event: any) => {
-        event.target.playVideo();
-        if(isMuted) event.target.mute();
-    };
-    
-    useEffect(() => {
-        if (isActive && video && playerRef.current && !player) {
-            // FIX: Cast window to any to access YT property from YouTube Iframe API
-            const newPlayer = new (window as any).YT.Player(playerRef.current.id, {
-                videoId: video.key,
-                playerVars: {
-                    autoplay: 1,
-                    controls: 0,
-                    showinfo: 0,
-                    modestbranding: 1,
-                    loop: 1,
-                    playlist: video.key,
-                    fs: 0,
-                    cc_load_policy: 0,
-                    iv_load_policy: 3,
-                    autohide: 1,
-                },
-                events: {
-                    'onReady': onPlayerReady,
-                },
-            });
-            setPlayer(newPlayer);
-        }
-
-        return () => {
-            if(player) {
-                player.destroy();
-                setPlayer(null);
-            }
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isActive, video]);
-
-    const toggleMute = () => {
-        if(!player) return;
-        if(player.isMuted()) {
-            player.unMute();
-            setIsMuted(false);
-        } else {
-            player.mute();
-            setIsMuted(true);
-        }
-    }
-
-    return (
-        <div className="w-full h-screen snap-start relative flex-shrink-0">
-            <div className="absolute inset-0 z-0">
-                {isActive && video ? (
-                    <div id={`player-${movie.id}`} ref={playerRef} className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full object-cover"></div>
-                ) : (
-                    <img src={`https://image.tmdb.org/t/p/original${movie.backdrop_path}`} alt={movie.title} className="w-full h-full object-cover" />
-                )}
-            </div>
-
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
-
-            <div className="absolute bottom-0 left-0 p-6 text-white w-full flex justify-between items-end">
-                <div className="w-4/5">
-                    <h2 className="text-3xl font-bold">{movie.title}</h2>
-                    <p className="mt-2 text-sm text-zinc-300 line-clamp-2">{movie.overview}</p>
-                </div>
-                <div className="flex flex-col space-y-6">
-                    <button onClick={() => onLike(movie.id)} className="flex flex-col items-center space-y-1 text-center">
-                        <div className="p-3 bg-white/10 rounded-full backdrop-blur-lg"><HeartIcon className="w-7 h-7" /></div>
-                    </button>
-                     <button onClick={() => onDislike(movie.id)} className="flex flex-col items-center space-y-1 text-center">
-                        <div className="p-3 bg-white/10 rounded-full backdrop-blur-lg"><XIcon className="w-7 h-7" /></div>
-                    </button>
-                    <button onClick={toggleMute} className="flex flex-col items-center space-y-1 text-center">
-                        <div className="p-3 bg-white/10 rounded-full backdrop-blur-lg">
-                            {isMuted ? <MuteIcon className="w-7 h-7" /> : <UnmuteIcon className="w-7 h-7" />}
-                        </div>
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
+interface MovieWithVideo extends Movie {
+    video?: Video | null;
+}
 
 const TikTokView: React.FC<TikTokViewProps> = ({ apiKey, sessionId, account }) => {
-    const [movies, setMovies] = useState<Movie[]>([]);
-    const { likedIds, dislikeMovie, likeMovie, hasRated, isLoading: isLoadingPreferences } = useTMDbAccount({ apiKey, sessionId, account });
+    const [movies, setMovies] = useState<MovieWithVideo[]>([]);
     const [page, setPage] = useState(1);
-    const [activeIndex, setActiveIndex] = useState(0);
+    const [isLoading, setIsLoading] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const { likeMovie, dislikeMovie, hasRated } = useTMDbAccount({ apiKey, sessionId, account });
+
+    const observer = useRef<IntersectionObserver | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    
-    const fetchMovies = useCallback(async () => {
+    const [currentItem, setCurrentItem] = useState(0);
+
+    const fetchMoviesAndVideos = useCallback(async (pageNum: number) => {
+        if (isLoading || !hasMore) return;
         setIsLoading(true);
         try {
-            let newMovies: Movie[] = [];
-            const lastLikedId = Array.from(likedIds).pop();
-            if (lastLikedId && Math.random() > 0.3) {
-                 const res = await getSimilarMovies(apiKey, lastLikedId);
-                 newMovies = res.results.filter(m => !hasRated(m.id) && m.backdrop_path);
-            }
-
-            if (newMovies.length < 5) {
-                const res = await getPopularMovies(apiKey, page);
-                setPage(p => p+1);
-                newMovies.push(...res.results.filter(m => !hasRated(m.id) && m.backdrop_path));
+            const data = await getPopularMovies(apiKey, pageNum);
+            if (data.results.length === 0) {
+                setHasMore(false);
+                setIsLoading(false);
+                return;
             }
             
-            setMovies(prev => [...prev, ...newMovies.filter(nm => !prev.find(pm => pm.id === nm.id))]);
+            const moviesWithVideos = await Promise.all(
+                data.results.filter(m => !hasRated(m.id)).map(async (movie) => {
+                    const video = await getMovieVideos(apiKey, movie.id);
+                    return { ...movie, video };
+                })
+            );
 
+            const validMovies = moviesWithVideos.filter(m => m.video);
+            setMovies(prev => [...prev, ...validMovies]);
+            setHasMore(data.page < data.total_pages);
         } catch (error) {
-            console.error('Failed to fetch movies', error);
+            console.error("Failed to fetch movies for feed:", error);
         } finally {
             setIsLoading(false);
         }
-    }, [apiKey, page, likedIds, hasRated]);
+    }, [apiKey, isLoading, hasMore, hasRated]);
 
     useEffect(() => {
-        if(!isLoadingPreferences) {
-            fetchMovies();
-        }
+        fetchMoviesAndVideos(1);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLoadingPreferences]);
-
+    }, []);
+    
     const handleScroll = () => {
-        if (containerRef.current) {
-            const { scrollTop, clientHeight } = containerRef.current;
-            const newIndex = Math.round(scrollTop / clientHeight);
-            if (newIndex !== activeIndex) {
-                setActiveIndex(newIndex);
-            }
-            if (movies.length > 0 && newIndex === movies.length - 1 && !isLoading) {
-               fetchMovies();
+        const container = containerRef.current;
+        if (container) {
+            const { scrollTop, scrollHeight, clientHeight } = container;
+            if (scrollHeight - scrollTop <= clientHeight + 500 && !isLoading) { 
+                setPage(p => p + 1);
             }
         }
     };
+    
+    useEffect(() => {
+        if (page > 1) {
+            fetchMoviesAndVideos(page);
+        }
+    }, [page, fetchMoviesAndVideos]);
 
-    const handleLike = (id: number) => {
-        likeMovie(id);
-        setMovies(movies => movies.filter(m => m.id !== id));
+    const FeedItem: React.FC<{ movie: MovieWithVideo, isVisible: boolean }> = ({ movie, isVisible }) => {
+        if (!movie.video) return null;
+        return (
+            <div className="h-full w-full snap-start relative flex-shrink-0 bg-black">
+                { isVisible ? (
+                    <VideoPlayer videoKey={movie.video.key} />
+                ) : (
+                    <img src={`https://image.tmdb.org/t/p/original${movie.backdrop_path}`} className="w-full h-full object-cover" alt={movie.title}/>
+                )}
+                <div className="absolute bottom-0 left-0 p-4 text-white bg-gradient-to-t from-black to-transparent w-full">
+                    <h3 className="font-bold text-xl">{movie.title}</h3>
+                    <p className="text-sm line-clamp-2 mt-1">{movie.overview}</p>
+                </div>
+                <div className="absolute right-2 bottom-20 flex flex-col items-center gap-4">
+                    <button onClick={() => likeMovie(movie.id)} className="flex flex-col items-center text-white bg-black bg-opacity-30 p-2 rounded-full">
+                        <HeartIcon className="h-8 w-8" />
+                    </button>
+                    <button onClick={() => dislikeMovie(movie.id)} className="flex flex-col items-center text-white bg-black bg-opacity-30 p-2 rounded-full">
+                        <XIcon className="h-8 w-8" />
+                    </button>
+                </div>
+            </div>
+        )
     };
+    
+    useEffect(() => {
+        const options = {
+            root: containerRef.current,
+            rootMargin: '0px',
+            threshold: 0.7
+        };
 
-    const handleDislike = (id: number) => {
-        dislikeMovie(id);
-        setMovies(movies => movies.filter(m => m.id !== id));
-    };
+        const callback = (entries: IntersectionObserverEntry[]) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    const index = parseInt(entry.target.getAttribute('data-index') || '0', 10);
+                    setCurrentItem(index);
+                }
+            });
+        };
+
+        observer.current = new IntersectionObserver(callback, options);
+        const items = containerRef.current?.querySelectorAll('.feed-item');
+        if (items) {
+            items.forEach(item => observer.current?.observe(item));
+        }
+
+        return () => observer.current?.disconnect();
+    }, [movies]);
 
     return (
-        <div
+        <div 
             ref={containerRef}
             onScroll={handleScroll}
-            className="w-screen h-screen overflow-y-scroll snap-y snap-mandatory fixed top-0 left-0"
-        >
+            className="h-screen w-screen -mt-24 overflow-y-scroll snap-y snap-mandatory scroll-smooth">
             {movies.map((movie, index) => (
-                <TikTokCard
-                    key={movie.id}
-                    movie={movie}
-                    apiKey={apiKey}
-                    onLike={handleLike}
-                    onDislike={handleDislike}
-                    isActive={index === activeIndex}
-                />
+                <div key={`${movie.id}-${index}`} data-index={index} className="feed-item h-screen w-screen">
+                    <FeedItem movie={movie} isVisible={index === currentItem} />
+                </div>
             ))}
-            {(isLoading || isLoadingPreferences) && <div className="w-full h-screen snap-start flex items-center justify-center"><Loader /></div>}
+            {isLoading && (
+                <div className="h-screen w-screen flex items-center justify-center absolute bottom-0 bg-black bg-opacity-50">
+                    <Loader />
+                </div>
+            )}
         </div>
     );
 };

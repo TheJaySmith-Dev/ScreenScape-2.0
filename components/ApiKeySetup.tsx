@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { LockIcon } from './Icons';
 
@@ -9,47 +8,40 @@ interface ApiKeySetupProps {
 const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onSave }) => {
   const [key, setKey] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = () => {
     if (key.trim()) {
       onSave(key.trim());
     }
   };
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-zinc-900 animate-text-focus-in">
-      <div className="w-full max-w-md p-8 space-y-8 bg-black/30 backdrop-blur-2xl rounded-3xl shadow-2xl border border-glass-edge">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-white">Welcome to ScreenScape</h1>
-          <p className="mt-2 text-zinc-400">Please enter your TMDb API key to begin.</p>
-          <p className="mt-1 text-xs text-zinc-500">Your key is stored only in your browser and never sent to our servers.</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-900 text-white p-4">
+      <div className="max-w-md w-full text-center bg-zinc-800 p-8 rounded-lg shadow-lg">
+        <h1 className="text-3xl font-bold mb-2">ScreenScape</h1>
+        <p className="text-zinc-400 mb-6">Enter your TMDB API Key to get started.</p>
+        <div className="relative mb-4">
+          <LockIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500" />
+          <input
+            type="password"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            placeholder="TMDB API Key (v3 auth)"
+            className="w-full pl-10 pr-4 py-2 bg-zinc-700 border border-zinc-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
         </div>
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          <div className="relative">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <LockIcon className="h-5 w-5 text-zinc-500" />
-            </div>
-            <input
-              id="api-key"
-              name="api-key"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              className="block w-full rounded-xl border-0 bg-white/5 py-3 pl-10 text-white shadow-sm ring-1 ring-inset ring-white/10 placeholder:text-zinc-500 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm sm:leading-6 transition-all"
-              placeholder="TMDb API Key"
-            />
-          </div>
-          <div>
-            <button
-              type="submit"
-              className="flex w-full justify-center rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-colors duration-300"
-            >
-              Save & Continue
-            </button>
-          </div>
-        </form>
+        <button
+          onClick={handleSave}
+          disabled={!key.trim()}
+          className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-900 disabled:text-zinc-500 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-md transition-colors"
+        >
+          Save and Continue
+        </button>
+        <p className="text-xs text-zinc-500 mt-4">
+          You can get a free API key from{' '}
+          <a href="https://www.themoviedb.org/signup" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">
+            The Movie Database (TMDB)
+          </a>.
+        </p>
       </div>
     </div>
   );

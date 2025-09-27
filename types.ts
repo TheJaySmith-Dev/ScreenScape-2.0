@@ -1,4 +1,3 @@
-import { type } from "@google/genai";
 
 export enum ViewType {
   NETFLIX = 'NETFLIX',
