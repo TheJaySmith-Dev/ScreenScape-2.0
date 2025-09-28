@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { MediaItem, Movie, TVShow, MovieDetails, TVShowDetails, CreditsResponse, Episode, NextEpisodeToAir } from '../types';
+// FIX: Import PaginatedResponse to resolve 'Cannot find name' error.
+import type { MediaItem, Movie, TVShow, MovieDetails, TVShowDetails, CreditsResponse, Episode, NextEpisodeToAir, WatchProviderResponse, PaginatedResponse } from '../types';
 import { 
     getPopularMovies, getPopularTVShows, getTrendingAll, searchMulti, 
     getMovieVideos, getMovieDetails, getMovieCredits, getMovieImages, 
     getTVShowDetails, getTVShowCredits, getTVShowVideos, getTVShowImages,
     getMoviesByProvider, getTVShowsByProvider, getUpcomingMovies, getOnTheAirTVShows, getMoviesByKeyword,
-    normalizeMovie, normalizeTVShow, discoverTVShows, discoverMovies
+    normalizeMovie, normalizeTVShow, discoverTVShows, discoverMovies, getMovieWatchProviders, getTVShowWatchProviders
 } from '../services/tmdbService';
 import { usePreferences } from '../hooks/usePreferences';
 import Loader from './Loader';
@@ -25,8 +26,18 @@ const serviceHubs = [
     logo: 'https://lumiere-a.akamaihd.net/v1/images/disney_logo_march_2024_050fef2e.png?region=0%2C0%2C1920%2C1080',
     originalsNetworkId: 2739 
   },
-  // Future streaming services can be added here
 ];
+
+const subHubs = [
+    {
+        id: 15,
+        name: 'Hulu',
+        logo: 'https://disney.images.edge.bamgrid.com/ripcut-delivery/v2/variant/disney/81FA4D830379184F4220A87D3197E9A13BB6F3873862C9EA8BE66A6B1834BD37/compose?format=webp&width=800',
+        parentId: 337, // Belongs to Disney+
+        video: 'https://vod-bgc-na-east-1.media.dssott.com/bgui/ps01/disney/bgui/2023/11/13/1699896662-xyz.mp4',
+        introVideo: 'https://vod-bgc-na-east-1.media.dssott.com/bgui/ps01/disney/bgui/2025/03/07/1741367926-hulu.mp4'
+    }
+]
 
 const useCountdown = (targetDate: string) => {
     const countDownDate = useMemo(() => new Date(targetDate).getTime(), [targetDate]);
@@ -166,14 +177,14 @@ const UpcomingEpisodesRow: React.FC<{ title: string; items: {show: MediaItem, ep
 
 
 const HubButton: React.FC<{
-  hub: typeof serviceHubs[0];
+  hub: { id: number, name: string, logo: string };
   onClick: () => void;
   isActive: boolean;
 }> = ({ hub, onClick, isActive }) => (
     <div className="flex-shrink-0 w-1/3 sm:w-1/4 md:w-1/6 p-1.5 md:p-2">
         <button
             onClick={onClick}
-            className={`w-full aspect-video bg-zinc-800/80 backdrop-blur-xl rounded-lg border-2  transition-all duration-300 transform hover:scale-105 hover:border-white/80 hover:shadow-2xl group ${isActive ? 'border-white/90 shadow-indigo-500/30' : 'border-zinc-700/80'}`}
+            className={`w-full aspect-video bg-[#3A3C42]/80 backdrop-blur-xl rounded-lg border-2  transition-all duration-300 transform hover:scale-105 hover:border-white/80 hover:shadow-2xl group ${isActive ? 'border-white/90 shadow-indigo-500/30' : 'border-zinc-700/80'}`}
         >
             <div className="p-2 md:p-4 flex items-center justify-center h-full">
                 <img src={hub.logo} alt={hub.name} className="max-h-8 md:max-h-10 max-w-full group-hover:scale-110 transition-transform duration-300" />
@@ -181,6 +192,39 @@ const HubButton: React.FC<{
         </button>
     </div>
 );
+
+const SubHubButton: React.FC<{
+  hub: { id: number; name: string; logo: string; video?: string; };
+  onClick: () => void;
+  isActive: boolean;
+}> = ({ hub, onClick, isActive }) => {
+    const [isHovered, setIsHovered] = useState(false);
+
+    return (
+        <div className="flex-shrink-0 w-1/3 sm:w-1/4 md:w-1/6 p-1.5 md:p-2">
+            <button
+                onClick={onClick}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+                className={`relative w-full aspect-video bg-[#282a30]/80 backdrop-blur-xl rounded-lg border-2 transition-all duration-300 transform hover:scale-105 hover:border-white/80 hover:shadow-2xl group overflow-hidden ${isActive ? 'border-white/90 shadow-indigo-500/30' : 'border-zinc-700/80'}`}
+            >
+                {hub.video && (
+                    <video
+                        src={hub.video}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isHovered || isActive ? 'opacity-100' : 'opacity-0'}`}
+                    />
+                )}
+                <div className="relative z-10 p-2 md:p-4 flex items-center justify-center h-full bg-black/20">
+                    <img src={hub.logo} alt={hub.name} className="max-h-16 md:max-h-20 max-w-full group-hover:scale-110 transition-transform duration-300" />
+                </div>
+            </button>
+        </div>
+    );
+};
 
 
 const MediaModal: React.FC<{ 
@@ -282,7 +326,29 @@ const MediaModal: React.FC<{
                             <div className="space-y-8">
                                 <div className="flex items-center space-x-4 text-sm md:text-base flex-wrap">
                                     <span className="text-green-400 font-semibold">{((details.vote_average || 0) * 10).toFixed(0)}% Match</span>
-                                    <span className="text-zinc-400">{item.release_date?.split('-')[0]}</span>
+                                    {details && 'status' in details ? (
+                                        <span className="text-zinc-400">
+                                            {(() => {
+                                                const startYear = details.first_air_date ? new Date(details.first_air_date).getFullYear() : '';
+                                                if (!startYear) return '';
+                                                
+                                                const isOngoing = details.status === 'Returning Series' || details.status === 'In Production' || details.status === 'Pilot';
+
+                                                if (isOngoing) {
+                                                    return `${startYear} - `;
+                                                }
+
+                                                const endYear = details.last_air_date ? new Date(details.last_air_date).getFullYear() : '';
+                                                if (endYear && startYear !== endYear) {
+                                                    return `${startYear} - ${endYear}`;
+                                                }
+                                                
+                                                return `${startYear}`;
+                                            })()}
+                                        </span>
+                                    ) : (
+                                        <span className="text-zinc-400">{item.release_date?.split('-')[0]}</span>
+                                    )}
                                     {'number_of_seasons' in details && details.number_of_seasons && <span className="text-zinc-400">{details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}</span>}
                                     <span className="text-zinc-400">{formatRuntime(details)}</span>
                                 </div>
@@ -348,7 +414,7 @@ const HeroCarousel: React.FC<{ items: MediaItem[]; onSelectItem: (item: MediaIte
      if (!currentItem) return null;
 
     return (
-        <div className="relative h-[60vh] -mt-24 w-full overflow-hidden">
+        <div className="relative h-full w-full">
             {items.map((item, index) => (
                  <div
                     key={`${item.media_type}-${item.id}`}
@@ -382,13 +448,25 @@ const HeroCarousel: React.FC<{ items: MediaItem[]; onSelectItem: (item: MediaIte
     );
 };
 
-const shuffleArray = <T,>(array: T[]): T[] => {
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-    }
-    return newArray;
+const IntroVideoOverlay: React.FC<{ videoSrc: string; onFinish: () => void; }> = ({ videoSrc, onFinish }) => {
+    return (
+        <div className="fixed inset-0 bg-black z-[200] flex items-center justify-center animate-text-focus-in">
+            <video
+                key={videoSrc}
+                src={videoSrc}
+                autoPlay
+                playsInline
+                onEnded={onFinish}
+                className="w-full h-full object-cover"
+            />
+            <button 
+                onClick={onFinish}
+                className="absolute bottom-8 right-8 bg-black/50 text-white px-4 py-2 rounded-full text-sm backdrop-blur-md hover:bg-white/20 transition-colors"
+            >
+                Skip Intro
+            </button>
+        </div>
+    );
 };
 
 
@@ -403,10 +481,13 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const { likedIds, likeMovie, dislikeMovie } = usePreferences();
   const [activeHub, setActiveHub] = useState<(typeof serviceHubs)[0] | null>(null);
+  const [activeSubHub, setActiveSubHub] = useState<(typeof subHubs)[0] | null>(null);
   const [hubContent, setHubContent] = useState<Record<string, MediaItem[]>>({});
   const [hubUpcomingContent, setHubUpcomingContent] = useState<{movies: MediaItem[], episodes: {show: MediaItem, episode: NextEpisodeToAir}[]}>({ movies: [], episodes: [] });
   const [isHubLoading, setIsHubLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [introVideoSrc, setIntroVideoSrc] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -428,17 +509,17 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
             .map(item => item.media_type === 'movie' ? normalizeMovie(item as Movie) : normalizeTVShow(item as TVShow));
         setTrending(normalizedTrending);
 
-        const combinedPopular = shuffleArray([
-            ...popularMoviesRes.results.map(normalizeMovie), 
-            ...popularTVRes.results.map(normalizeTVShow)
-        ]);
-        setPopular(combinedPopular);
+        const popularMovies = popularMoviesRes.results.map((movie) => normalizeMovie(movie));
+        const popularTVShows = popularTVRes.results.map((tvShow) => normalizeTVShow(tvShow));
+        const combinedPopularItems = [...popularMovies, ...popularTVShows]
+            .sort((a, b) => b.popularity - a.popularity);
+        setPopular(combinedPopularItems);
 
-        const combinedUpcoming = shuffleArray([
-            ...upcomingMoviesRes.results.map(normalizeMovie),
-            ...onTheAirTVRes.results.map(normalizeTVShow)
-        ]);
-        setUpcoming(combinedUpcoming);
+        const upcomingMoviesItems = upcomingMoviesRes.results.map((movie) => normalizeMovie(movie));
+        const onTheAirTVShowsItems = onTheAirTVRes.results.map((tvShow) => normalizeTVShow(tvShow));
+        const combinedUpcomingItems = [...upcomingMoviesItems, ...onTheAirTVShowsItems]
+            .sort((a, b) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime());
+        setUpcoming(combinedUpcomingItems);
 
 
         const currentMonth = new Date().getMonth(); // 9 for Oct, 11 for Dec
@@ -479,12 +560,35 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
       if (searchQuery.trim().length > 2) {
         try {
           setError(null);
-          setIsLoading(true);
+          setIsSearching(true);
           const res = await searchMulti(apiKey, searchQuery);
           const normalizedResults = res.results
             .filter(item => (item.media_type === 'movie' || item.media_type === 'tv') && item.backdrop_path)
             .map(item => item.media_type === 'movie' ? normalizeMovie(item as Movie) : normalizeTVShow(item as TVShow));
-          setSearchResults(normalizedResults);
+          
+          const providerIdToFilter = activeSubHub?.id || activeHub?.id;
+
+          if (providerIdToFilter) {
+            const providerPromises = normalizedResults.map(item => 
+              item.media_type === 'movie' 
+                ? getMovieWatchProviders(apiKey, item.id) 
+                : getTVShowWatchProviders(apiKey, item.id)
+            );
+            const settledProviders = await Promise.allSettled(providerPromises);
+
+            const filteredResults = normalizedResults.filter((_, index) => {
+              const result = settledProviders[index];
+              if (result.status === 'fulfilled') {
+                const providers = (result.value as WatchProviderResponse).results['US']?.flatrate;
+                return providers?.some(p => p.provider_id === providerIdToFilter) || false;
+              }
+              return false;
+            });
+            setSearchResults(filteredResults);
+          } else {
+            setSearchResults(normalizedResults);
+          }
+
         } catch (error: any) {
           console.error('Failed to perform search:', error);
           if (error.message.includes('401')) {
@@ -493,17 +597,18 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
             setError('Could not perform search.');
           }
         } finally {
-          setIsLoading(false);
+          setIsSearching(false);
         }
       }
     };
     const debounce = setTimeout(performSearch, 300);
     return () => clearTimeout(debounce);
-  }, [searchQuery, apiKey, onInvalidApiKey]);
+  }, [searchQuery, apiKey, onInvalidApiKey, activeHub, activeSubHub]);
 
   useEffect(() => {
     const fetchHubContent = async () => {
-        if (!activeHub) {
+        const currentProvider = activeSubHub || activeHub;
+        if (!currentProvider) {
             setHubContent({});
             setHubUpcomingContent({ movies: [], episodes: [] });
             return;
@@ -511,67 +616,85 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
         setIsHubLoading(true);
         setError(null);
         try {
-            // Fetch main content rows
+            const providerId = currentProvider.id;
+            const originalsId = activeHub?.originalsNetworkId;
+            
+            const popularMoviesPromise = getMoviesByProvider(apiKey, providerId, 'popularity.desc');
+            const popularTVPromise = getTVShowsByProvider(apiKey, providerId, 'popularity.desc');
+            const newMoviesPromise = getMoviesByProvider(apiKey, providerId, 'primary_release_date.desc');
+            const newTVPromise = getTVShowsByProvider(apiKey, providerId, 'first_air_date.desc');
+
+            const originalsTVPromise = (originalsId && !activeSubHub)
+                ? discoverTVShows(apiKey, { with_networks: originalsId, 'sort_by': 'popularity.desc' })
+                : Promise.resolve(null);
+            
             const [popularMoviesRes, popularTVRes, newMoviesRes, newTVRes, originalsTVRes] = await Promise.all([
-                getMoviesByProvider(apiKey, activeHub.id, 'popularity.desc'),
-                getTVShowsByProvider(apiKey, activeHub.id, 'popularity.desc'),
-                getMoviesByProvider(apiKey, activeHub.id, 'primary_release_date.desc'),
-                getTVShowsByProvider(apiKey, activeHub.id, 'first_air_date.desc'),
-                discoverTVShows(apiKey, { with_networks: activeHub.originalsNetworkId, 'sort_by': 'popularity.desc' }),
+                popularMoviesPromise,
+                popularTVPromise,
+                newMoviesPromise,
+                newTVPromise,
+                originalsTVPromise,
             ]);
 
-            const popularContent = shuffleArray([...popularMoviesRes.results.map(normalizeMovie), ...popularTVRes.results.map(normalizeTVShow)]);
-            const newContent = shuffleArray([...newMoviesRes.results.map(normalizeMovie), ...newTVRes.results.map(normalizeTVShow)]);
+            const popularMovies = popularMoviesRes.results.map(normalizeMovie);
+            const popularTV = popularTVRes.results.map(normalizeTVShow);
+            const popularItems = [...popularMovies, ...popularTV]
+                .sort((a, b) => b.popularity - a.popularity);
+            
+            const newMovies = newMoviesRes.results.map(normalizeMovie);
+            const newTV = newTVRes.results.map(normalizeTVShow);
+            const newItems = [...newMovies, ...newTV]
+                .sort((a, b) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime());
             
             setHubContent({
-                popular: popularContent,
-                new: newContent,
-                originals: originalsTVRes.results.map(normalizeTVShow),
+                popular: popularItems,
+                new: newItems,
+                originals: originalsTVRes ? originalsTVRes.results.map(normalizeTVShow) : [],
             });
 
-            // Fetch upcoming content
             const today = new Date();
             const todayStr = today.toISOString().split('T')[0];
+            const futureDate = new Date();
+            futureDate.setDate(today.getDate() + 90);
+            const futureDateStr = futureDate.toISOString().split('T')[0];
 
-            // Upcoming Movies
-            const upcomingMoviesRes = await discoverMovies(apiKey, {
-                'with_watch_providers': activeHub.id,
-                'watch_region': 'US',
-                'primary_release_date.gte': todayStr,
-                'sort_by': 'primary_release_date.asc'
-            });
+            const [upcomingMoviesRes, onTheAirShowsRes] = await Promise.all([
+                discoverMovies(apiKey, { 'with_watch_providers': providerId, 'watch_region': 'US', 'primary_release_date.gte': todayStr, 'primary_release_date.lte': futureDateStr, 'sort_by': 'popularity.desc' }),
+                discoverTVShows(apiKey, { 'with_watch_providers': providerId, 'watch_region': 'US', 'air_date.gte': todayStr, 'sort_by': 'popularity.desc' })
+            ]);
 
-            // Upcoming Episodes
-            const popularShowsOnHub = await getTVShowsByProvider(apiKey, activeHub.id, 'popularity.desc', 1);
-            const showDetailPromises = popularShowsOnHub.results.slice(0, 20).map(show => getTVShowDetails(apiKey, show.id));
-            const showsWithDetails = await Promise.all(showDetailPromises);
+            const upcomingMovies = upcomingMoviesRes.results.map(normalizeMovie);
+            
+            const showsToCheck = onTheAirShowsRes.results.slice(0, 20);
+            const showDetailPromises = showsToCheck.map(show => getTVShowDetails(apiKey, show.id));
+            const settledShowDetails = await Promise.allSettled(showDetailPromises);
 
-            const upcomingEpisodes = showsWithDetails
-                .filter(details => details.next_episode_to_air && new Date(details.next_episode_to_air.air_date) >= today)
-                .map(details => ({
-                    show: normalizeTVShow(details), 
-                    episode: details.next_episode_to_air!
-                }))
+            const upcomingEpisodes = settledShowDetails
+                .filter((result): result is PromiseFulfilledResult<TVShowDetails> => result.status === 'fulfilled' && !!result.value.next_episode_to_air)
+                .map(result => result.value)
+                .filter(details => {
+                    if (!details.next_episode_to_air) return false;
+                    const airDate = new Date(details.next_episode_to_air.air_date);
+                    return airDate >= new Date(new Date().setHours(0, 0, 0, 0));
+                })
+                .map(details => ({ show: normalizeTVShow(details), episode: details.next_episode_to_air! }))
                 .sort((a, b) => new Date(a.episode.air_date).getTime() - new Date(b.episode.air_date).getTime());
-
-            setHubUpcomingContent({
-                movies: upcomingMoviesRes.results.map(normalizeMovie),
-                episodes: upcomingEpisodes,
-            });
+            
+            setHubUpcomingContent({ movies: upcomingMovies, episodes: upcomingEpisodes });
 
         } catch (error: any) {
-            console.error(`Failed to fetch content for hub ${activeHub.name}`, error);
+            console.error(`Failed to fetch content for hub ${currentProvider.name}`, error);
             if (error.message.includes('401')) {
                 onInvalidApiKey();
             } else {
-                setError(`Could not load content for ${activeHub.name}.`);
+                setError(`Could not load content for ${currentProvider.name}.`);
             }
         } finally {
             setIsHubLoading(false);
         }
     }
     fetchHubContent();
-  }, [activeHub, apiKey, onInvalidApiKey]);
+  }, [activeHub, activeSubHub, apiKey, onInvalidApiKey]);
 
   const handleSelectItem = (item: MediaItem) => {
     setSelectedMedia(item);
@@ -582,10 +705,24 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
   }
 
   const handleHubClick = (hub: typeof serviceHubs[0]) => {
+      setActiveSubHub(null); // Always reset sub-hub when main hub changes
+      setIntroVideoSrc(null);
       if (activeHub?.id === hub.id) {
-          setActiveHub(null); // Deselect if clicked again
+          setActiveHub(null);
       } else {
           setActiveHub(hub);
+      }
+  }
+
+  const handleSubHubClick = (subHub: typeof subHubs[0]) => {
+      if (activeSubHub?.id === subHub.id) {
+          setActiveSubHub(null);
+          setIntroVideoSrc(null);
+      } else {
+          setActiveSubHub(subHub);
+          if (subHub.introVideo) {
+              setIntroVideoSrc(subHub.introVideo);
+          }
       }
   }
 
@@ -599,21 +736,23 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
 
   const renderContent = () => {
     if (searchQuery.trim().length > 2) {
-      if (isLoading) return <Loader />;
-      return <MediaRow title={`Results for "${searchQuery}"`} items={searchResults} onSelect={handleSelectItem} />;
+      if (isSearching) return <Loader />;
+      const title = `Results for "${searchQuery}"${activeSubHub ? ` on ${activeSubHub.name}` : activeHub ? ` on ${activeHub.name}` : ''}`;
+      return <MediaRow title={title} items={searchResults} onSelect={handleSelectItem} />;
     }
 
     if (activeHub) {
+        const hubName = activeSubHub?.name || activeHub.name;
         if (isHubLoading && !hubContent.popular) return <div className="flex justify-center items-center py-10"><Loader /></div>;
         return (
             <>
-                <MediaRow title={`Popular on ${activeHub.name}`} items={hubContent.popular || []} onSelect={handleSelectItem} />
-                <MediaRow title={`New on ${activeHub.name}`} items={hubContent.new || []} onSelect={handleSelectItem} />
-                <MediaRow title={`${activeHub.name} Originals`} items={hubContent.originals || []} onSelect={handleSelectItem} cardType="poster" />
+                <MediaRow title={`Popular on ${hubName}`} items={hubContent.popular || []} onSelect={handleSelectItem} />
+                <MediaRow title={`New on ${hubName}`} items={hubContent.new || []} onSelect={handleSelectItem} />
+                {!activeSubHub && <MediaRow title={`${activeHub.name} Originals`} items={hubContent.originals || []} onSelect={handleSelectItem} cardType="poster" />}
                 
                 {isHubLoading && hubUpcomingContent.movies.length === 0 && hubUpcomingContent.episodes.length === 0 && <div className="flex justify-center items-center py-10"><Loader /></div>}
                 
-                <UpcomingMediaRow title={`Coming Soon to ${activeHub.name}`} items={hubUpcomingContent.movies} onSelect={handleSelectItem} />
+                <UpcomingMediaRow title={`Coming Soon to ${hubName}`} items={hubUpcomingContent.movies} onSelect={handleSelectItem} />
                 <UpcomingEpisodesRow title="Upcoming Episodes" items={hubUpcomingContent.episodes} />
             </>
         );
@@ -630,54 +769,60 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
   };
 
   const renderHeroSection = () => {
-      if (searchQuery) return null;
+      if (searchQuery || introVideoSrc) return null;
       
+      const heroContainerClass = 'relative h-[60vh] w-full overflow-hidden -mt-24';
+
       const itemsForCarousel = activeHub ? (hubContent.popular || []) : trending;
 
       if(activeHub && isHubLoading) {
-          return <div className="h-[60vh] -mt-24 w-full flex items-center justify-center"><Loader /></div>;
-      }
-      
-      if (itemsForCarousel.length > 0) {
-          return <HeroCarousel items={itemsForCarousel.slice(0, 5)} onSelectItem={handleSelectItem} />;
+          return <div className="h-[60vh] w-full flex items-center justify-center -mt-24"><Loader /></div>;
       }
 
-      return <div className="h-[60vh] -mt-24 w-full"></div>;
+      return (
+        <div className={heroContainerClass}>
+            <HeroCarousel items={itemsForCarousel.slice(0, 5)} onSelectItem={handleSelectItem} />
+        </div>
+      );
   }
 
   return (
-    <div className="animate-fade-in">
+    <>
+      {introVideoSrc && <IntroVideoOverlay videoSrc={introVideoSrc} onFinish={() => setIntroVideoSrc(null)} />}
       {renderHeroSection()}
-
-      {!searchQuery && (
-          <div className="container mx-auto px-2 sm:px-6 md:px-12 my-8">
-              <div className="flex flex-wrap justify-center items-center -m-1.5 md:-m-2">
-                  {serviceHubs.map(hub => (
-                      <HubButton 
-                          key={hub.id} 
-                          hub={hub} 
-                          onClick={() => handleHubClick(hub)}
-                          isActive={activeHub?.id === hub.id}
-                      />
-                  ))}
-              </div>
-          </div>
+      
+      <div className="px-6 md:px-12 mt-8">
+        <div className="flex flex-wrap -mx-1.5 md:-mx-2">
+            {serviceHubs.map(hub => <HubButton key={hub.id} hub={hub} onClick={() => handleHubClick(hub)} isActive={activeHub?.id === hub.id} />)}
+        </div>
+      </div>
+      
+      {activeHub && (
+        <div className="px-6 md:px-12 mt-4 border-b border-zinc-700/50 pb-6">
+            <div className="flex flex-wrap -mx-1.5 md:-mx-2">
+                {subHubs.filter(sh => sh.parentId === activeHub.id).map(subHub => (
+                    <SubHubButton key={subHub.id} hub={subHub} onClick={() => handleSubHubClick(subHub)} isActive={activeSubHub?.id === subHub.id} />
+                ))}
+            </div>
+        </div>
       )}
 
-      <div className={!searchQuery ? 'mt-0' : 'mt-8'}>
+      <div className="mt-8">
         {renderContent()}
       </div>
 
-      {selectedMedia && <MediaModal 
-        item={selectedMedia} 
-        apiKey={apiKey} 
-        onClose={handleCloseModal}
-        likedIds={likedIds}
-        likeMovie={likeMovie}
-        dislikeMovie={dislikeMovie}
-        onInvalidApiKey={onInvalidApiKey}
-      />}
-    </div>
+      {selectedMedia && (
+        <MediaModal 
+            item={selectedMedia} 
+            apiKey={apiKey} 
+            onClose={handleCloseModal}
+            likedIds={likedIds}
+            likeMovie={likeMovie}
+            dislikeMovie={dislikeMovie}
+            onInvalidApiKey={onInvalidApiKey}
+        />
+      )}
+    </>
   );
 };
 

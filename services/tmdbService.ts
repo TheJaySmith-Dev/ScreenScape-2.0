@@ -1,4 +1,4 @@
-import type { Movie, TVShow, PaginatedResponse, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, MediaItem, Episode } from '../types';
+import type { Movie, TVShow, PaginatedResponse, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, MediaItem, Episode, WatchProviderResponse } from '../types';
 
 const API_BASE_URL = 'https://api.themoviedb.org/3';
 
@@ -55,6 +55,9 @@ export const discoverMovies = (apiKey: string, params: Record<string, string | n
     const query = new URLSearchParams({ ...params, page: page.toString() }).toString();
     return fetchFromTMDB(apiKey, `discover/movie?${query}`);
 };
+export const getMovieWatchProviders = (apiKey: string, movieId: number): Promise<WatchProviderResponse> => {
+    return fetchFromTMDB(apiKey, `movie/${movieId}/watch/providers`);
+};
 
 
 // --- TV Show Specific ---
@@ -79,6 +82,9 @@ export const getTVShowImages = (apiKey: string, tvId: number): Promise<ImageResp
 };
 export const getTVShowSeasonDetails = (apiKey: string, tvId: number, seasonNumber: number): Promise<{ episodes: Episode[] }> => {
   return fetchFromTMDB(apiKey, `tv/${tvId}/season/${seasonNumber}`);
+};
+export const getTVShowWatchProviders = (apiKey: string, tvId: number): Promise<WatchProviderResponse> => {
+    return fetchFromTMDB(apiKey, `tv/${tvId}/watch/providers`);
 };
 
 

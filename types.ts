@@ -8,6 +8,7 @@ export interface Movie {
   release_date: string;
   vote_average: number;
   genre_ids: number[];
+  popularity: number;
   media_type?: 'movie';
 }
 
@@ -21,6 +22,7 @@ export interface TVShow {
   first_air_date: string;
   vote_average: number;
   genre_ids: number[];
+  popularity: number;
   media_type?: 'tv';
 }
 
@@ -34,6 +36,7 @@ export interface MediaItem {
   release_date: string; // Normalized from movie.release_date or tv.first_air_date
   vote_average: number;
   genre_ids: number[];
+  popularity: number;
   media_type: 'movie' | 'tv';
 }
 
@@ -62,6 +65,8 @@ export interface TVShowDetails extends TVShow {
     episode_run_time: number[];
     number_of_seasons: number;
     next_episode_to_air: NextEpisodeToAir | null;
+    last_air_date: string | null;
+    status: string;
 }
 
 export interface Episode {
@@ -127,3 +132,26 @@ export interface ImageResponse {
     id: number;
     logos: LogoImage[];
 }
+
+// --- START: NEW TYPES FOR CONTEXTUAL SEARCH ---
+export interface Provider {
+  logo_path: string;
+  provider_id: number;
+  provider_name: string;
+  display_priority: number;
+}
+
+export interface WatchProviderCountry {
+  link: string;
+  flatrate?: Provider[];
+  rent?: Provider[];
+  buy?: Provider[];
+}
+
+export interface WatchProviderResponse {
+  id: number;
+  results: {
+    [countryCode: string]: WatchProviderCountry;
+  };
+}
+// --- END: NEW TYPES FOR CONTEXTUAL SEARCH ---
