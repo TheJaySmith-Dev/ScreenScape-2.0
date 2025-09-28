@@ -11,7 +11,7 @@ import {
 import { usePreferences } from '../hooks/usePreferences';
 import Loader from './Loader';
 import VideoPlayer from './VideoPlayer';
-import { PlayIcon, HeartIcon, XIcon, HeartIconSolid } from './Icons';
+import { PlayIcon, HeartIcon, XIcon, HeartIconSolid, MuteIcon, UnmuteIcon } from './Icons';
 
 interface NetflixViewProps {
   apiKey: string;
@@ -241,6 +241,7 @@ const MediaModal: React.FC<{
     const [videoKey, setVideoKey] = useState<string | null>(null);
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isMuted, setIsMuted] = useState(true);
 
     useEffect(() => {
         const fetchAllDetails = async () => {
@@ -302,13 +303,19 @@ const MediaModal: React.FC<{
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center animate-scale-up-center" onClick={onClose}>
             <div className="bg-zinc-900 rounded-2xl overflow-hidden w-full max-w-4xl h-[90vh] shadow-2xl relative border border-glass-edge mx-2 sm:mx-4" onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-3 right-3 z-20 text-white bg-black/50 rounded-full p-2 hover:bg-white/20 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <XIcon className="w-6 h-6" />
                 </button>
                 
+                <div className="absolute top-3 right-14 z-20">
+                    {videoKey && (
+                        <button onClick={() => setIsMuted(!isMuted)} className="text-white bg-black/50 rounded-full p-2 hover:bg-white/20 transition-colors">
+                            {isMuted ? <MuteIcon className="w-6 h-6" /> : <UnmuteIcon className="w-6 h-6" />}
+                        </button>
+                    )}
+                </div>
+
                 <div className="absolute inset-0 z-0">
-                    {videoKey ? <VideoPlayer videoKey={videoKey} /> : <img src={`https://image.tmdb.org/t/p/original${item.backdrop_path}`} alt="" className="w-full h-full object-cover"/> }
+                    {videoKey ? <VideoPlayer videoKey={videoKey} isMuted={isMuted} /> : <img src={`https://image.tmdb.org/t/p/original${item.backdrop_path}`} alt="" className="w-full h-full object-cover"/> }
                 </div>
 
                 <div className="absolute inset-0 z-10 overflow-y-auto scrollbar-hide">
