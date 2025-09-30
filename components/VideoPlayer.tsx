@@ -9,6 +9,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted }) => {
   const playerRef = useRef<HTMLDivElement>(null);
   const playerInstance = useRef<any>(null);
 
+  // This effect handles toggling mute state after the player is initialized.
+  useEffect(() => {
+    if (playerInstance.current && typeof playerInstance.current.mute === 'function') {
+      if (isMuted) {
+        playerInstance.current.mute();
+      } else {
+        playerInstance.current.unMute();
+      }
+    }
+  }, [isMuted]);
+
   // Create/destroy player when videoKey changes
   useEffect(() => {
     if (!videoKey || !playerRef.current) return;
@@ -27,7 +38,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted }) => {
         rel: 0,
         showinfo: 0,
         modestbranding: 1,
-        mute: 1, // Start muted to ensure autoplay on mobile
+        mute: 1, // Start muted, the effect above will unmute if needed
         loop: 1,
         playlist: videoKey, // Required for loop to work
       },
@@ -43,18 +54,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted }) => {
       }
     };
   }, [videoKey]);
-
-  // Handle mute/unmute toggles from parent
-  useEffect(() => {
-    const player = playerInstance.current;
-    if (player && typeof player.unMute === 'function' && typeof player.mute === 'function') {
-      if (isMuted) {
-        player.mute();
-      } else {
-        player.unMute();
-      }
-    }
-  }, [isMuted]);
+  
 
   return (
     <div className="w-full h-full">

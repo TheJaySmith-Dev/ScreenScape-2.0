@@ -16,17 +16,17 @@ const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onSave }) => {
   };
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-zinc-900 animate-text-focus-in p-4">
-      <div className="w-full max-w-md p-6 sm:p-8 space-y-8 bg-black/30 backdrop-blur-2xl rounded-3xl shadow-2xl border border-glass-edge">
+    <div className="h-screen w-screen flex items-center justify-center animate-text-focus-in p-4">
+      <div className="w-full max-w-md p-6 sm:p-8 space-y-8 bg-glass backdrop-blur-2xl rounded-3xl shadow-2xl border border-glass-edge">
         <div className="text-center">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">Welcome to ScreenScape</h1>
-          <p className="mt-2 text-sm sm:text-base text-zinc-400">Please enter your TMDb API key to begin.</p>
-          <p className="mt-1 text-xs text-zinc-500">Your key is stored only in your browser.</p>
+          <p className="mt-2 text-sm sm:text-base text-zinc-300">Please enter your TMDb API key to begin.</p>
+          <p className="mt-1 text-xs text-zinc-400">Your key is stored only in your browser.</p>
         </div>
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="relative">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <LockIcon className="h-5 w-5 text-zinc-500" />
+              <LockIcon className="h-5 w-5 text-zinc-400" />
             </div>
             <input
               id="api-key"

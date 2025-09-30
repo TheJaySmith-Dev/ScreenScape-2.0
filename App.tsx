@@ -3,10 +3,13 @@ import ApiKeySetup from './components/ApiKeySetup';
 import Header from './components/Header';
 import NetflixView from './components/NetflixView';
 
+export type ViewType = 'home' | 'movies' | 'tv' | 'likes';
+
 const App: React.FC = () => {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [view, setView] = useState<ViewType>('home');
 
   useEffect(() => {
     const storedApiKey = localStorage.getItem('tmdbApiKey');
@@ -35,8 +38,13 @@ const App: React.FC = () => {
     );
   }
 
+  const handleSetView = (newView: ViewType) => {
+    setView(newView);
+    setSearchQuery(''); // Clear search when changing views
+  }
+
   return (
-    <div className="min-h-screen bg-zinc-900 text-white font-sans">
+    <div className="min-h-screen text-white font-sans">
       {!apiKey ? (
         <ApiKeySetup onSave={handleApiKeySave} />
       ) : (
@@ -44,9 +52,17 @@ const App: React.FC = () => {
           <Header
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
+            view={view}
+            setView={handleSetView}
           />
-          <main className="pt-24">
-            <NetflixView apiKey={apiKey} searchQuery={searchQuery} onInvalidApiKey={handleInvalidApiKey} />
+          <main>
+            {/* FIX: Removed `setSearchQuery` prop as it is not expected by NetflixViewProps. */}
+            <NetflixView 
+              apiKey={apiKey} 
+              searchQuery={searchQuery} 
+              onInvalidApiKey={handleInvalidApiKey} 
+              view={view}
+            />
           </main>
         </>
       )}

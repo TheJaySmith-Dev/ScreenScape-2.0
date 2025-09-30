@@ -60,10 +60,32 @@ export interface NextEpisodeToAir {
     still_path: string | null;
 }
 
+// FIX: Add Creator and SeasonSummary types to support new fields in TVShowDetails.
+export interface Creator {
+    id: number;
+    credit_id: string;
+    name: string;
+    gender: number | null;
+    profile_path: string | null;
+}
+
+export interface SeasonSummary {
+    air_date: string | null;
+    episode_count: number;
+    id: number;
+    name: string;
+    overview: string;
+    poster_path: string | null;
+    season_number: number;
+}
+
 export interface TVShowDetails extends TVShow {
     genres: { id: number, name: string }[];
+    // FIX: Add missing `created_by` and `seasons` properties to fix type errors.
+    created_by: Creator[];
     episode_run_time: number[];
     number_of_seasons: number;
+    seasons: SeasonSummary[];
     next_episode_to_air: NextEpisodeToAir | null;
     last_air_date: string | null;
     status: string;
