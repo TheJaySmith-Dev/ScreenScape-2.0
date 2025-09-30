@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SearchIcon, HomeIcon, FilmIcon, TVIcon, LikesIcon } from './Icons';
+import { SearchIcon, HomeIcon, FilmIcon, TVIcon, LikesIcon, AiIcon } from './Icons';
 import type { ViewType } from '../App';
 
 interface HeaderProps {
@@ -43,6 +43,7 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
       { id: 'home', label: 'Home', icon: (isActive) => <HomeIcon className="w-6 h-6" isActive={isActive} /> },
       { id: 'movies', label: 'Movies', icon: (isActive) => <FilmIcon className="w-6 h-6" isActive={isActive} /> },
       { id: 'tv', label: 'TV', icon: (isActive) => <TVIcon className="w-6 h-6" isActive={isActive} /> },
+      { id: 'ai', label: 'AI', icon: (isActive) => <AiIcon className="w-6 h-6" isActive={isActive} /> },
   ];
 
   return (

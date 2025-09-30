@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 type IconProps = { className?: string };
@@ -77,4 +76,10 @@ export const ChevronDownIcon: React.FC<IconProps> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
     </svg>
+);
+
+export const AiIcon: React.FC<IconProps & { isActive: boolean }> = ({ className, isActive }) => (
+    <span className={className} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <i className={`${isActive ? 'fi fi-sr-brain-circuit' : 'fi fi-rr-brain-circuit'} text-2xl`}></i>
+    </span>
 );
