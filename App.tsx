@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ApiKeySetup from './components/ApiKeySetup';
 import Header from './components/Header';
 import NetflixView from './components/NetflixView';
+import AiView from './components/AiView';
 
-export type ViewType = 'home' | 'movies' | 'tv' | 'likes';
+export type ViewType = 'home' | 'movies' | 'tv' | 'likes' | 'ai';
 
 const App: React.FC = () => {
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -56,13 +57,16 @@ const App: React.FC = () => {
             setView={handleSetView}
           />
           <main>
-            {/* FIX: Removed `setSearchQuery` prop as it is not expected by NetflixViewProps. */}
-            <NetflixView 
-              apiKey={apiKey} 
-              searchQuery={searchQuery} 
-              onInvalidApiKey={handleInvalidApiKey} 
-              view={view}
-            />
+            {view === 'ai' ? (
+              <AiView />
+            ) : (
+              <NetflixView
+                apiKey={apiKey}
+                searchQuery={searchQuery}
+                onInvalidApiKey={handleInvalidApiKey}
+                view={view}
+              />
+            )}
           </main>
         </>
       )}
