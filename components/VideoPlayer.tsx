@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface VideoPlayerProps {
   videoKey: string;
@@ -8,24 +8,31 @@ interface VideoPlayerProps {
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted }) => {
   const playerRef = useRef<HTMLDivElement>(null);
   const playerInstance = useRef<any>(null);
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
 
-  // This effect handles toggling mute state after the player is initialized.
+  // This effect synchronizes the player's mute state with the component's state.
+  // It runs whenever the mute state changes OR when the player becomes ready.
   useEffect(() => {
-    if (playerInstance.current && typeof playerInstance.current.mute === 'function') {
+    if (isPlayerReady && playerInstance.current && typeof playerInstance.current.mute === 'function') {
       if (isMuted) {
         playerInstance.current.mute();
       } else {
         playerInstance.current.unMute();
       }
     }
-  }, [isMuted]);
+  }, [isMuted, isPlayerReady]);
 
-  // Create/destroy player when videoKey changes
+  // This effect creates and destroys the YouTube player instance.
+  // It runs whenever the videoKey changes.
   useEffect(() => {
     if (!videoKey || !playerRef.current) return;
 
+    // Reset player ready state for the new video
+    setIsPlayerReady(false);
+
     const onPlayerReady = (event: any) => {
       event.target.playVideo();
+      setIsPlayerReady(true); // Signal that the player is ready to be controlled
     };
 
     const playerContainerNode = playerRef.current;
@@ -38,7 +45,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted }) => {
         rel: 0,
         showinfo: 0,
         modestbranding: 1,
-        mute: 1, // Start muted, the effect above will unmute if needed
+        mute: 1, // Always start muted, the effect will handle the state
         loop: 1,
         playlist: videoKey, // Required for loop to work
       },
@@ -55,7 +62,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted }) => {
     };
   }, [videoKey]);
   
-
   return (
     <div className="w-full h-full">
       <div ref={playerRef} className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full" />
