@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { ViewType } from '../App';
 import type { MediaItem, Movie, TVShow, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, LogoImage, Episode, CastMember, CrewMember } from '../types';
@@ -26,7 +28,7 @@ import {
 } from '../services/tmdbService';
 import { usePreferences } from '../hooks/usePreferences';
 import Loader from './Loader';
-import { PlayIcon, HeartIcon, HeartIconSolid, XIcon, ChevronDownIcon, MuteIcon, UnmuteIcon } from './Icons';
+import { PlayIcon, HeartIcon, HeartIconSolid, XIcon, ChevronDownIcon, MuteIcon, UnmuteIcon, NetflixLogo, DisneyPlusLogo, AppleTVPlusLogo, PrimeVideoLogo, HuluLogo } from './Icons';
 import VideoPlayer from './VideoPlayer';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
@@ -54,18 +56,18 @@ const formatRuntime = (runtime: number) => {
 
 // --- START: BRAND HUB COMPONENTS ---
 const serviceHubs = [
-  { id: 'disney', brandColor: 'bg-brand-disney', providerId: 337, logo: "https://lumiere-a.akamaihd.net/v1/images/a8e5567d1658de062d95d079ebf536b0_4096x2309_6dedcc02.png?region=0%2C0%2C4096%2C2309", hoverAnimation: "https://lumiere-a.akamaihd.net/v1/images/disney_logo_animation_march_2024_27a0dafe.gif" },
-  { id: 'netflix', brandColor: 'bg-brand-netflix', providerId: 8, logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Netflix_2015_logo.svg/1280px-Netflix_2015_logo.svg.png", hoverAnimation: "https://www.caviarcriativo.com/wp-content/uploads/2020/06/Significados-da-Marca-Netflix-1.gif" },
-  { id: 'apple', brandColor: 'bg-brand-apple', providerId: 2, logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/1024px-Apple_logo_black.svg.png", hoverAnimation: "https://cdn.dribbble.com/users/325495/screenshots/4294410/media/b6d616d0132b35a16f2c3510eac40461.gif" },
-  { id: 'prime', brandColor: 'bg-brand-prime', providerId: 9, logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/Amazon_Prime_Video_logo.svg/2560px-Amazon_Prime_Video_logo.svg.png", hoverAnimation: "https://i.gifer.com/origin/c8/c888e52e4604f323112248c8b6567551_w200.gif" },
-  { id: 'hulu', brandColor: 'bg-[#1CE783]', providerId: 15, logo: "https://upload.wikimedia.org/wikipedia/commons/f/f9/Hulu_logo_%282018%29.svg", hoverAnimation: "https://i.gifer.com/origin/39/3931630c6d59b2e7a22a6f8b22a275f3_w200.gif" },
+  { id: 'disney', providerId: 337, LogoComponent: DisneyPlusLogo, hoverAnimation: "https://lumiere-a.akamaihd.net/v1/images/disney_logo_animation_march_2024_27a0dafe.gif" },
+  { id: 'netflix', providerId: 8, LogoComponent: NetflixLogo, hoverAnimation: "https://www.caviarcriativo.com/wp-content/uploads/2020/06/Significados-da-Marca-Netflix-1.gif" },
+  { id: 'apple', providerId: 2, LogoComponent: AppleTVPlusLogo, hoverAnimation: "https://cdn.dribbble.com/users/325495/screenshots/4294410/media/b6d616d0132b35a16f2c3510eac40461.gif" },
+  { id: 'prime', providerId: 9, LogoComponent: PrimeVideoLogo, hoverAnimation: "https://i.gifer.com/origin/c8/c888e52e4604f323112248c8b6567551_w200.gif" },
+  { id: 'hulu', providerId: 15, LogoComponent: HuluLogo, hoverAnimation: "https://i.gifer.com/origin/39/3931630c6d59b2e7a22a6f8b22a275f3_w200.gif" },
 ];
 
 const HubButton: React.FC<{
-    logo: string;
+    LogoComponent: React.ElementType;
     hoverAnimation: string;
     onClick: () => void;
-}> = ({ logo, hoverAnimation, onClick }) => {
+}> = ({ LogoComponent, hoverAnimation, onClick }) => {
     const [isHovered, setIsHovered] = useState(false);
 
     return (
@@ -75,11 +77,9 @@ const HubButton: React.FC<{
             onMouseLeave={() => setIsHovered(false)}
             className="group relative aspect-video rounded-lg bg-zinc-800/80 backdrop-blur-sm border-2 border-zinc-700/60 overflow-hidden shadow-lg transition-all duration-300 ease-in-out hover:border-zinc-400/80 hover:scale-105"
         >
-            <img
-                src={logo}
-                alt="Service Logo"
-                className={`absolute inset-0 w-full h-full object-contain p-4 md:p-6 transition-all duration-300 ease-in-out group-hover:opacity-0 brightness-0 invert ${logo.includes("disney") ? "scale-125" : ""}`}
-            />
+            <div className="absolute inset-0 w-full h-full p-8 md:p-10 transition-all duration-300 ease-in-out group-hover:opacity-0 text-white flex items-center justify-center">
+                <LogoComponent className="w-full h-auto max-h-full" />
+            </div>
             <img
                 src={isHovered ? hoverAnimation : ''}
                 alt="Service Animation"
@@ -89,6 +89,17 @@ const HubButton: React.FC<{
         </button>
     );
 };
+
+const BrandHub: React.FC<{ onSelectProvider: (providerId: number) => void }> = ({ onSelectProvider }) => (
+    <div className="mb-12 px-4 md:px-12">
+        <h2 className="text-2xl font-bold mb-4 text-center">Stream Your Favorites</h2>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {serviceHubs.map(hub => (
+                <HubButton key={hub.id} {...hub} onClick={() => onSelectProvider(hub.providerId)} />
+            ))}
+        </div>
+    </div>
+);
 // --- END: BRAND HUB COMPONENTS ---
 
 interface MediaItemCardProps {
@@ -189,246 +200,322 @@ const Hero: React.FC<HeroProps> = ({ items, onSelect }) => {
                     <h1 className="text-3xl md:text-5xl font-extrabold drop-shadow-lg mb-4">{item.title}</h1>
                     <p className="text-sm md:text-base line-clamp-3 mb-6 drop-shadow-md">{item.overview}</p>
                     <div className="flex items-center space-x-3">
-                        <button className="flex items-center justify-center bg-white text-black px-6 py-2 rounded-md font-semibold hover:bg-opacity-80 transition">
+                        {/* FIX: The onSelect handler for the Play button was missing the 'item' argument, causing an error. */}
+                        <button onClick={() => onSelect(item)} className="flex items-center justify-center bg-white text-black px-6 py-2 rounded-md font-semibold hover:bg-opacity-80 transition">
                             <PlayIcon className="w-6 h-6 mr-2" />
                             Play
                         </button>
                         <button 
                             onClick={() => onSelect(item)}
-                            className="flex items-center justify-center bg-zinc-700 bg-opacity-70 text-white px-6 py-2 rounded-md font-semibold hover:bg-opacity-50 transition"
+                            className="flex items-center justify-center bg-zinc-700/60 text-white px-6 py-2 rounded-md font-semibold hover:bg-zinc-600/60 transition"
                         >
-                            <ChevronDownIcon className="w-6 h-6 mr-2" />
                             More Info
                         </button>
                     </div>
                 </div>
             </div>
-
-            {/* Carousel Indicators */}
-            <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 flex space-x-2">
-                {items.map((_, index) => (
-                    <button
-                        key={index}
-                        onClick={() => setCurrentIndex(index)}
-                        className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${currentIndex === index ? 'bg-white scale-110' : 'bg-white/50 hover:bg-white'}`}
-                        aria-label={`Go to slide ${index + 1}`}
-                    />
-                ))}
-            </div>
-        </div>
-    );
-};
-
-const CreditRow: React.FC<{ title: string; people: (CastMember | CrewMember)[] }> = ({ title, people }) => {
-    if (!people || people.length === 0) return null;
-
-    return (
-        <div className="mb-6">
-            <h3 className="text-xl font-bold mb-3">{title}</h3>
-            <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-                <div className="flex space-x-4">
-                    {people.map((person) => {
-                        const profilePath = 'profile_path' in person ? person.profile_path : null;
-                        const imageUrl = profilePath ? `${IMAGE_BASE_URL}w185${profilePath}` : 'https://via.placeholder.com/185x278?text=No+Image';
-                        return (
-                            <div key={person.id} className="flex-shrink-0 w-28 text-center">
-                                <img src={imageUrl} alt={person.name} className="w-full h-40 object-cover rounded-lg mb-2" />
-                                <p className="font-semibold text-sm truncate">{person.name}</p>
-                                {'character' in person && <p className="text-xs text-zinc-400 truncate">{person.character}</p>}
-                                {'job' in person && <p className="text-xs text-zinc-400 truncate">{person.job}</p>}
-                            </div>
-                        );
-                    })}
+            {/* Carousel Dots */}
+            {items.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex space-x-2">
+                    {items.map((_, index) => (
+                        <button
+                            key={index}
+                            onClick={() => setCurrentIndex(index)}
+                            className={`w-2 h-2 rounded-full transition-colors ${index === currentIndex ? 'bg-white' : 'bg-white/50'}`}
+                            aria-label={`Go to slide ${index + 1}`}
+                        />
+                    ))}
                 </div>
-            </div>
+            )}
         </div>
     );
 };
 
 
-interface SeasonAccordionProps {
-  seasons: TVShowDetails['seasons'];
-  tvId: number;
-  apiKey: string;
+interface SearchResultsGridProps {
+    items: MediaItem[];
+    onSelect: (item: MediaItem) => void;
+    genres: Map<number, string>;
+    isLoading: boolean;
+    loadMore: () => void;
+    hasMore: boolean;
 }
 
-const SeasonAccordion: React.FC<SeasonAccordionProps> = ({ seasons, tvId, apiKey }) => {
-    const [openSeason, setOpenSeason] = useState<number | null>(null);
-    const [episodes, setEpisodes] = useState<Episode[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-
-    const handleToggleSeason = async (seasonNumber: number) => {
-        if (openSeason === seasonNumber) {
-            setOpenSeason(null);
-        } else {
-            setIsLoading(true);
-            setOpenSeason(seasonNumber);
-            try {
-                const seasonDetails = await getTVShowSeasonDetails(apiKey, tvId, seasonNumber);
-                setEpisodes(seasonDetails.episodes);
-            } catch (error) {
-                console.error("Failed to fetch season details:", error);
-            } finally {
-                setIsLoading(false);
+const SearchResultsGrid: React.FC<SearchResultsGridProps> = ({ items, onSelect, genres, isLoading, loadMore, hasMore }) => {
+    const observer = useRef<IntersectionObserver>();
+    const lastElementRef = useCallback(node => {
+        if (isLoading) return;
+        if (observer.current) observer.current.disconnect();
+        observer.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && hasMore) {
+                loadMore();
             }
-        }
-    };
-
+        });
+        if (node) observer.current.observe(node);
+    }, [isLoading, hasMore, loadMore]);
+    
     return (
-        <div className="space-y-2">
-            <h3 className="text-xl font-bold mb-3">Seasons</h3>
-            {seasons.map((season) => (
-                <div key={season.id} className="bg-zinc-800/50 rounded-lg">
-                    <button
-                        onClick={() => handleToggleSeason(season.season_number)}
-                        className="w-full flex justify-between items-center p-4 text-left"
-                    >
-                        <span className="font-semibold">{season.name} ({season.episode_count} episodes)</span>
-                        <ChevronDownIcon className={`w-5 h-5 transition-transform ${openSeason === season.season_number ? 'rotate-180' : ''}`} />
-                    </button>
-                    {openSeason === season.season_number && (
-                        <div className="p-4 border-t border-zinc-700">
-                            {isLoading ? <Loader /> : (
-                                <ul className="space-y-3">
-                                    {episodes.map(ep => (
-                                        <li key={ep.id}>
-                                            <p className="font-semibold">{ep.episode_number}. {ep.name}</p>
-                                            <p className="text-sm text-zinc-400 line-clamp-2">{ep.overview}</p>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
+        <div className="px-4 md:px-12 pt-28 pb-12">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                 {items.map((item, index) => {
+                    const isLastElement = items.length === index + 1;
+                    return (
+                        <div ref={isLastElement ? lastElementRef : null} key={`${item.media_type}-${item.id}`}>
+                            <MediaItemCard 
+                                item={item} 
+                                onSelect={onSelect} 
+                                genres={genres} 
+                                isVertical={true} 
+                            />
                         </div>
-                    )}
-                </div>
-            ))}
+                    );
+                })}
+            </div>
+            {isLoading && <Loader />}
+            {!hasMore && !isLoading && items.length > 0 && <p className="text-center text-zinc-500 mt-8">You've reached the end!</p>}
         </div>
     );
 };
 
-interface MediaModalProps {
+
+interface ModalProps {
     item: MediaItem;
-    apiKey: string;
     onClose: () => void;
+    apiKey: string;
+    onInvalidApiKey: () => void;
+    onSelect: (item: MediaItem) => void;
     genres: Map<number, string>;
 }
 
-const MediaModal: React.FC<MediaModalProps> = ({ item, apiKey, onClose, genres }) => {
+const Modal: React.FC<ModalProps> = ({ item, onClose, apiKey, onInvalidApiKey, onSelect, genres }) => {
     const [details, setDetails] = useState<MovieDetails | TVShowDetails | null>(null);
     const [trailer, setTrailer] = useState<Video | null>(null);
     const [logo, setLogo] = useState<LogoImage | null>(null);
     const [credits, setCredits] = useState<CreditsResponse | null>(null);
+    const [similar, setSimilar] = useState<MediaItem[]>([]);
+    const [activeSeason, setActiveSeason] = useState<number | null>(null);
+    const [episodes, setEpisodes] = useState<Episode[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isMuted, setIsMuted] = useState(true);
-    const { likedIds, dislikedIds, likeMovie, dislikeMovie } = usePreferences();
+
+    const { likedIds, likeMovie, dislikeMovie } = usePreferences();
+    const isLiked = likedIds.has(item.id);
 
     useEffect(() => {
         const fetchDetails = async () => {
             try {
-                const detailPromise = item.media_type === 'movie' ? getMovieDetails(apiKey, item.id) : getTVShowDetails(apiKey, item.id);
-                const videoPromise = item.media_type === 'movie' ? getMovieVideos(apiKey, item.id) : getTVShowVideos(apiKey, item.id);
-                const imagePromise = item.media_type === 'movie' ? getMovieImages(apiKey, item.id) : getTVShowImages(apiKey, item.id);
-                const creditPromise = item.media_type === 'movie' ? getMovieCredits(apiKey, item.id) : getTVShowCredits(apiKey, item.id);
-                
-                const [detailData, videoData, imageData, creditData] = await Promise.all([detailPromise, videoPromise, imagePromise, creditPromise]);
-                
-                // FIX: Explicitly handle the two cases for the detail data to satisfy TypeScript's type checker.
-                if (item.media_type === 'movie') {
-                    setDetails({ ...(detailData as MovieDetails), media_type: item.media_type });
-                } else {
-                    setDetails({ ...(detailData as TVShowDetails), media_type: item.media_type });
-                }
-                setTrailer(videoData);
-                setCredits(creditData);
+                setIsLoading(true);
+                const fetchFn = item.media_type === 'movie' ? getMovieDetails : getTVShowDetails;
+                const creditsFn = item.media_type === 'movie' ? getMovieCredits : getTVShowCredits;
+                const videoFn = item.media_type === 'movie' ? getMovieVideos : getTVShowVideos;
+                const imageFn = item.media_type === 'movie' ? getMovieImages : getTVShowImages;
+                const similarFn = item.media_type === 'movie' ? getSimilarMovies : null;
 
-                if (imageData.logos && imageData.logos.length > 0) {
-                    const bestLogo = imageData.logos.sort((a, b) => b.vote_average - a.vote_average)[0];
-                    setLogo(bestLogo);
+                const [detailsData, creditsData, videoData, imageData, similarData] = await Promise.all([
+                    fetchFn(apiKey, item.id),
+                    creditsFn(apiKey, item.id),
+                    videoFn(apiKey, item.id),
+                    imageFn(apiKey, item.id),
+                    similarFn ? similarFn(apiKey, item.id) : Promise.resolve(null),
+                ]);
+
+                setDetails(detailsData);
+                setCredits(creditsData);
+                setTrailer(videoData);
+                setLogo(imageData.logos.find(l => l.iso_639_1 === 'en') || imageData.logos[0] || null);
+                if (similarData && 'results' in similarData) {
+                    setSimilar(similarData.results.map(normalizeMovie));
                 }
+
+                if (item.media_type === 'tv' && 'seasons' in detailsData) {
+                    const firstSeason = detailsData.seasons.find(s => s.season_number > 0);
+                    if (firstSeason) {
+                        setActiveSeason(firstSeason.season_number);
+                    }
+                }
+
             } catch (error) {
-                console.error("Failed to fetch media details:", error);
+                console.error("Error fetching modal details:", error);
+                if (error instanceof Error && error.message.includes("Invalid API Key")) {
+                    onInvalidApiKey();
+                }
+            } finally {
+                setIsLoading(false);
             }
         };
-        fetchDetails();
-    }, [item, apiKey]);
 
-    if (!details) {
-        return (
-            <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-                <Loader />
-            </div>
-        );
+        fetchDetails();
+    }, [item, apiKey, onInvalidApiKey]);
+
+    useEffect(() => {
+        if (item.media_type === 'tv' && activeSeason !== null) {
+            const fetchEpisodes = async () => {
+                const seasonDetails = await getTVShowSeasonDetails(apiKey, item.id, activeSeason);
+                setEpisodes(seasonDetails.episodes);
+            };
+            fetchEpisodes();
+        }
+    }, [activeSeason, item, apiKey]);
+
+    const handleLike = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        likeMovie(item.id);
     }
     
-    const crewToDisplay = credits?.crew.filter(c => ['Director', 'Screenplay', 'Writer', 'Creator'].includes(c.job)) ?? [];
+    const handleDislike = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        dislikeMovie(item.id);
+    }
+
+    const backdropPath = details?.backdrop_path ? `${IMAGE_BASE_URL}original${details.backdrop_path}` : '';
+    const tvDetails = details as TVShowDetails;
+    const movieDetails = details as MovieDetails;
+    const director = credits?.crew?.find((member: CrewMember) => member.job === 'Director');
 
     return (
-        <div className="fixed inset-0 bg-black/80 z-50 animate-scale-up-center" onClick={onClose}>
-            <div className="relative w-full h-full max-w-4xl mx-auto my-12 bg-zinc-900 rounded-lg shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-4 right-4 z-30 text-white bg-black/50 rounded-full p-1 hover:bg-white/20 transition">
-                    <XIcon className="w-6 h-6" />
-                </button>
-                
-                <div className="relative w-full h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-                    {/* Trailer Section */}
-                    <div className="relative w-full h-[60vh] bg-black">
-                        {trailer?.key ? (
-                            <VideoPlayer videoKey={trailer.key} isMuted={isMuted} />
-                        ) : (
-                            details.backdrop_path && <img src={`${IMAGE_BASE_URL}original${details.backdrop_path}`} alt={item.title} className="w-full h-full object-cover"/>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent"></div>
-                        {trailer?.key && (
-                            <button onClick={() => setIsMuted(!isMuted)} className="absolute bottom-4 right-4 z-20 h-10 w-10 border-2 border-white/70 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition">
-                                {isMuted ? <MuteIcon className="h-6 w-6" /> : <UnmuteIcon className="h-6 w-6" />}
-                            </button>
-                        )}
+        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center" onClick={onClose}>
+            <div 
+                className="bg-zinc-900 w-full max-w-3xl max-h-[90vh] rounded-lg overflow-y-auto shadow-2xl animate-scale-up-center scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent"
+                onClick={e => e.stopPropagation()}
+            >
+                {isLoading ? (
+                    <div className="h-[80vh] flex items-center justify-center">
+                        <Loader />
                     </div>
-                    
-                    {/* Content Section */}
-                    <div className="relative px-4 sm:px-8 md:px-12 pb-12 -mt-24 z-10">
-                        {logo ? (
-                           <img src={`${IMAGE_BASE_URL}w500${logo.file_path}`} alt={`${item.title} logo`} className="max-w-xs max-h-32 mb-4" />
-                        ) : (
-                           // FIX: Use the `in` operator as a type guard to safely access title or name.
-                           <h1 className="text-3xl md:text-5xl font-extrabold mb-4">{'title' in details ? details.title : details.name}</h1>
-                        )}
-                       
-                        <div className="flex items-center space-x-4 text-zinc-400 text-sm mb-4">
-                            <span>{('release_date' in details ? details.release_date : details.first_air_date)?.substring(0, 4)}</span>
-                            <span>&#8226;</span>
-                            <span>{('runtime' in details ? formatRuntime(details.runtime) : formatRuntime(details.episode_run_time?.[0] || 0))}</span>
-                            <span>&#8226;</span>
-                            <span className="text-green-400 font-semibold">{(details.vote_average * 10).toFixed(0)}% Match</span>
-                        </div>
-
-                        <div className="flex items-center space-x-3 mb-6">
-                            <button onClick={() => likeMovie(item.id)} className={`transition ${likedIds.has(item.id) ? 'text-indigo-400' : 'text-white'}`}>
-                                <HeartIconSolid className="w-8 h-8" />
+                ) : (
+                    <>
+                        <div className="relative aspect-video">
+                            {trailer?.key ? (
+                                <>
+                                <VideoPlayer videoKey={trailer.key} isMuted={isMuted} />
+                                <div className="absolute top-4 right-16 z-10">
+                                    <button 
+                                        onClick={() => setIsMuted(!isMuted)}
+                                        className="h-10 w-10 rounded-full border border-white/50 bg-black/30 flex items-center justify-center text-white backdrop-blur-sm"
+                                    >
+                                        {isMuted ? <MuteIcon className="w-6 h-6" /> : <UnmuteIcon className="w-6 h-6" />}
+                                    </button>
+                                </div>
+                                </>
+                            ) : (
+                                backdropPath && <img src={backdropPath} alt={item.title} className="w-full h-full object-cover" />
+                            )}
+                            <button onClick={onClose} className="absolute top-4 right-4 h-10 w-10 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-white hover:text-black transition z-10">
+                                <XIcon className="w-6 h-6" />
                             </button>
-                             <button onClick={() => dislikeMovie(item.id)} className={`transition ${dislikedIds.has(item.id) ? 'text-red-500' : 'text-white'}`}>
-                                <XIcon className="w-9 h-9" />
-                            </button>
-                        </div>
-                        
-                        <p className="text-base mb-6 max-w-2xl">{details.overview}</p>
-                        
-                        <div className="flex flex-wrap gap-2 mb-6">
-                            {details.genres.map(g => <span key={g.id} className="px-3 py-1 bg-zinc-800 rounded-full text-xs">{g.name}</span>)}
+                            {/* START: Redesigned Compact Layout */}
+                             <div className="absolute bottom-0 left-0 right-0 p-8 z-10 bg-gradient-to-t from-zinc-900 via-zinc-900/80 to-transparent">
+                                <div className="max-w-[50%] mb-4">
+                                     {logo?.file_path ? (
+                                        <img src={`${IMAGE_BASE_URL}w500${logo.file_path}`} alt={`${item.title} logo`} className="max-h-20 max-w-full drop-shadow-2xl" />
+                                    ) : (
+                                        // FIX: TVShowDetails has `name` not `title`. Conditionally access the correct property.
+                                        <h1 className="text-4xl font-bold text-white drop-shadow-lg">{(details && ('title' in details ? details.title : (details as TVShowDetails).name)) || item.title}</h1>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-x-12 items-start">
+                                    {/* Left Column */}
+                                    <div>
+                                        <div className="flex items-center space-x-4 mb-4">
+                                            <button onClick={onClose} className="flex items-center justify-center bg-white text-black px-6 py-3 rounded-md font-semibold hover:bg-opacity-80 transition text-lg">
+                                                <PlayIcon className="w-6 h-6 mr-2" />
+                                                Play
+                                            </button>
+                                            <button onClick={handleLike} className={`p-3 rounded-full border-2 ${isLiked ? 'border-indigo-500 bg-indigo-500/20 text-indigo-400' : 'border-zinc-600 text-zinc-400 hover:border-white hover:text-white'}`}>
+                                                {isLiked ? <HeartIconSolid className="w-6 h-6"/> : <HeartIcon className="w-6 h-6" />}
+                                            </button>
+                                            <button onClick={handleDislike} className={`p-3 rounded-full border-2 border-zinc-600 text-zinc-400 hover:border-white hover:text-white`}>
+                                                <XIcon className="w-6 h-6" />
+                                            </button>
+                                        </div>
+                                         <div className="flex items-center space-x-4 mb-4 text-zinc-400 text-sm">
+                                            {details?.vote_average && details.vote_average > 0 ? <span className="text-green-400 font-semibold">{(details.vote_average * 10).toFixed(0)}% Match</span> : null}
+                                            <span>{(details && ('release_date' in details ? details.release_date : details.first_air_date))?.substring(0, 4)}</span>
+                                            {item.media_type === 'movie' && movieDetails?.runtime ? <span>{formatRuntime(movieDetails.runtime)}</span> : null}
+                                            {item.media_type === 'tv' && tvDetails?.number_of_seasons ? <span>{tvDetails.number_of_seasons} Season{tvDetails.number_of_seasons > 1 ? 's' : ''}</span> : null}
+                                        </div>
+                                        <p className="text-sm leading-relaxed line-clamp-3">{details?.overview}</p>
+                                    </div>
+                                    {/* Right Column */}
+                                    <div className="text-sm mt-4 md:mt-0">
+                                        <dl className="space-y-3">
+                                            <div>
+                                                <dt className="font-semibold text-zinc-400 mb-1 sr-only">Cast</dt>
+                                                <dd className="text-zinc-200">
+                                                   <span className="text-zinc-400">Cast: </span> {credits?.cast?.slice(0, 3).map(c => c.name).join(', ')}{credits && credits.cast.length > 3 ? ', ...' : ''}
+                                                </dd>
+                                            </div>
+                                            {director && (
+                                                <div>
+                                                    <dt className="font-semibold text-zinc-400 mb-1 sr-only">Director</dt>
+                                                    <dd className="text-zinc-200"><span className="text-zinc-400">Director: </span>{director.name}</dd>
+                                                </div>
+                                            )}
+                                            {details?.genres && details.genres.length > 0 && (
+                                                <div>
+                                                    <dt className="font-semibold text-zinc-400 mb-1 sr-only">Genres</dt>
+                                                    <dd className="text-zinc-200"><span className="text-zinc-400">Genres: </span>{details.genres.map(g => g.name).join(', ')}</dd>
+                                                </div>
+                                            )}
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                            {/* END: Redesigned Compact Layout */}
                         </div>
 
-                        {credits && <CreditRow title="Cast" people={credits.cast.slice(0, 20)} />}
-                        {credits && <CreditRow title="Crew" people={crewToDisplay} />}
-                        
-                        {details.media_type === 'tv' && 'seasons' in details && (
-                            <SeasonAccordion seasons={details.seasons} tvId={details.id} apiKey={apiKey} />
-                        )}
+                        <div className="p-8 pt-0">
+                            {item.media_type === 'tv' && tvDetails?.seasons?.length > 0 && (
+                                <div className="mt-8 border-t border-zinc-800 pt-8">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-2xl font-bold">Episodes</h3>
+                                        <select
+                                            value={activeSeason ?? ''}
+                                            onChange={e => setActiveSeason(Number(e.target.value))}
+                                            className="bg-zinc-800 rounded-md px-3 py-1 border border-zinc-700"
+                                        >
+                                            {tvDetails.seasons.filter(s => s.season_number > 0).map(season => (
+                                                <option key={season.id} value={season.season_number}>
+                                                    Season {season.season_number}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {episodes.map(episode => (
+                                            <div key={episode.id} className="flex items-start p-3 hover:bg-zinc-800/50 rounded-lg">
+                                                <span className="text-xl text-zinc-400 font-semibold mr-4">{episode.episode_number}</span>
+                                                <div className="w-48 h-24 mr-4 flex-shrink-0">
+                                                    <img 
+                                                        src={episode.still_path ? `${IMAGE_BASE_URL}w300${episode.still_path}` : 'https://via.placeholder.com/300x169?text=No+Image'} 
+                                                        alt={episode.name} 
+                                                        className="w-full h-full object-cover rounded-md" 
+                                                    />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h4 className="font-bold">{episode.name}</h4>
+                                                    <p className="text-sm text-zinc-400 line-clamp-2 mt-1">{episode.overview}</p>
 
-                    </div>
-                </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                             {similar.length > 0 && (
+                                <div className="mt-8 border-t border-zinc-800 pt-8">
+                                    <MediaRow title="More Like This" items={similar} onSelect={onSelect} genres={genres} isVertical />
+                                </div>
+                             )}
+
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
-}
+};
 
 
 interface NetflixViewProps {
@@ -439,175 +526,265 @@ interface NetflixViewProps {
 }
 
 const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvalidApiKey, view }) => {
-  const [mediaRows, setMediaRows] = useState<Record<string, MediaItem[]>>({});
-  const [searchResults, setSearchResults] = useState<MediaItem[] | null>(null);
   const [heroItems, setHeroItems] = useState<MediaItem[]>([]);
+  const [rows, setRows] = useState<{ title: string; items: MediaItem[]; isVertical?: boolean }[]>([]);
+  const [searchResults, setSearchResults] = useState<MediaItem[]>([]);
+  const [searchPage, setSearchPage] = useState(1);
+  const [hasMoreResults, setHasMoreResults] = useState(true);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [genres, setGenres] = useState<Map<number, string>>(new Map());
-  const [selectedProvider, setSelectedProvider] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { likedIds } = usePreferences();
+  const [likedItems, setLikedItems] = useState<MediaItem[]>([]);
+  const [isLikedItemsLoading, setIsLikedItemsLoading] = useState(false);
+  
+  const resetScroll = () => window.scrollTo(0, 0);
 
-  const fetchAndSetRows = useCallback(async () => {
+  useEffect(() => {
+    const handleSelectItem = (event: CustomEvent<MediaItem>) => {
+      setSelectedItem(event.detail);
+    };
+    window.addEventListener('selectMediaItem', handleSelectItem as EventListener);
+    return () => {
+      window.removeEventListener('selectMediaItem', handleSelectItem as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    const fetchGenres = async () => {
+        try {
+            const genreMap = await getGenres(apiKey);
+            setGenres(genreMap);
+        } catch (error) {
+            console.error("Error fetching genres:", error);
+            if (error instanceof Error && error.message.includes("Invalid API Key")) {
+                onInvalidApiKey();
+            }
+        }
+    };
+    fetchGenres();
+  }, [apiKey, onInvalidApiKey]);
+
+  const loadDataForView = useCallback(async () => {
     setIsLoading(true);
+    resetScroll();
     try {
-      const genreMap = await getGenres(apiKey);
-      setGenres(genreMap);
+        let newRows: { title: string; items: MediaItem[], isVertical?: boolean }[] = [];
+        let newHeroItems: MediaItem[] = [];
 
-      let rows: Record<string, MediaItem[]> = {};
-      
-      const processResults = <T extends Movie | TVShow>(results: T[], type: 'movie' | 'tv') => {
-        return results.map(item => type === 'movie' ? normalizeMovie(item as Movie) : normalizeTVShow(item as TVShow));
-      };
+        if (view === 'home') {
+            const [trending, popularMovies, popularTv, upcomingMovies, onTheAirTv] = await Promise.all([
+                getTrendingAll(apiKey),
+                getPopularMovies(apiKey),
+                getPopularTVShows(apiKey),
+                getUpcomingMovies(apiKey),
+                getOnTheAirTVShows(apiKey),
+            ]);
+            
+            newHeroItems = shuffleArray(trending.results.map(item => item.media_type === 'movie' ? normalizeMovie(item as Movie) : normalizeTVShow(item as TVShow)).filter(item => item.backdrop_path)).slice(0, 5);
+            
+            newRows = [
+                { title: "Trending This Week", items: trending.results.map(item => item.media_type === 'movie' ? normalizeMovie(item as Movie) : normalizeTVShow(item as TVShow)) },
+                { title: "Popular on ScreenScape", items: popularMovies.results.map(normalizeMovie), isVertical: true },
+                { title: "Fan Favorites", items: popularTv.results.map(normalizeTVShow), isVertical: true },
+                { title: "Coming Soon", items: upcomingMovies.results.map(normalizeMovie) },
+                { title: "Currently Airing", items: onTheAirTv.results.map(normalizeTVShow) },
+            ];
 
-      if (selectedProvider) {
-        const [movies, tvShows] = await Promise.all([
-          getMoviesByProvider(apiKey, selectedProvider).then(res => processResults(res.results, 'movie')),
-          getTVShowsByProvider(apiKey, selectedProvider).then(res => processResults(res.results, 'tv')),
-        ]);
-        rows['Movies on this Service'] = movies;
-        rows['TV Shows on this Service'] = tvShows;
-        const hero = movies[0] || tvShows[0] || null;
-        setHeroItems(hero ? [hero] : []);
-      } else if (view === 'home') {
-          const [trendingRes, popularMoviesRes, popularTVRes, upcomingRes] = await Promise.all([
-            getTrendingAll(apiKey),
-            getPopularMovies(apiKey),
-            getPopularTVShows(apiKey),
-            getUpcomingMovies(apiKey),
-        ]);
+        } else if (view === 'movies') {
+            const [popularMovies, upcomingMovies] = await Promise.all([
+                getPopularMovies(apiKey),
+                getUpcomingMovies(apiKey),
+            ]);
+            newHeroItems = shuffleArray(popularMovies.results.map(normalizeMovie).filter(item => item.backdrop_path)).slice(0, 5);
+            newRows = [
+                { title: "Popular Movies", items: popularMovies.results.map(normalizeMovie), isVertical: true },
+                { title: "Upcoming Movies", items: upcomingMovies.results.map(normalizeMovie) },
+            ];
 
-        const trendingNorm = (trendingRes.results as any[])
-            .filter(item => item.media_type === 'movie' || item.media_type === 'tv')
-            .map(item => item.media_type === 'movie'
-                ? normalizeMovie(item as Movie)
-                : normalizeTVShow(item as TVShow)
-            );
-        
-        const upcomingNorm = processResults(upcomingRes.results, 'movie');
-        const popularMoviesNorm = processResults(popularMoviesRes.results, 'movie');
-        const popularTVNorm = processResults(popularTVRes.results, 'tv');
+        } else if (view === 'tv') {
+             const [popularTv, onTheAirTv] = await Promise.all([
+                getPopularTVShows(apiKey),
+                getOnTheAirTVShows(apiKey),
+            ]);
+            newHeroItems = shuffleArray(popularTv.results.map(normalizeTVShow).filter(item => item.backdrop_path)).slice(0, 5);
+            newRows = [
+                { title: "Popular TV Shows", items: popularTv.results.map(normalizeTVShow), isVertical: true },
+                { title: "Currently Airing TV", items: onTheAirTv.results.map(normalizeTVShow) },
+            ];
+        }
 
-        const trendingForHero = trendingNorm.slice(0, 5);
-        const newForHero = upcomingNorm.slice(0, 5);
-        const combinedHeroItems = shuffleArray([...trendingForHero, ...newForHero]);
-        setHeroItems(combinedHeroItems);
-
-        rows = { 
-            'Trending Now': trendingNorm, 
-            'Popular Movies': popularMoviesNorm, 
-            'Popular TV Shows': popularTVNorm, 
-            'Coming Soon': upcomingNorm 
-        };
-      } else if (view === 'movies') {
-        const [popular, upcoming] = await Promise.all([
-            getPopularMovies(apiKey).then(res => processResults(res.results, 'movie')),
-            getUpcomingMovies(apiKey).then(res => processResults(res.results, 'movie')),
-        ]);
-        rows = { 'Popular Movies': popular, 'Coming Soon': upcoming };
-        const hero = popular[0] || null;
-        setHeroItems(hero ? [hero] : []);
-      } else if (view === 'tv') {
-        const [popular, onTheAir] = await Promise.all([
-            getPopularTVShows(apiKey).then(res => processResults(res.results, 'tv')),
-            getOnTheAirTVShows(apiKey).then(res => processResults(res.results, 'tv')),
-        ]);
-        rows = { 'Popular TV Shows': popular, 'Currently Airing': onTheAir };
-        const hero = popular[0] || null;
-        setHeroItems(hero ? [hero] : []);
-      }
-      
-      setMediaRows(rows);
-
-    } catch (error: any) {
-      console.error("Failed to fetch data:", error);
-      if (error.message.includes("Invalid API Key")) {
+        setHeroItems(newHeroItems);
+        setRows(newRows);
+    } catch (error) {
+      console.error(`Error fetching data for ${view}:`, error);
+      if (error instanceof Error && error.message.includes("Invalid API Key")) {
         onInvalidApiKey();
       }
     } finally {
       setIsLoading(false);
     }
-  }, [apiKey, onInvalidApiKey, view, selectedProvider]);
+  }, [apiKey, onInvalidApiKey, view]);
 
-  useEffect(() => {
-    fetchAndSetRows();
-  }, [fetchAndSetRows]);
+  const fetchSearchResults = useCallback(async (query: string, page: number, clear: boolean = false) => {
+    setIsSearchLoading(true);
+    try {
+        const data = await searchMulti(apiKey, query, page);
+        const validResults = data.results.filter(item => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path).map(item => item.media_type === 'movie' ? normalizeMovie(item as Movie) : normalizeTVShow(item as TVShow));
+        
+        setSearchResults(prev => clear ? validResults : [...prev, ...validResults]);
+        setHasMoreResults(data.page < data.total_pages);
+    } catch (error) {
+        console.error("Error fetching search results:", error);
+         if (error instanceof Error && error.message.includes("Invalid API Key")) {
+            onInvalidApiKey();
+        }
+    } finally {
+        setIsSearchLoading(false);
+    }
+  }, [apiKey, onInvalidApiKey]);
 
   useEffect(() => {
     if (searchQuery) {
-      setIsLoading(true);
-      searchMulti(apiKey, searchQuery)
-        .then(response => {
-          const results = response.results
-            .filter(item => item.media_type === 'movie' || item.media_type === 'tv')
-            .map(item => item.media_type === 'movie' ? normalizeMovie(item as Movie) : normalizeTVShow(item as TVShow));
-          setSearchResults(results);
-          setIsLoading(false);
-        })
-        .catch(error => {
-          console.error("Search failed:", error);
-          setIsLoading(false);
-        });
+      setSearchResults([]);
+      setSearchPage(1);
+      setHasMoreResults(true);
+      fetchSearchResults(searchQuery, 1, true);
     } else {
-      setSearchResults(null);
-      // When clearing search, refetch original view data if we were showing provider data
-      if(selectedProvider) {
-          setSelectedProvider(null);
-      }
+        loadDataForView();
+        setSearchResults([]);
     }
-  }, [searchQuery, apiKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, view]);
 
-  const handleSelectProvider = (providerId: number) => {
-    setSelectedItem(null);
-    setSearchResults(null);
-    setSelectedProvider(providerId);
-  }
-
-  const handleSelect = (item: MediaItem) => {
-    setSelectedItem(item);
+  const loadMoreSearchResults = () => {
+    const nextPage = searchPage + 1;
+    setSearchPage(nextPage);
+    fetchSearchResults(searchQuery, nextPage, false);
   };
+  
+  const handleSelectProvider = useCallback(async (providerId: number) => {
+    setIsLoading(true);
+    resetScroll();
+    try {
+        const [movies, tvShows] = await Promise.all([
+            getMoviesByProvider(apiKey, providerId),
+            getTVShowsByProvider(apiKey, providerId),
+        ]);
 
-  const handleCloseModal = () => {
-    setSelectedItem(null);
-  };
+        const combined = shuffleArray([
+            ...movies.results.map(normalizeMovie),
+            ...tvShows.results.map(normalizeTVShow),
+        ]);
+        
+        const service = serviceHubs.find(s => s.providerId === providerId);
+        
+        setHeroItems(combined.filter(i => i.backdrop_path).slice(0, 5));
+        setRows([
+            { title: `Top on ${service?.id || 'Service'}`, items: combined },
+        ]);
 
-  const currentRows = searchResults ? { [`Search Results for "${searchQuery}"`]: searchResults } : mediaRows;
+    } catch (error) {
+        console.error(`Error fetching data for provider ${providerId}:`, error);
+        if (error instanceof Error && error.message.includes("Invalid API Key")) {
+            onInvalidApiKey();
+        }
+    } finally {
+        setIsLoading(false);
+    }
+  }, [apiKey, onInvalidApiKey]);
 
-  return (
-    <div className="pt-24">
-      {isLoading && Object.keys(currentRows).length === 0 ? (
-         <div className="h-[calc(100vh-6rem)] flex items-center justify-center"> <Loader /> </div>
-      ) : (
-        <>
-            {!searchQuery && <Hero items={heroItems} onSelect={handleSelect} />}
 
-            <div className="px-4 md:px-12 my-8">
-                <div className="grid grid-cols-5 gap-2 md:gap-4">
-                    {serviceHubs.map(hub => (
-                        <HubButton key={hub.id} {...hub} onClick={() => handleSelectProvider(hub.providerId)} />
-                    ))}
-                </div>
+  useEffect(() => {
+    if (view === 'likes') {
+        const fetchLikedItems = async () => {
+            if (likedIds.size === 0) {
+                setLikedItems([]);
+                return;
+            }
+
+            setIsLikedItemsLoading(true);
+            const likedItemsArray: MediaItem[] = [];
+            
+            // We can't know if an ID is a movie or TV show, so we try fetching both.
+            // This is not ideal, but necessary with the current data structure.
+            for (const id of likedIds) {
+                try {
+                    const movieDetails = await getMovieDetails(apiKey, id);
+                    likedItemsArray.push(normalizeMovie(movieDetails));
+                } catch (movieError) {
+                    try {
+                        const tvDetails = await getTVShowDetails(apiKey, id);
+                        likedItemsArray.push(normalizeTVShow(tvDetails));
+                    } catch (tvError) {
+                        console.warn(`Could not fetch details for ID ${id}:`, movieError, tvError);
+                    }
+                }
+            }
+            setLikedItems(likedItemsArray);
+            setIsLikedItemsLoading(false);
+        };
+        fetchLikedItems();
+    }
+  }, [view, likedIds, apiKey]);
+
+
+  const renderContent = () => {
+    if (searchQuery) {
+        return (
+            <SearchResultsGrid 
+                items={searchResults}
+                onSelect={setSelectedItem}
+                genres={genres}
+                isLoading={isSearchLoading}
+                loadMore={loadMoreSearchResults}
+                hasMore={hasMoreResults}
+            />
+        );
+    }
+    
+    if (view === 'likes') {
+        if (isLikedItemsLoading) return <div className="pt-28"><Loader /></div>;
+        if (likedItems.length === 0) return <p className="text-center pt-40 text-zinc-400">You haven't liked any titles yet.</p>;
+        return (
+             <div className="pt-28">
+                <MediaRow title="Your Liked Titles" items={likedItems} onSelect={setSelectedItem} genres={genres} isVertical />
             </div>
+        )
+    }
 
-            <div className="pb-12">
-                {Object.entries(currentRows).map(([title, items]) => (
-                    <MediaRow
-                        key={title}
-                        title={title}
-                        items={items}
-                        onSelect={handleSelect}
-                        genres={genres}
-                        isVertical={title === 'Coming Soon'}
-                    />
+    if (isLoading) {
+      return (
+        <div className="h-screen flex items-center justify-center">
+            <Loader />
+        </div>
+      );
+    }
+    
+    return (
+        <>
+            <Hero items={heroItems} onSelect={setSelectedItem} />
+            <div className="py-8">
+                 <BrandHub onSelectProvider={handleSelectProvider} />
+                {rows.map((row, index) => (
+                    <MediaRow key={`${row.title}-${index}`} {...row} onSelect={setSelectedItem} genres={genres} />
                 ))}
             </div>
         </>
-      )}
+    );
+  };
 
+  return (
+    <div>
+      {renderContent()}
       {selectedItem && (
-        <MediaModal
-            item={selectedItem}
+        <Modal 
+            item={selectedItem} 
+            onClose={() => setSelectedItem(null)} 
             apiKey={apiKey}
-            onClose={handleCloseModal}
+            onInvalidApiKey={onInvalidApiKey}
+            onSelect={setSelectedItem}
             genres={genres}
         />
       )}

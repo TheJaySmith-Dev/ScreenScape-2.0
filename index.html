@@ -24,6 +24,8 @@
                 'text-focus-in': 'text-focus-in 1s cubic-bezier(0.550, 0.085, 0.680, 0.530) both',
                 'scale-up-center': 'scale-up-center 0.4s cubic-bezier(0.390, 0.575, 0.565, 1.000) both',
                 'aurora': 'aurora 60s infinite',
+                'pulse-ring': 'pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                'speaking-glow': 'speaking-glow 1.2s ease-in-out infinite alternate',
             },
             keyframes: {
                 'text-focus-in': {
@@ -50,7 +52,25 @@
                   '50%': { transform: 'translate(var(--x-2), var(--y-2))' },
                   '75%': { transform: 'translate(var(--x-3), var(--y-3))' },
                   '100%': { transform: 'translate(var(--x-4), var(--y-4))' },
-                }
+                },
+                'pulse-ring': {
+                  '0%': {
+                    transform: 'scale(1)',
+                    opacity: '0.8',
+                  },
+                  '100%': {
+                    transform: 'scale(1.8)',
+                    opacity: '0',
+                  },
+                },
+                'speaking-glow': {
+                  'from': {
+                    boxShadow: '0 0 5px 2px rgba(129, 140, 248, 0.4)',
+                  },
+                  'to': {
+                    boxShadow: '0 0 20px 8px rgba(129, 140, 248, 0.2)',
+                  },
+                },
             },
           },
         },

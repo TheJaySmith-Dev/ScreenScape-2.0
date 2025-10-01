@@ -2,33 +2,40 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ApiKeySetup from './components/ApiKeySetup';
 import Header from './components/Header';
 import NetflixView from './components/NetflixView';
-import AiView from './components/AiView';
+import AIAssistant from './components/AIAssistant';
 
-export type ViewType = 'home' | 'movies' | 'tv' | 'likes' | 'ai';
+export type ViewType = 'home' | 'movies' | 'tv' | 'likes';
 
 const App: React.FC = () => {
-  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [tmdbApiKey, setTmdbApiKey] = useState<string | null>(null);
+  const [geminiApiKey, setGeminiApiKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<ViewType>('home');
 
   useEffect(() => {
-    const storedApiKey = localStorage.getItem('tmdbApiKey');
-    if (storedApiKey) {
-      setApiKey(storedApiKey);
+    const storedTmdbKey = localStorage.getItem('tmdbApiKey');
+    const storedGeminiKey = localStorage.getItem('geminiApiKey');
+    if (storedTmdbKey) {
+      setTmdbApiKey(storedTmdbKey);
+    }
+    if (storedGeminiKey) {
+        setGeminiApiKey(storedGeminiKey);
     }
     setIsLoading(false);
   }, []);
 
-  const handleApiKeySave = useCallback((key: string) => {
-    localStorage.setItem('tmdbApiKey', key);
-    setApiKey(key);
+  const handleApiKeySave = useCallback((tmdbKey: string, geminiKey: string) => {
+    localStorage.setItem('tmdbApiKey', tmdbKey);
+    localStorage.setItem('geminiApiKey', geminiKey);
+    setTmdbApiKey(tmdbKey);
+    setGeminiApiKey(geminiKey);
   }, []);
 
   const handleInvalidApiKey = useCallback(() => {
-    console.error("Invalid API Key detected. Clearing key and prompting for new one.");
+    console.error("Invalid TMDb API Key detected. Clearing key.");
     localStorage.removeItem('tmdbApiKey');
-    setApiKey(null);
+    setTmdbApiKey(null);
   }, []);
 
   if (isLoading) {
@@ -43,10 +50,12 @@ const App: React.FC = () => {
     setView(newView);
     setSearchQuery(''); // Clear search when changing views
   }
+  
+  const showApp = tmdbApiKey && geminiApiKey;
 
   return (
     <div className="min-h-screen text-white font-sans">
-      {!apiKey ? (
+      {!showApp ? (
         <ApiKeySetup onSave={handleApiKeySave} />
       ) : (
         <>
@@ -57,17 +66,14 @@ const App: React.FC = () => {
             setView={handleSetView}
           />
           <main>
-            {view === 'ai' ? (
-              <AiView />
-            ) : (
-              <NetflixView
-                apiKey={apiKey}
-                searchQuery={searchQuery}
-                onInvalidApiKey={handleInvalidApiKey}
-                view={view}
-              />
-            )}
+            <NetflixView 
+              apiKey={tmdbApiKey} 
+              searchQuery={searchQuery} 
+              onInvalidApiKey={handleInvalidApiKey} 
+              view={view}
+            />
           </main>
+          <AIAssistant tmdbApiKey={tmdbApiKey} geminiApiKey={geminiApiKey} />
         </>
       )}
     </div>
