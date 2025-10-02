@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { ViewType } from '../App';
 import type { MediaItem, Movie, TVShow, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, LogoImage, Episode, CastMember, CrewMember } from '../types';
@@ -372,6 +370,12 @@ const Modal: React.FC<ModalProps> = ({ item, onClose, apiKey, onInvalidApiKey, o
     const movieDetails = details as MovieDetails;
     const director = credits?.crew?.find((member: CrewMember) => member.job === 'Director');
 
+    const currentItem = details || item;
+    // FIX: Add helper variables to handle type differences between Movie and TV details for title and release_date.
+    const title = details ? ('title' in details ? details.title : (details as TVShowDetails).name) : item.title;
+    const releaseDate = details ? ('release_date' in details ? details.release_date : (details as TVShowDetails).first_air_date) : item.release_date;
+
+
     return (
         <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center" onClick={onClose}>
             <div 
@@ -398,19 +402,18 @@ const Modal: React.FC<ModalProps> = ({ item, onClose, apiKey, onInvalidApiKey, o
                                 </div>
                                 </>
                             ) : (
-                                backdropPath && <img src={backdropPath} alt={item.title} className="w-full h-full object-cover" />
+                                backdropPath && <img src={backdropPath} alt={title} className="w-full h-full object-cover" />
                             )}
                             <button onClick={onClose} className="absolute top-4 right-4 h-10 w-10 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-white hover:text-black transition z-10">
                                 <XIcon className="w-6 h-6" />
                             </button>
                             {/* START: Redesigned Compact Layout */}
-                             <div className="absolute bottom-0 left-0 right-0 p-8 z-10 bg-gradient-to-t from-zinc-900 via-zinc-900/80 to-transparent">
+                             <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8 z-10 bg-gradient-to-t from-zinc-900 via-zinc-900/80 to-transparent">
                                 <div className="max-w-[50%] mb-4">
                                      {logo?.file_path ? (
-                                        <img src={`${IMAGE_BASE_URL}w500${logo.file_path}`} alt={`${item.title} logo`} className="max-h-20 max-w-full drop-shadow-2xl" />
+                                        <img src={`${IMAGE_BASE_URL}w500${logo.file_path}`} alt={`${title} logo`} className="max-h-12 md:max-h-20 max-w-full drop-shadow-2xl" />
                                     ) : (
-                                        // FIX: TVShowDetails has `name` not `title`. Conditionally access the correct property.
-                                        <h1 className="text-4xl font-bold text-white drop-shadow-lg">{(details && ('title' in details ? details.title : (details as TVShowDetails).name)) || item.title}</h1>
+                                        <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">{title}</h1>
                                     )}
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-x-12 items-start">
@@ -429,12 +432,12 @@ const Modal: React.FC<ModalProps> = ({ item, onClose, apiKey, onInvalidApiKey, o
                                             </button>
                                         </div>
                                          <div className="flex items-center space-x-4 mb-4 text-zinc-400 text-sm">
-                                            {details?.vote_average && details.vote_average > 0 ? <span className="text-green-400 font-semibold">{(details.vote_average * 10).toFixed(0)}% Match</span> : null}
-                                            <span>{(details && ('release_date' in details ? details.release_date : details.first_air_date))?.substring(0, 4)}</span>
-                                            {item.media_type === 'movie' && movieDetails?.runtime ? <span>{formatRuntime(movieDetails.runtime)}</span> : null}
-                                            {item.media_type === 'tv' && tvDetails?.number_of_seasons ? <span>{tvDetails.number_of_seasons} Season{tvDetails.number_of_seasons > 1 ? 's' : ''}</span> : null}
+                                            {currentItem?.vote_average && currentItem.vote_average > 0 ? <span className="text-green-400 font-semibold">{(currentItem.vote_average * 10).toFixed(0)}% Match</span> : null}
+                                            <span>{releaseDate?.substring(0, 4)}</span>
+                                            {currentItem.media_type === 'movie' && movieDetails?.runtime ? <span>{formatRuntime(movieDetails.runtime)}</span> : null}
+                                            {currentItem.media_type === 'tv' && tvDetails?.number_of_seasons ? <span>{tvDetails.number_of_seasons} Season{tvDetails.number_of_seasons > 1 ? 's' : ''}</span> : null}
                                         </div>
-                                        <p className="text-sm leading-relaxed line-clamp-3">{details?.overview}</p>
+                                        <p className="text-sm leading-relaxed line-clamp-3">{currentItem?.overview}</p>
                                     </div>
                                     {/* Right Column */}
                                     <div className="text-sm mt-4 md:mt-0">
@@ -465,7 +468,7 @@ const Modal: React.FC<ModalProps> = ({ item, onClose, apiKey, onInvalidApiKey, o
                         </div>
 
                         <div className="p-8 pt-0">
-                            {item.media_type === 'tv' && tvDetails?.seasons?.length > 0 && (
+                            {currentItem.media_type === 'tv' && tvDetails?.seasons?.length > 0 && (
                                 <div className="mt-8 border-t border-zinc-800 pt-8">
                                     <div className="flex items-center justify-between mb-4">
                                         <h3 className="text-2xl font-bold">Episodes</h3>
