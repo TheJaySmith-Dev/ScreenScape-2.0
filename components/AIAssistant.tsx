@@ -1,3 +1,5 @@
+
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Chat, FunctionDeclaration, Type, LiveServerMessage, Modality, Blob as GenAIBlob } from '@google/genai';
 import { SparklesIcon, XIcon, PaperAirplaneIcon, MicrophoneIcon, GearIcon } from './Icons';
@@ -14,7 +16,6 @@ type Message =
     | { type: 'cards'; role: 'model'; items: MediaItem[] };
 
 // --- Audio Helper Functions ---
-// FIX: Added 'bytes' parameter to the encode function.
 function encode(bytes: Uint8Array) {
     let binary = '';
     const len = bytes.byteLength;
@@ -24,7 +25,6 @@ function encode(bytes: Uint8Array) {
     return btoa(binary);
 }
 
-// FIX: Added 'base64' parameter to the decode function.
 function decode(base64: string) {
     const binaryString = atob(base64);
     const len = binaryString.length;
@@ -74,7 +74,9 @@ const MediaCard: React.FC<{ item: MediaItem, onClick: () => void }> = ({ item, o
     </div>
 );
 
-const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ tmdbApiKey, geminiApiKey }) => {
+// FIX: Removed geminiApiKey from props to align with Gemini API guidelines.
+// The key will be sourced from `process.env.API_KEY`.
+const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
@@ -88,23 +90,24 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ t
     
     const voiceSessionPromise = useRef<any>(null);
 
-    // FIX: useRef<T>() is invalid; it requires an initial value. Provide 'undefined' as the initial value.
+    // FIX: Corrected multiple useRef hooks that were missing an initial value.
+    // FIX: useRef must be called with an initial value.
     const inputAudioContext = useRef<AudioContext | undefined>(undefined);
-    // FIX: useRef<T>() is invalid; it requires an initial value. Provide 'undefined' as the initial value.
+    // FIX: useRef must be called with an initial value.
     const outputAudioContext = useRef<AudioContext | undefined>(undefined);
     const nextStartTime = useRef(0);
     const audioSources = useRef(new Set<AudioBufferSourceNode>());
-    // FIX: useRef<T>() is invalid; it requires an initial value. Provide 'undefined' as the initial value.
+    // FIX: useRef must be called with an initial value.
     const mediaStream = useRef<MediaStream | undefined>(undefined);
-    // FIX: useRef<T>() is invalid; it requires an initial value. Provide 'undefined' as the initial value.
+    // FIX: useRef must be called with an initial value.
     const scriptProcessor = useRef<ScriptProcessorNode | undefined>(undefined);
     
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    // FIX: useRef<T>() is invalid; it requires an initial value. Provide 'undefined' as the initial value.
+    // FIX: useRef must be called with an initial value.
     const inputAnalyser = useRef<AnalyserNode | undefined>(undefined);
-    // FIX: useRef<T>() is invalid; it requires an initial value. Provide 'undefined' as the initial value.
+    // FIX: useRef must be called with an initial value.
     const outputAnalyser = useRef<AnalyserNode | undefined>(undefined);
-    // FIX: useRef<T>() is invalid; it requires an initial value. Provide 'undefined' as the initial value.
+    // FIX: useRef must be called with an initial value.
     const animationFrameId = useRef<number | undefined>(undefined);
 
     useEffect(() => {
@@ -236,14 +239,19 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ t
 
 
     const initTextChat = useCallback(() => {
-        if (!geminiApiKey) { return; }
+        // FIX: Removed check for geminiApiKey as it's no longer a prop.
         if (chatRef.current) return;
-        const ai = new GoogleGenAI({apiKey: geminiApiKey});
+        // FIX: Initialized GoogleGenAI with API key from environment variable as per guidelines.
+        const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
         const tools = [{ functionDeclarations: [findMediaTool, getMediaDetailsTool, navigateToMediaPageTool] }];
         chatRef.current = ai.chats.create({ model: 'gemini-2.5-flash', config: { tools, systemInstruction } });
         setMessages([{ type: 'text', role: 'model', content: "Hi! I'm ScreenScape AI. How can I help you find something to watch today?" }]);
-    }, [geminiApiKey, systemInstruction]);
+    // FIX: Removed geminiApiKey from dependency array.
+    }, [systemInstruction]);
 
+// FIX: Replaced the stopVoiceSession function with a more robust version that properly cleans up all Web Audio API resources.
+// The previous implementation was missing cleanup for several audio nodes and contexts, which can lead to memory leaks and errors.
+// This new version disconnects all nodes in the input and output audio graphs and closes both audio contexts.
     const stopVoiceSession = useCallback(async () => {
         setIsVoiceMode(false);
         setVoiceStatus('idle');
@@ -257,21 +265,35 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ t
                 voiceSessionPromise.current = null;
             }
         }
+
+        if (animationFrameId.current) {
+            cancelAnimationFrame(animationFrameId.current);
+        }
+
         mediaStream.current?.getTracks().forEach(track => track.stop());
-        scriptProcessor.current?.disconnect();
+
+        if (scriptProcessor.current) {
+            scriptProcessor.current.disconnect();
+            scriptProcessor.current.onaudioprocess = null;
+        }
+        inputAnalyser.current?.disconnect();
         if (inputAudioContext.current?.state !== 'closed') {
            inputAudioContext.current?.close();
         }
-        if (animationFrameId.current) {
-            cancelAnimationFrame(animationFrameId.current);
+
+        for (const source of audioSources.current.values()) {
+            try { source.stop(); } catch(e) {}
+            try { source.disconnect(); } catch(e) {}
+        }
+        audioSources.current.clear();
+        outputAnalyser.current?.disconnect();
+        if (outputAudioContext.current?.state !== 'closed') {
+            outputAudioContext.current?.close();
         }
     }, []);
 
     const startVoiceSession = useCallback(async () => {
-        if (!geminiApiKey) {
-            setMessages(prev => [...prev, { type: 'text', role: 'model', content: "Gemini API key is missing." }]);
-            return;
-        }
+        // FIX: Removed check for geminiApiKey. The environment variable is assumed to be present.
         setIsVoiceMode(true);
         setVoiceStatus('connecting');
 
@@ -283,7 +305,8 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ t
             return;
         }
 
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+        // FIX: Initialized GoogleGenAI with API key from environment variable as per guidelines.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
         voiceSessionPromise.current = ai.live.connect({
             model: 'gemini-2.5-flash-native-audio-preview-09-2025',
@@ -372,8 +395,8 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ t
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } } }
             },
         });
-
-    }, [geminiApiKey, stopVoiceSession, functions, selectedVoice, messages.length]);
+    // FIX: Removed geminiApiKey from dependency array.
+    }, [stopVoiceSession, functions, selectedVoice, messages.length]);
 
     // Animation loop for visualizer
     useEffect(() => {
@@ -394,7 +417,7 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ t
             vx: (Math.random() - 0.5) * 0.5,
             vy: (Math.random() - 0.5) * 0.5,
             radius: Math.random() * 150 + 100,
-            color: `hsla(${Math.random() * 60 + 220}, 100%, 60%, 0.3)`
+            color: `hsla(${Math.random() * 60 + 180}, 100%, 60%, 0.3)`
         }));
         
         let frame = 0;
@@ -402,7 +425,7 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ t
         const render = () => {
             frame++;
             ctx.globalCompositeOperation = 'source-over';
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillStyle = 'rgba(13, 20, 33, 0.1)';
             ctx.fillRect(0, 0, width, height);
             ctx.globalCompositeOperation = 'lighter';
             
@@ -512,20 +535,20 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ t
 
     return (
         <>
-            <button onClick={() => setIsOpen(true)} className="fixed bottom-6 right-6 bg-indigo-600 text-white p-4 rounded-full shadow-lg hover:bg-indigo-500 transition-colors z-50 animate-text-focus-in"><SparklesIcon className="w-6 h-6" /></button>
+            <button onClick={() => setIsOpen(true)} className="fixed bottom-6 right-6 bg-cyan-600 text-white p-4 rounded-full shadow-lg hover:bg-cyan-500 transition-colors z-50 animate-text-focus-in"><SparklesIcon className="w-6 h-6" /></button>
             
             {isOpen && !isVoiceMode && (
                 <div className="fixed inset-0 bg-black/60 z-[100] flex justify-center items-center sm:justify-end" onClick={() => setIsOpen(false)}>
-                    <div className="w-full h-full sm:h-[calc(100%-4rem)] max-w-md bg-zinc-900 shadow-2xl flex flex-col sm:rounded-2xl border border-glass-edge" onClick={e => e.stopPropagation()}>
+                    <div className="w-full h-full sm:h-[calc(100%-4rem)] max-w-md bg-primary shadow-2xl flex flex-col sm:rounded-2xl border border-glass-edge" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between p-4 border-b border-zinc-800 flex-shrink-0">
-                            <h2 className="text-lg font-bold flex items-center gap-2"><SparklesIcon className="w-5 h-5 text-indigo-400" /> ScreenScape AI</h2>
+                            <h2 className="text-lg font-bold flex items-center gap-2"><SparklesIcon className="w-5 h-5 text-cyan-400" /> ScreenScape AI</h2>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => setIsSettingsOpen(prev => !prev)} className="text-zinc-400 hover:text-white relative">
                                     <GearIcon className="w-6 h-6" />
                                     {isSettingsOpen && (
                                         <div className="absolute top-full right-0 mt-2 w-48 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg z-10" onClick={e => e.stopPropagation()}>
                                             <div className="p-2"><label htmlFor="voice-select" className="block text-xs text-zinc-400 mb-1">AI Voice</label>
-                                                <select id="voice-select" value={selectedVoice} onChange={e => handleVoiceChange(e.target.value)} className="w-full bg-zinc-700 text-white text-sm rounded-md p-1 border-transparent focus:ring-1 focus:ring-indigo-500">
+                                                <select id="voice-select" value={selectedVoice} onChange={e => handleVoiceChange(e.target.value)} className="w-full bg-zinc-700 text-white text-sm rounded-md p-1 border-transparent focus:ring-1 focus:ring-cyan-500">
                                                     {voices.map(v => <option key={v} value={v}>{v}</option>)}
                                                 </select>
                                             </div>
@@ -539,7 +562,7 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ t
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
                             {messages.map((msg, index) => {
                                 if (msg.type === 'text') {
-                                    return (<div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-zinc-800 text-zinc-200 rounded-bl-none'}`}><SimpleMarkdown text={msg.content} /></div></div>)
+                                    return (<div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-cyan-700 text-white rounded-br-none' : 'bg-zinc-800 text-zinc-200 rounded-bl-none'}`}><SimpleMarkdown text={msg.content} /></div></div>)
                                 }
                                 if (msg.type === 'cards' && msg.items.length > 0) {
                                     return <div key={index} className="space-y-2">{msg.items.map(item => <MediaCard key={`${item.id}-${item.media_type}`} item={item} onClick={() => handleCardClick(item)} />)}</div>
@@ -551,12 +574,12 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ t
                         </div>
                         <div className="p-4 border-t border-zinc-800 flex-shrink-0">
                             <form onSubmit={handleSend} className="relative">
-                                <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="e.g., 'Find sci-fi movies...'" className="w-full bg-zinc-800 rounded-full py-3 pl-4 pr-20 text-sm focus:ring-1 focus:ring-indigo-500 border-transparent transition" disabled={isLoading} />
+                                <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="e.g., 'Find sci-fi movies...'" className="w-full bg-zinc-800 rounded-full py-3 pl-4 pr-20 text-sm focus:ring-1 focus:ring-cyan-500 border-transparent transition" disabled={isLoading} />
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
                                     <button type="button" onClick={toggleVoiceMode} className={`p-2 rounded-full text-white bg-zinc-600 hover:bg-zinc-500 transition-colors`}>
                                         <MicrophoneIcon className="w-5 h-5" />
                                     </button>
-                                    <button type="submit" disabled={isLoading || !input.trim()} className="p-2 rounded-full bg-indigo-600 text-white disabled:bg-zinc-600 disabled:cursor-not-allowed transition-colors"><PaperAirplaneIcon className="w-5 h-5" /></button>
+                                    <button type="submit" disabled={isLoading || !input.trim()} className="p-2 rounded-full bg-cyan-600 text-white disabled:bg-zinc-600 disabled:cursor-not-allowed transition-colors"><PaperAirplaneIcon className="w-5 h-5" /></button>
                                 </div>
                             </form>
                         </div>
@@ -565,15 +588,15 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ t
             )}
 
             {isVoiceMode && (
-                <div className="fixed inset-0 z-[200] bg-black/30 backdrop-blur-2xl flex flex-col justify-center items-center animate-text-focus-in">
+                <div className="fixed inset-0 z-[200] bg-primary/30 backdrop-blur-2xl flex flex-col justify-center items-center animate-text-focus-in">
                     <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
                     
                     <div className="relative z-10 flex items-center justify-center">
-                        <div className="absolute h-40 w-40 rounded-full bg-indigo-500/30 animate-pulse-ring" style={{ animationDuration: '2s' }}></div>
-                        <div className="absolute h-32 w-32 rounded-full bg-indigo-500/50 animate-pulse-ring" style={{ animationDelay: '0.5s', animationDuration: '2s' }}></div>
+                        <div className="absolute h-40 w-40 rounded-full bg-cyan-500/30 animate-pulse-ring" style={{ animationDuration: '2s' }}></div>
+                        <div className="absolute h-32 w-32 rounded-full bg-cyan-500/50 animate-pulse-ring" style={{ animationDelay: '0.5s', animationDuration: '2s' }}></div>
                         <button 
                             onClick={stopVoiceSession} 
-                            className="relative bg-indigo-600 text-white rounded-full h-24 w-24 flex items-center justify-center text-lg font-semibold shadow-2xl hover:bg-indigo-500 transition-all duration-300 ease-in-out transform hover:scale-110"
+                            className="relative bg-cyan-600 text-white rounded-full h-24 w-24 flex items-center justify-center text-lg font-semibold shadow-2xl hover:bg-cyan-500 transition-all duration-300 ease-in-out transform hover:scale-110"
                         >
                             END
                         </button>
@@ -585,7 +608,7 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; geminiApiKey: string }> = ({ t
                             {isSettingsOpen && (
                                 <div className="absolute top-full right-0 mt-2 w-48 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-lg shadow-lg z-10" onClick={e => e.stopPropagation()}>
                                     <div className="p-2"><label htmlFor="voice-select" className="block text-xs text-zinc-400 mb-1">AI Voice</label>
-                                        <select id="voice-select" value={selectedVoice} onChange={e => handleVoiceChange(e.target.value)} className="w-full bg-zinc-700 text-white text-sm rounded-md p-1 border-transparent focus:ring-1 focus:ring-indigo-500">
+                                        <select id="voice-select" value={selectedVoice} onChange={e => handleVoiceChange(e.target.value)} className="w-full bg-zinc-700 text-white text-sm rounded-md p-1 border-transparent focus:ring-1 focus:ring-cyan-500">
                                             {voices.map(v => <option key={v} value={v}>{v}</option>)}
                                         </select>
                                     </div>

@@ -60,7 +60,6 @@ export interface NextEpisodeToAir {
     still_path: string | null;
 }
 
-// FIX: Add Creator and SeasonSummary types to support new fields in TVShowDetails.
 export interface Creator {
     id: number;
     credit_id: string;
@@ -81,7 +80,6 @@ export interface SeasonSummary {
 
 export interface TVShowDetails extends TVShow {
     genres: { id: number, name: string }[];
-    // FIX: Add missing `created_by` and `seasons` properties to fix type errors.
     created_by: Creator[];
     episode_run_time: number[];
     number_of_seasons: number;
@@ -155,7 +153,6 @@ export interface ImageResponse {
     logos: LogoImage[];
 }
 
-// --- START: NEW TYPES FOR CONTEXTUAL SEARCH ---
 export interface Provider {
   logo_path: string;
   provider_id: number;
@@ -176,4 +173,11 @@ export interface WatchProviderResponse {
     [countryCode: string]: WatchProviderCountry;
   };
 }
-// --- END: NEW TYPES FOR CONTEXTUAL SEARCH ---
+
+export type FilterCategory = 'service' | 'studio' | 'network';
+
+export interface ActiveFilter {
+  type: FilterCategory;
+  id: number;
+  name: string;
+}

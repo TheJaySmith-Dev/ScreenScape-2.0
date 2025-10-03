@@ -3,9 +3,11 @@ import React, { useEffect, useRef, useState } from 'react';
 interface VideoPlayerProps {
   videoKey: string;
   isMuted: boolean;
+  onEnd?: () => void;
+  loop?: boolean;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loop = false }) => {
   const playerRef = useRef<HTMLDivElement>(null);
   const playerInstance = useRef<any>(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
@@ -35,22 +37,34 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted }) => {
       setIsPlayerReady(true); // Signal that the player is ready to be controlled
     };
 
+    const onPlayerStateChange = (event: any) => {
+      if (event.data === (window as any).YT.PlayerState.ENDED && onEnd) {
+        onEnd();
+      }
+    };
+
     const playerContainerNode = playerRef.current;
     
+    const playerVars: any = {
+      autoplay: 1,
+      controls: 0,
+      rel: 0,
+      showinfo: 0,
+      modestbranding: 1,
+      mute: 1, // Always start muted, the effect will handle the state
+    };
+
+    if (loop) {
+      playerVars.loop = 1;
+      playerVars.playlist = videoKey; // Required for loop to work
+    }
+
     playerInstance.current = new (window as any).YT.Player(playerContainerNode, {
       videoId: videoKey,
-      playerVars: {
-        autoplay: 1,
-        controls: 0,
-        rel: 0,
-        showinfo: 0,
-        modestbranding: 1,
-        mute: 1, // Always start muted, the effect will handle the state
-        loop: 1,
-        playlist: videoKey, // Required for loop to work
-      },
+      playerVars,
       events: {
         'onReady': onPlayerReady,
+        'onStateChange': onPlayerStateChange,
       }
     });
 
@@ -60,7 +74,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted }) => {
         playerInstance.current = null;
       }
     };
-  }, [videoKey]);
+  }, [videoKey, loop, onEnd]);
   
   return (
     <div className="w-full h-full">

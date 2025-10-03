@@ -35,9 +35,9 @@ export const getPopularMovies = (apiKey: string, page: number = 1): Promise<Pagi
 export const getSimilarMovies = (apiKey: string, movieId: number): Promise<PaginatedResponse<Movie>> => {
   return fetchFromTMDB(apiKey, `movie/${movieId}/similar`);
 };
-export const getMovieVideos = async (apiKey: string, movieId: number): Promise<Video | null> => {
+export const getMovieVideos = async (apiKey: string, movieId: number): Promise<Video[]> => {
   const response = await fetchFromTMDB<{ results: Video[] }>(apiKey, `movie/${movieId}/videos`);
-  return response.results.find(v => v.site === 'YouTube' && v.type === 'Trailer') || response.results.find(v => v.site === 'YouTube') || null;
+  return response.results.filter(v => v.site === 'YouTube');
 };
 export const getMovieDetails = (apiKey: string, movieId: number): Promise<MovieDetails> => {
     return fetchFromTMDB(apiKey, `movie/${movieId}`);
@@ -73,9 +73,9 @@ export const getTVShowDetails = (apiKey: string, tvId: number): Promise<TVShowDe
 export const getTVShowCredits = (apiKey: string, tvId: number): Promise<CreditsResponse> => {
     return fetchFromTMDB(apiKey, `tv/${tvId}/credits`);
 };
-export const getTVShowVideos = async (apiKey: string, tvId: number): Promise<Video | null> => {
+export const getTVShowVideos = async (apiKey: string, tvId: number): Promise<Video[]> => {
   const response = await fetchFromTMDB<{ results: Video[] }>(apiKey, `tv/${tvId}/videos`);
-  return response.results.find(v => v.site === 'YouTube' && v.type === 'Trailer') || response.results.find(v => v.site === 'YouTube') || null;
+  return response.results.filter(v => v.site === 'YouTube');
 };
 export const getTVShowImages = (apiKey: string, tvId: number): Promise<ImageResponse> => {
     return fetchFromTMDB(apiKey, `tv/${tvId}/images?include_image_language=en,null`);

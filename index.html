@@ -13,12 +13,17 @@
         theme: {
           extend: {
             colors: {
+              primary: '#0D1321',
               glass: 'rgba(255, 255, 255, 0.05)',
               'glass-edge': 'rgba(255, 255, 255, 0.2)',
-              'brand-disney': '#0A28D0',
               'brand-netflix': '#E50914',
-              'brand-apple': '#F5F5F7',
+              'brand-disney': '#1A3A8B',
+              'brand-max': '#8D47F4',
               'brand-prime': '#00A8E1',
+              'brand-hulu': '#1CE783',
+              'brand-apple': '#F5F5F7',
+              'brand-paramount': '#0064FF',
+              'brand-peacock': '#FFCB00',
             },
             animation: {
                 'text-focus-in': 'text-focus-in 1s cubic-bezier(0.550, 0.085, 0.680, 0.530) both',
@@ -26,6 +31,7 @@
                 'aurora': 'aurora 60s infinite',
                 'pulse-ring': 'pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 'speaking-glow': 'speaking-glow 1.2s ease-in-out infinite alternate',
+                'glow': 'glow 2s ease-in-out infinite alternate',
             },
             keyframes: {
                 'text-focus-in': {
@@ -65,10 +71,18 @@
                 },
                 'speaking-glow': {
                   'from': {
-                    boxShadow: '0 0 5px 2px rgba(129, 140, 248, 0.4)',
+                    boxShadow: '0 0 5px 2px rgba(74, 222, 128, 0.4)',
                   },
                   'to': {
-                    boxShadow: '0 0 20px 8px rgba(129, 140, 248, 0.2)',
+                    boxShadow: '0 0 20px 8px rgba(74, 222, 128, 0.2)',
+                  },
+                },
+                glow: {
+                  'from': {
+                    textShadow: '0 0 5px #fff, 0 0 10px #fff, 0 0 15px #0073e6, 0 0 20px #0073e6, 0 0 25px #0073e6, 0 0 30px #0073e6, 0 0 35px #0073e6',
+                  },
+                  'to': {
+                    textShadow: '0 0 10px #fff, 0 0 20px #fff, 0 0 30px #0073e6, 0 0 40px #0073e6, 0 0 50px #0073e6, 0 0 60px #0073e6, 0 0 70px #0073e6',
                   },
                 },
             },
@@ -88,9 +102,9 @@
 }
 </script>
 </head>
-  <body class="bg-black text-white overflow-x-hidden">
-    <div class="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden bg-zinc-900">
-      <div class="absolute inset-[-200%] animate-aurora" style="background-image: radial-gradient(at 21% 33%, hsla(240, 90%, 20%, 0.4) 0px, transparent 50%), radial-gradient(at 79% 32%, hsla(277, 90%, 20%, 0.4) 0px, transparent 50%), radial-gradient(at 26% 83%, hsla(21, 90%, 25%, 0.4) 0px, transparent 50%), radial-gradient(at 73% 88%, hsla(339, 90%, 30%, 0.4) 0px, transparent 50%); --x-0: 10%; --y-0: 10%; --x-1: 30%; --y-1: 70%; --x-2: 80%; --y-2: 40%; --x-3: 40%; --y-3: 20%; --x-4: 10%; --y-4: 10%;"></div>
+  <body class="bg-primary text-white overflow-x-hidden">
+    <div class="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden bg-primary">
+      <div class="absolute inset-[-200%] animate-aurora" style="background-image: radial-gradient(at 21% 33%, hsla(240, 90%, 10%, 0.4) 0px, transparent 50%), radial-gradient(at 79% 32%, hsla(277, 90%, 15%, 0.4) 0px, transparent 50%), radial-gradient(at 26% 83%, hsla(210, 90%, 20%, 0.4) 0px, transparent 50%), radial-gradient(at 73% 88%, hsla(300, 90%, 25%, 0.4) 0px, transparent 50%); --x-0: 10%; --y-0: 10%; --x-1: 30%; --y-1: 70%; --x-2: 80%; --y-2: 40%; --x-3: 40%; --y-3: 20%; --x-4: 10%; --y-4: 10%;"></div>
     </div>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
