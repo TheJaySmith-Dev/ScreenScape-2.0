@@ -1,8 +1,4 @@
 
-
-
-
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { ViewType } from '../App';
 // FIX: Added WatchProviderCountry to the import list to resolve 'Cannot find name' error.
@@ -77,7 +73,7 @@ const MediaItemCard: React.FC<MediaItemCardProps> = React.memo(({ item, onSelect
     
     return (
         <div 
-            className="group relative flex-shrink-0 w-36 md:w-48 aspect-[2/3] rounded-lg overflow-hidden cursor-pointer transform transition-all duration-300 ease-in-out hover:scale-105 hover:z-10 shadow-lg hover:shadow-cyan-500/20"
+            className="group relative w-full aspect-[2/3] rounded-lg overflow-hidden cursor-pointer transform transition-all duration-300 ease-in-out hover:scale-105 hover:z-10 shadow-lg hover:shadow-cyan-500/20"
             onClick={() => onSelect(item)}
         >
             <img src={imageUrl} alt={item.title} className="w-full h-full object-cover" />
@@ -108,7 +104,9 @@ const MediaRow: React.FC<MediaRowProps> = ({ title, items, onSelect }) => {
                 <div className="pl-4 md:pl-12 overflow-x-auto overflow-y-hidden pb-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
                     <div className="flex space-x-4">
                         {items.filter(item => item.poster_path).map(item => (
-                            <MediaItemCard key={`${item.media_type}-${item.id}`} item={item} onSelect={onSelect} />
+                            <div key={`${item.media_type}-${item.id}`} className="flex-shrink-0 w-36 md:w-48">
+                                <MediaItemCard item={item} onSelect={onSelect} />
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -633,7 +631,8 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
             const itemsArray: MediaItem[] = [];
             
             // Using Promise.all for parallel fetching
-            const promises = Array.from(watchlistIds).map(async (id) => {
+            // FIX: Explicitly typing `id` as `number` to resolve a TypeScript inference issue where it was being treated as `unknown`.
+            const promises = Array.from(watchlistIds).map(async (id: number) => {
                 try {
                     const movieDetails = await getMovieDetails(apiKey, id);
                     return normalizeMovie(movieDetails);
