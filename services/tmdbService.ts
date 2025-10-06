@@ -1,129 +1,69 @@
 
-import type { Movie, TVShow, PaginatedResponse, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, MediaItem, Episode, WatchProviderResponse } from '../types';
+import type { Movie, TVShow, MediaItem, PaginatedResponse, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, WatchProviderResponse } from '../types';
 
 const API_BASE_URL = 'https://api.themoviedb.org/3';
 
-const fetchFromTMDB = async <T>(apiKey: string, endpoint: string): Promise<T> => {
-  const url = `${API_BASE_URL}/${endpoint}${endpoint.includes('?') ? '&' : '?'}api_key=${apiKey}&language=en-US`;
-  const response = await fetch(url);
+const fetchFromTMDB = async <T>(apiKey: string, endpoint: string, params: Record<string, string | number> = {}): Promise<T> => {
+  const url = new URL(`${API_BASE_URL}/${endpoint}`);
+  url.searchParams.append('api_key', apiKey);
+  Object.entries(params).forEach(([key, value]) => url.searchParams.append(key, String(value)));
+
+  const response = await fetch(url.toString());
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error(`Invalid API Key. Status: ${response.status}`);
+    const errorData = await response.json().catch(() => ({}));
+    const status = errorData.status_code || response.status;
+    const message = errorData.status_message || `An error occurred (Status: ${response.status})`;
+    
+    if (status === 7 || status === 34) { // Invalid API Key or resource not found
+      throw new Error("Invalid API Key or resource not found.");
     }
-    throw new Error(`Failed to fetch from TMDB: ${response.statusText} (Status: ${response.status})`);
+    
+    throw new Error(`${message} (Status: ${response.status})`);
   }
   return response.json();
 };
 
-// --- Normalization ---
 export const normalizeMovie = (movie: Movie): MediaItem => ({
-    ...movie,
-    media_type: 'movie',
+  ...movie,
+  title: movie.title,
+  release_date: movie.release_date,
+  media_type: 'movie',
 });
 
 export const normalizeTVShow = (tvShow: TVShow): MediaItem => ({
-    ...tvShow,
-    title: tvShow.name,
-    release_date: tvShow.first_air_date,
-    media_type: 'tv',
+  ...tvShow,
+  title: tvShow.name,
+  release_date: tvShow.first_air_date,
+  media_type: 'tv',
 });
 
+export const getTrendingAll = (apiKey: string) => fetchFromTMDB<PaginatedResponse<Movie | TVShow>>(apiKey, 'trending/all/week');
+export const searchMulti = (apiKey: string, query: string, page: number = 1) => fetchFromTMDB<PaginatedResponse<Movie | TVShow>>(apiKey, 'search/multi', { query, page });
+export const getPopularMovies = (apiKey: string) => fetchFromTMDB<PaginatedResponse<Movie>>(apiKey, 'movie/popular');
+export const getPopularTVShows = (apiKey: string) => fetchFromTMDB<PaginatedResponse<TVShow>>(apiKey, 'tv/popular');
+export const getUpcomingMovies = (apiKey: string) => fetchFromTMDB<PaginatedResponse<Movie>>(apiKey, 'movie/upcoming');
+export const getOnTheAirTVShows = (apiKey: string) => fetchFromTMDB<PaginatedResponse<TVShow>>(apiKey, 'tv/on_the_air');
+export const getMovieVideos = (apiKey: string, id: number) => fetchFromTMDB<{id: number; results: Video[]}>(apiKey, `movie/${id}/videos`).then(res => res.results);
+export const getTVShowVideos = (apiKey: string, id: number) => fetchFromTMDB<{id: number; results: Video[]}>(apiKey, `tv/${id}/videos`).then(res => res.results);
+export const getMovieDetails = (apiKey: string, id: number) => fetchFromTMDB<MovieDetails>(apiKey, `movie/${id}`);
+export const getTVShowDetails = (apiKey: string, id: number) => fetchFromTMDB<TVShowDetails>(apiKey, `tv/${id}`);
+export const getMovieCredits = (apiKey: string, id: number) => fetchFromTMDB<CreditsResponse>(apiKey, `movie/${id}/credits`);
+export const getTVShowCredits = (apiKey: string, id: number) => fetchFromTMDB<CreditsResponse>(apiKey, `tv/${id}/credits`);
+export const getSimilarMovies = (apiKey: string, id: number) => fetchFromTMDB<PaginatedResponse<Movie>>(apiKey, `movie/${id}/similar`);
+export const getMovieImages = (apiKey: string, id: number) => fetchFromTMDB<ImageResponse>(apiKey, `movie/${id}/images`, { include_image_language: 'en' });
+export const getTVShowImages = (apiKey: string, id: number) => fetchFromTMDB<ImageResponse>(apiKey, `tv/${id}/images`, { include_image_language: 'en' });
+export const getMovieWatchProviders = (apiKey: string, id: number) => fetchFromTMDB<WatchProviderResponse>(apiKey, `movie/${id}/watch/providers`);
+export const getTVShowWatchProviders = (apiKey: string, id: number) => fetchFromTMDB<WatchProviderResponse>(apiKey, `tv/${id}/watch/providers`);
 
-// --- Generic ---
-export const getTrendingAll = (apiKey: string, timeWindow: 'day' | 'week' = 'week'): Promise<PaginatedResponse<Movie | TVShow>> => {
-  return fetchFromTMDB(apiKey, `trending/all/${timeWindow}`);
-};
+export const discoverMovies = (apiKey: string, params: Record<string, any>) => fetchFromTMDB<PaginatedResponse<Movie>>(apiKey, 'discover/movie', params);
+export const discoverTVShows = (apiKey: string, params: Record<string, any>) => fetchFromTMDB<PaginatedResponse<TVShow>>(apiKey, 'discover/tv', params);
 
-export const searchMulti = (apiKey: string, query: string, page: number = 1): Promise<PaginatedResponse<Movie | TVShow>> => {
-  return fetchFromTMDB(apiKey, `search/multi?query=${encodeURIComponent(query)}&page=${page}`);
-};
+export const getMoviesByProvider = (apiKey: string, providerId: number) => discoverMovies(apiKey, { with_watch_providers: providerId, watch_region: 'GB', sort_by: 'popularity.desc' });
+export const getTVShowsByProvider = (apiKey: string, providerId: number) => discoverTVShows(apiKey, { with_watch_providers: providerId, watch_region: 'GB', sort_by: 'popularity.desc' });
+export const getNewMoviesByProvider = (apiKey: string, providerId: number) => discoverMovies(apiKey, { with_watch_providers: providerId, watch_region: 'GB', 'primary_release_date.gte': new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
+export const getNewTVShowsByProvider = (apiKey: string, providerId: number) => discoverTVShows(apiKey, { with_watch_providers: providerId, watch_region: 'GB', 'first_air_date.gte': new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
+export const getMoviesByCompany = (apiKey: string, companyId: number) => discoverMovies(apiKey, { with_companies: companyId, sort_by: 'popularity.desc' });
+export const getTopRatedMoviesByCompany = (apiKey: string, companyId: number) => discoverMovies(apiKey, { with_companies: companyId, sort_by: 'vote_average.desc', 'vote_count.gte': 200 });
+export const getTopRatedTVShowsByNetwork = (apiKey: string, networkId: number) => discoverTVShows(apiKey, { with_networks: networkId, sort_by: 'vote_average.desc', 'vote_count.gte': 100 });
 
-// --- Discover ---
-export const discoverMovies = (apiKey: string, params: Record<string, string | number>): Promise<PaginatedResponse<Movie>> => {
-  const query = new URLSearchParams(params as any).toString();
-  return fetchFromTMDB(apiKey, `discover/movie?${query}`);
-};
-
-export const discoverTVShows = (apiKey: string, params: Record<string, string | number>): Promise<PaginatedResponse<TVShow>> => {
-  const query = new URLSearchParams(params as any).toString();
-  return fetchFromTMDB(apiKey, `discover/tv?${query}`);
-};
-
-// --- Movie Specific ---
-export const getPopularMovies = (apiKey: string, page: number = 1): Promise<PaginatedResponse<Movie>> => {
-  return fetchFromTMDB(apiKey, `movie/popular?page=${page}`);
-};
-export const getUpcomingMovies = (apiKey: string, page: number = 1): Promise<PaginatedResponse<Movie>> => {
-  return fetchFromTMDB(apiKey, `movie/upcoming?page=${page}`);
-};
-export const getSimilarMovies = (apiKey: string, movieId: number): Promise<PaginatedResponse<Movie>> => {
-  return fetchFromTMDB(apiKey, `movie/${movieId}/similar`);
-};
-export const getMovieVideos = async (apiKey: string, movieId: number): Promise<Video[]> => {
-  const response = await fetchFromTMDB<{ results: Video[] }>(apiKey, `movie/${movieId}/videos`);
-  return response.results.filter(v => v.site === 'YouTube');
-};
-export const getMovieDetails = (apiKey: string, movieId: number): Promise<MovieDetails> => {
-    return fetchFromTMDB(apiKey, `movie/${movieId}`);
-};
-export const getMovieCredits = (apiKey: string, movieId: number): Promise<CreditsResponse> => {
-    return fetchFromTMDB(apiKey, `movie/${movieId}/credits`);
-};
-export const getMovieImages = (apiKey: string, movieId: number): Promise<ImageResponse> => {
-    return fetchFromTMDB(apiKey, `movie/${movieId}/images?include_image_language=en,null`);
-};
-export const getMovieWatchProviders = (apiKey: string, movieId: number): Promise<WatchProviderResponse> => {
-  return fetchFromTMDB(apiKey, `movie/${movieId}/watch/providers`);
-};
-
-// --- TV Show Specific ---
-export const getPopularTVShows = (apiKey: string, page: number = 1): Promise<PaginatedResponse<TVShow>> => {
-  return fetchFromTMDB(apiKey, `tv/popular?page=${page}`);
-};
-export const getOnTheAirTVShows = (apiKey: string, page: number = 1): Promise<PaginatedResponse<TVShow>> => {
-  return fetchFromTMDB(apiKey, `tv/on_the_air?page=${page}`);
-};
-export const getTVShowVideos = async (apiKey: string, tvId: number): Promise<Video[]> => {
-  const response = await fetchFromTMDB<{ results: Video[] }>(apiKey, `tv/${tvId}/videos`);
-  return response.results.filter(v => v.site === 'YouTube');
-};
-export const getTVShowDetails = (apiKey: string, tvId: number): Promise<TVShowDetails> => {
-    return fetchFromTMDB(apiKey, `tv/${tvId}`);
-};
-export const getTVShowCredits = (apiKey: string, tvId: number): Promise<CreditsResponse> => {
-    return fetchFromTMDB(apiKey, `tv/${tvId}/credits`);
-};
-export const getTVShowImages = (apiKey: string, tvId: number): Promise<ImageResponse> => {
-    return fetchFromTMDB(apiKey, `tv/${tvId}/images?include_image_language=en,null`);
-};
-export const getTVShowSeasonDetails = (apiKey: string, tvId: number, seasonNumber: number): Promise<{episodes: Episode[]}> => {
-    return fetchFromTMDB(apiKey, `tv/${tvId}/season/${seasonNumber}`);
-};
-export const getTVShowWatchProviders = (apiKey: string, tvId: number): Promise<WatchProviderResponse> => {
-  return fetchFromTMDB(apiKey, `tv/${tvId}/watch/providers`);
-};
-
-// --- Filter-based ---
-export const getMoviesByProvider = (apiKey: string, providerId: number, page: number = 1) => {
-    return discoverMovies(apiKey, { with_watch_providers: providerId, watch_region: 'GB', page });
-};
-export const getTVShowsByProvider = (apiKey: string, providerId: number, page: number = 1) => {
-    return discoverTVShows(apiKey, { with_watch_providers: providerId, watch_region: 'GB', page });
-};
-export const getMoviesByCompany = (apiKey: string, companyId: number, page: number = 1) => {
-    return discoverMovies(apiKey, { with_companies: companyId, page });
-};
-export const getNewMoviesByProvider = (apiKey: string, providerId: number, page: number = 1) => {
-    const today = new Date().toISOString().split('T')[0];
-    return discoverMovies(apiKey, { with_watch_providers: providerId, watch_region: 'GB', 'primary_release_date.gte': today, sort_by: 'primary_release_date.asc', page });
-};
-export const getNewTVShowsByProvider = (apiKey: string, providerId: number, page: number = 1) => {
-    const today = new Date().toISOString().split('T')[0];
-    return discoverTVShows(apiKey, { with_watch_providers: providerId, watch_region: 'GB', 'air_date.gte': today, sort_by: 'first_air_date.asc', page });
-};
-export const getTopRatedMoviesByCompany = (apiKey: string, companyId: number, page: number = 1) => {
-    return discoverMovies(apiKey, { with_companies: companyId, sort_by: 'vote_average.desc', 'vote_count.gte': 100, page });
-};
-export const getTopRatedTVShowsByNetwork = (apiKey: string, networkId: number, page: number = 1) => {
-    return discoverTVShows(apiKey, { with_networks: networkId, sort_by: 'vote_average.desc', 'vote_count.gte': 50, page });
-};
+export const getTVShowSeasonDetails = (apiKey: string, tvId: number, seasonNumber: number) => fetchFromTMDB<any>(apiKey, `tv/${tvId}/season/${seasonNumber}`);

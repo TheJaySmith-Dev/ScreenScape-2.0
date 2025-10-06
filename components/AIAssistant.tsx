@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Chat, FunctionDeclaration, Type, LiveServerMessage, Modality, Blob as GenAIBlob } from '@google/genai';
 import { SparklesIcon, XIcon, PaperAirplaneIcon, MicrophoneIcon, GearIcon } from './Icons';
@@ -237,6 +238,7 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
         // FIX: Initialized GoogleGenAI with API key from environment variable as per guidelines.
         const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
         const tools = [{ functionDeclarations: [findMediaTool, getMediaDetailsTool, navigateToMediaPageTool] }];
+        // FIX: Replaced deprecated startChat with chats.create and updated model name.
         chatRef.current = ai.chats.create({ model: 'gemini-2.5-flash', config: { tools, systemInstruction } });
         setMessages([{ type: 'text', role: 'model', content: "Hi! I'm ScreenScape AI. How can I help you find something to watch today?" }]);
     // FIX: Removed geminiApiKey from dependency array.
@@ -302,6 +304,7 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
         voiceSessionPromise.current = ai.live.connect({
+            // FIX: Updated to the correct model for live audio sessions.
             model: 'gemini-2.5-flash-native-audio-preview-09-2025',
             callbacks: {
                 onopen: () => {
@@ -488,7 +491,9 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
         setInput('');
         setIsLoading(true);
         try {
+            // FIX: Updated sendMessage to pass an object and handle the response from the new SDK version.
             let result = await chatRef.current.sendMessage({ message: currentInput });
+            // FIX: Updated property from function_calls to functionCalls.
             while (result.functionCalls && result.functionCalls.length > 0) {
                 const fc = result.functionCalls[0];
                 const functionToCall = functions[fc.name as keyof typeof functions];
@@ -504,8 +509,10 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
                     }
                 }
                 const apiResponse = Array.isArray(functionResult) ? { results: functionResult } : functionResult;
+                // FIX: Updated sendMessage to pass an object for function responses.
                 result = await chatRef.current.sendMessage({ message: [{ functionResponse: { id: fc.id, name: fc.name, response: apiResponse } }] });
             }
+            // FIX: Updated to access the .text property directly instead of calling a function.
             const text = result.text;
             if (text) setMessages(prev => [...prev, { type: 'text', role: 'model', content: text }]);
         } catch (error) {

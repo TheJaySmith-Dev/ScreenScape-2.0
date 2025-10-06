@@ -1,12 +1,12 @@
 
-
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import NetflixView from './components/NetflixView';
+import GameView from './components/GameView';
 import AIAssistant from './components/AIAssistant';
 import type { ActiveFilter } from './types';
 
-export type ViewType = 'home' | 'watchlist';
+export type ViewType = 'home' | 'watchlist' | 'game';
 
 const TMDB_API_KEY = '09b97a49759876f2fde9eadb163edc44';
 
@@ -35,6 +35,25 @@ const App: React.FC = () => {
     console.error("The hardcoded TMDb API Key is invalid or has been revoked.");
   }, []);
 
+  const renderMainContent = () => {
+    switch (view) {
+      case 'game':
+        return <GameView apiKey={TMDB_API_KEY} onInvalidApiKey={handleInvalidApiKey} />;
+      case 'home':
+      case 'watchlist':
+      default:
+        return (
+          <NetflixView 
+            apiKey={TMDB_API_KEY} 
+            searchQuery={searchQuery} 
+            onInvalidApiKey={handleInvalidApiKey} 
+            view={view}
+            activeFilter={activeFilter}
+          />
+        );
+    }
+  };
+
   return (
     <div className="min-h-screen text-white font-sans bg-primary">
         <>
@@ -47,13 +66,7 @@ const App: React.FC = () => {
             setActiveFilter={handleSetFilter}
           />
           <main className="pt-36 md:pt-20">
-            <NetflixView 
-              apiKey={TMDB_API_KEY} 
-              searchQuery={searchQuery} 
-              onInvalidApiKey={handleInvalidApiKey} 
-              view={view}
-              activeFilter={activeFilter}
-            />
+            {renderMainContent()}
           </main>
           <AIAssistant tmdbApiKey={TMDB_API_KEY} />
         </>

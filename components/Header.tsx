@@ -48,7 +48,7 @@ const networks = [
   { id: 19, name: 'FOX' },
 ];
 
-const mainNavItems = ['For You', 'Stream', 'Studios', 'Networks'];
+const mainNavItems = ['For You', 'Games', 'Stream', 'Studios', 'Networks'];
 const menuData: { [key: string]: { type: FilterCategory, items: {id: number, name: string}[] } } = {
     'Stream': { type: 'service', items: services },
     'Studios': { type: 'studio', items: studios },
@@ -93,6 +93,13 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
 
   const handleForYouClick = () => {
     setActiveFilter(null);
+    setView('home');
+    setIsMobileMenuOpen(false);
+  }
+
+  const handleGamesClick = () => {
+    setView('game');
+    setActiveFilter(null);
     setIsMobileMenuOpen(false);
   }
   
@@ -101,12 +108,13 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
   }
   
   const getButtonClass = (item: string) => {
-    const isForYouActive = item === 'For You' && !activeFilter;
-    const isCategoryActive = item !== 'For You' && activeFilter?.type === menuData[item]?.type;
-    return `px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 whitespace-nowrap ${
-        isForYouActive || isCategoryActive
-        ? 'text-cyan-300 bg-white/10'
-        : 'text-zinc-300 hover:text-white hover:bg-white/5'
+    const isForYouActive = item === 'For You' && view === 'home' && !activeFilter;
+    const isGameActive = item === 'Games' && view === 'game';
+    const isCategoryActive = item !== 'For You' && item !== 'Games' && activeFilter?.type === menuData[item]?.type;
+    return `glass-tab px-4 py-2 text-sm font-semibold whitespace-nowrap ${
+        isForYouActive || isCategoryActive || isGameActive
+        ? 'active text-cyan-300'
+        : 'text-zinc-300 hover:text-white'
     }`;
   }
 
@@ -116,6 +124,13 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
             return (
                 <button key={item} onClick={handleForYouClick} className={getButtonClass(item)}>
                     For You
+                </button>
+            )
+        }
+        if (item === 'Games') {
+            return (
+                <button key={item} onClick={handleGamesClick} className={getButtonClass(item)}>
+                    Games
                 </button>
             )
         }
@@ -226,9 +241,17 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
                   <li>
                       <button 
                           onClick={handleForYouClick} 
-                          className={`text-2xl font-bold transition-colors ${!activeFilter ? 'text-cyan-400' : 'text-white hover:text-cyan-300'}`}
+                          className={`text-2xl font-bold transition-colors ${view === 'home' && !activeFilter ? 'text-cyan-400' : 'text-white hover:text-cyan-300'}`}
                       >
                           For You
+                      </button>
+                  </li>
+                  <li>
+                      <button 
+                          onClick={handleGamesClick} 
+                          className={`text-2xl font-bold transition-colors ${view === 'game' ? 'text-cyan-400' : 'text-white hover:text-cyan-300'}`}
+                      >
+                          Games
                       </button>
                   </li>
                   {['Stream', 'Studios', 'Networks'].map(item => (

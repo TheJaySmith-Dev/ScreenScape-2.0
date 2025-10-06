@@ -33,11 +33,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
     setIsPlayerReady(false);
 
     const onPlayerReady = (event: any) => {
+      // For reliable autoplay, we must mute the player first, then play.
+      event.target.mute();
       event.target.playVideo();
-      setIsPlayerReady(true); // Signal that the player is ready to be controlled
+      setIsPlayerReady(true);
     };
 
     const onPlayerStateChange = (event: any) => {
+      // YT is defined on window by the YouTube IFrame API script
       if (event.data === (window as any).YT.PlayerState.ENDED && onEnd) {
         onEnd();
       }
@@ -45,13 +48,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
 
     const playerContainerNode = playerRef.current;
     
+    // We control autoplay and mute manually in onPlayerReady for better browser compatibility.
     const playerVars: any = {
-      autoplay: 1,
       controls: 0,
       rel: 0,
       showinfo: 0,
       modestbranding: 1,
-      mute: 1, // Always start muted, the effect will handle the state
     };
 
     if (loop) {

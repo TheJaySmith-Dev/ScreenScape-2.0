@@ -16,14 +16,6 @@
               primary: '#0D1321',
               glass: 'rgba(255, 255, 255, 0.05)',
               'glass-edge': 'rgba(255, 255, 255, 0.2)',
-              'brand-netflix': '#E50914',
-              'brand-disney': '#1A3A8B',
-              'brand-max': '#8D47F4',
-              'brand-prime': '#00A8E1',
-              'brand-hulu': '#1CE783',
-              'brand-apple': '#F5F5F7',
-              'brand-paramount': '#0064FF',
-              'brand-peacock': '#FFCB00',
             },
             animation: {
                 'text-focus-in': 'text-focus-in 1s cubic-bezier(0.550, 0.085, 0.680, 0.530) both',
@@ -32,26 +24,11 @@
                 'pulse-ring': 'pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 'speaking-glow': 'speaking-glow 1.2s ease-in-out infinite alternate',
                 'glow': 'glow 2s ease-in-out infinite alternate',
+                'shimmer-effect': 'shimmer-effect 3s infinite linear',
             },
             keyframes: {
-                'text-focus-in': {
-                    '0%': {
-                        filter: 'blur(12px)',
-                        opacity: '0',
-                    },
-                    '100%': {
-                        filter: 'blur(0px)',
-                        opacity: '1',
-                    },
-                },
-                'scale-up-center': {
-                    '0%': {
-                        transform: 'scale(0.5)',
-                    },
-                    '100%': {
-                        transform: 'scale(1)',
-                    },
-                },
+                'text-focus-in': { '0%': { filter: 'blur(12px)', opacity: '0' }, '100%': { filter: 'blur(0px)', opacity: '1' } },
+                'scale-up-center': { '0%': { transform: 'scale(0.5)' }, '100%': { transform: 'scale(1)' } },
                 aurora: {
                   '0%': { transform: 'translate(var(--x-0), var(--y-0))' },
                   '25%': { transform: 'translate(var(--x-1), var(--y-1))' },
@@ -59,67 +36,150 @@
                   '75%': { transform: 'translate(var(--x-3), var(--y-3))' },
                   '100%': { transform: 'translate(var(--x-4), var(--y-4))' },
                 },
-                'pulse-ring': {
-                  '0%': {
-                    transform: 'scale(1)',
-                    opacity: '0.8',
-                  },
-                  '100%': {
-                    transform: 'scale(1.8)',
-                    opacity: '0',
-                  },
-                },
-                'speaking-glow': {
-                  'from': {
-                    boxShadow: '0 0 5px 2px rgba(74, 222, 128, 0.4)',
-                  },
-                  'to': {
-                    boxShadow: '0 0 20px 8px rgba(74, 222, 128, 0.2)',
-                  },
-                },
-                glow: {
-                  'from': {
-                    textShadow: '0 0 5px #fff, 0 0 10px #fff, 0 0 15px #0073e6, 0 0 20px #0073e6, 0 0 25px #0073e6, 0 0 30px #0073e6, 0 0 35px #0073e6',
-                  },
-                  'to': {
-                    textShadow: '0 0 10px #fff, 0 0 20px #fff, 0 0 30px #0073e6, 0 0 40px #0073e6, 0 0 50px #0073e6, 0 0 60px #0073e6, 0 0 70px #0073e6',
-                  },
-                },
+                'pulse-ring': { '0%': { transform: 'scale(1)', opacity: '0.8' }, '100%': { transform: 'scale(1.8)', opacity: '0' } },
+                'speaking-glow': { 'from': { boxShadow: '0 0 5px 2px rgba(74, 222, 128, 0.4)' }, 'to': { boxShadow: '0 0 20px 8px rgba(74, 222, 128, 0.2)' } },
+                glow: { 'from': { textShadow: '0 0 5px #fff, 0 0 10px #fff, 0 0 15px #0073e6, 0 0 20px #0073e6, 0 0 25px #0073e6, 0 0 30px #0073e6, 0 0 35px #0073e6' }, 'to': { textShadow: '0 0 10px #fff, 0 0 20px #fff, 0 0 30px #0073e6, 0 0 40px #0073e6, 0 0 50px #0073e6, 0 0 60px #0073e6, 0 0 70px #0073e6' } },
+                'shimmer-effect': { '0%': { backgroundPosition: '200% 0' }, '100%': { backgroundPosition: '-200% 0' } },
+                'ripple-effect': { 'to': { transform: 'scale(4)', opacity: '0' } }
             },
           },
         },
       };
     </script>
     <style>
-      .disney-progress-bar {
+      :root {
+        --mouse-x: 0.5;
+        --mouse-y: 0.5;
+      }
+      /* --- Glass Morphism Panels --- */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.08);
+        -webkit-backdrop-filter: blur(20px) saturate(120%);
+        backdrop-filter: blur(20px) saturate(120%);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        transition: transform 0.3s ease, border-color 0.3s ease;
+      }
+      .glass-panel:hover {
+        transform: scale(1.03);
+        border-color: rgba(0, 231, 255, 0.5);
+      }
+      
+      /* --- Liquid Progress Bar --- */
+      .liquid-progress-bar {
         position: absolute;
         left: 50%;
         transform: translateX(-50%);
-        bottom: 1.25rem; /* 20px, matches old 'bottom-5' */
+        bottom: 1.25rem;
         z-index: 30;
-        width: 80%; /* matches old 'w-4/5' */
+        width: 80%;
       }
-      @media (min-width: 768px) { /* md breakpoint */
-          .disney-progress-bar {
-              width: 66.666667%; /* matches old 'md:w-2/3' */
-          }
-      }
-      .disney-bar-bg {
+      @media (min-width: 768px) { .liquid-progress-bar { width: 66.666667%; } }
+      .liquid-bar-bg {
         width: 100%;
-        height: 3px;
-        background: rgba(255,255,255,0.2);
-        border-radius: 2px;
-        overflow: hidden;
+        height: 4px;
+        background: rgba(255,255,255,0.1);
         -webkit-backdrop-filter: blur(8px);
         backdrop-filter: blur(8px);
+        border-radius: 4px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
       }
-      .disney-bar-fill {
+      .liquid-bar-fill {
         height: 100%;
         width: 0;
-        background: linear-gradient(90deg, #fff, #93d4ff, #fff);
-        border-radius: 2px;
-        position: relative;
+        border-radius: 4px;
         transition: width 0.1s linear;
+        position: relative;
+        background: linear-gradient(90deg, #93d4ff, #ffffff, #64b5f6, #93d4ff);
+        background-size: 200% 100%;
+        animation: shimmer-effect 2s infinite linear;
+      }
+      
+      /* --- Glass Buttons --- */
+      .glass-button {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        transition: all 0.2s cubic-bezier(0.390, 0.575, 0.565, 1.000);
+      }
+      .glass-button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 15px rgba(0, 231, 255, 0.4);
+        border-color: rgba(0, 231, 255, 0.7);
+      }
+      .glass-button:active {
+        transform: scale(0.98);
+      }
+
+      .glass-button-primary {
+        background: linear-gradient(135deg, rgba(25, 118, 210, 0.7), rgba(100, 181, 246, 0.7));
+      }
+      .glass-button-secondary {
+        background: rgba(255, 255, 255, 0.15);
+      }
+      
+      /* --- Ripple Effect --- */
+      span.ripple {
+        position: absolute;
+        border-radius: 50%;
+        transform: scale(0);
+        animation: ripple-effect 0.6s ease-out;
+        background-color: rgba(255, 255, 255, 0.4);
+        pointer-events: none;
+      }
+      
+      /* --- Header Glass Tabs --- */
+      .glass-tab {
+        background: transparent;
+        border: none;
+        position: relative;
+        transition: color 0.3s ease;
+      }
+      .glass-tab::after {
+        content: '';
+        position: absolute;
+        bottom: -4px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 2px;
+        background: linear-gradient(90deg, #93d4ff, #64b5f6);
+        border-radius: 2px;
+        transition: width 0.3s ease;
+      }
+      .glass-tab.active {
+        color: #93d4ff;
+      }
+      .glass-tab.active::after {
+        width: 80%;
+      }
+      
+      /* --- Hero Lighting & Parallax --- */
+      .hero-container {
+        --mouse-x: 0.5;
+        --mouse-y: 0.5;
+      }
+      .hero-light-effect::after {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: inherit;
+        background: radial-gradient(circle 400px at calc(var(--mouse-x) * 100%) calc(var(--mouse-y) * 100%), rgba(255, 255, 255, 0.25), transparent);
+        opacity: 0;
+        transition: opacity 0.5s ease;
+        pointer-events: none;
+        z-index: 25;
+      }
+      .hero-container:hover .hero-light-effect::after {
+        opacity: 1;
+      }
+      .hero-parallax-content {
+        transform: translate(calc((var(--mouse-x) - 0.5) * -30px), calc((var(--mouse-y) - 0.5) * -20px));
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       }
     </style>
     <script src="https://www.youtube.com/iframe_api"></script>
@@ -136,7 +196,7 @@
 </head>
   <body class="bg-primary text-white overflow-x-hidden">
     <div class="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden bg-primary">
-      <div class="absolute inset-[-200%] animate-aurora" style="background-image: radial-gradient(at 21% 33%, hsla(240, 90%, 10%, 0.4) 0px, transparent 50%), radial-gradient(at 79% 32%, hsla(277, 90%, 15%, 0.4) 0px, transparent 50%), radial-gradient(at 26% 83%, hsla(210, 90%, 20%, 0.4) 0px, transparent 50%), radial-gradient(at 73% 88%, hsla(300, 90%, 25%, 0.4) 0px, transparent 50%); --x-0: 10%; --y-0: 10%; --x-1: 30%; --y-1: 70%; --x-2: 80%; --y-2: 40%; --x-3: 40%; --y-3: 20%; --x-4: 10%; --y-4: 10%;"></div>
+      <div class="absolute inset-[-200%] animate-aurora" style="background-image: radial-gradient(at 21% 33%, hsla(240, 90%, 10%, 0.2) 0px, transparent 50%), radial-gradient(at 79% 32%, hsla(277, 90%, 15%, 0.2) 0px, transparent 50%), radial-gradient(at 26% 83%, hsla(210, 90%, 20%, 0.25) 0px, transparent 50%), radial-gradient(at 73% 88%, hsla(300, 90%, 25%, 0.25) 0px, transparent 50%); --x-0: 10%; --y-0: 10%; --x-1: 30%; --y-1: 70%; --x-2: 80%; --y-2: 40%; --x-3: 40%; --y-3: 20%; --x-4: 10%; --y-4: 10%;"></div>
     </div>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

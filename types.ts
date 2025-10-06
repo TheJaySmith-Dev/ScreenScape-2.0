@@ -1,117 +1,60 @@
-// Raw API response type for a movie
+
 export interface Movie {
   id: number;
   title: string;
-  overview: string;
   poster_path: string | null;
   backdrop_path: string | null;
+  overview: string;
   release_date: string;
   vote_average: number;
+  media_type: 'movie';
   genre_ids: number[];
-  popularity: number;
-  media_type?: 'movie';
 }
 
-// Raw API response type for a TV show
 export interface TVShow {
   id: number;
   name: string;
-  overview: string;
   poster_path: string | null;
   backdrop_path: string | null;
+  overview: string;
   first_air_date: string;
   vote_average: number;
+  media_type: 'tv';
   genre_ids: number[];
-  popularity: number;
-  media_type?: 'tv';
 }
 
-// Normalized type for use throughout the UI components
+export interface WatchProvider {
+    logo_path: string;
+    provider_id: number;
+    provider_name: string;
+    display_priority: number;
+}
+
+export interface WatchProviderCountry {
+    link: string;
+    flatrate?: WatchProvider[];
+    rent?: WatchProvider[];
+    buy?: WatchProvider[];
+}
+
+export interface WatchProviderResponse {
+    id: number;
+    results: {
+        [countryCode: string]: WatchProviderCountry;
+    };
+}
+
+
 export interface MediaItem {
   id: number;
-  title: string; // Normalized from movie.title or tv.name
-  overview: string;
+  title: string;
   poster_path: string | null;
   backdrop_path: string | null;
-  release_date: string; // Normalized from movie.release_date or tv.first_air_date
+  overview: string;
+  release_date: string;
   vote_average: number;
-  genre_ids: number[];
-  popularity: number;
   media_type: 'movie' | 'tv';
   watchProviders?: WatchProviderCountry | null;
-}
-
-export interface MovieDetails extends Movie {
-    genres: { id: number, name: string }[];
-    runtime: number;
-}
-
-export interface NextEpisodeToAir {
-    id: number;
-    name: string;
-    overview: string;
-    vote_average: number;
-    vote_count: number;
-    air_date: string;
-    episode_number: number;
-    production_code: string;
-    runtime: number;
-    season_number: number;
-    show_id: number;
-    still_path: string | null;
-}
-
-export interface Creator {
-    id: number;
-    credit_id: string;
-    name: string;
-    gender: number | null;
-    profile_path: string | null;
-}
-
-export interface SeasonSummary {
-    air_date: string | null;
-    episode_count: number;
-    id: number;
-    name: string;
-    overview: string;
-    poster_path: string | null;
-    season_number: number;
-}
-
-export interface TVShowDetails extends TVShow {
-    genres: { id: number, name: string }[];
-    created_by: Creator[];
-    episode_run_time: number[];
-    number_of_seasons: number;
-    seasons: SeasonSummary[];
-    next_episode_to_air: NextEpisodeToAir | null;
-    last_air_date: string | null;
-    status: string;
-}
-
-export interface Episode {
-    air_date: string;
-    episode_number: number;
-    id: number;
-    name: string;
-    overview: string;
-    season_number: number;
-    still_path: string | null;
-}
-
-
-export interface Video {
-  id: string;
-  iso_639_1: string;
-  iso_3166_1: string;
-  key: string;
-  name: string;
-  official: boolean;
-  published_at: string;
-  site: string;
-  size: number;
-  type: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -119,6 +62,45 @@ export interface PaginatedResponse<T> {
   results: T[];
   total_pages: number;
   total_results: number;
+}
+
+export interface Video {
+    iso_639_1: string;
+    iso_3166_1: string;
+    name: string;
+    key: string;
+    site: string;
+    size: number;
+    type: string;
+    official: boolean;
+    published_at: string;
+    id: string;
+}
+
+export interface Genre {
+    id: number;
+    name: string;
+}
+
+interface ProductionCompany {
+    id: number;
+    logo_path: string | null;
+    name: string;
+    origin_country: string;
+}
+
+export interface MovieDetails extends Movie {
+    genres: Genre[];
+    runtime: number | null;
+    production_companies: ProductionCompany[];
+}
+
+export interface TVShowDetails extends TVShow {
+    genres: Genre[];
+    number_of_seasons: number;
+    number_of_episodes: number;
+    episode_run_time: number[];
+    production_companies: ProductionCompany[];
 }
 
 export interface CastMember {
@@ -132,9 +114,11 @@ export interface CrewMember {
     id: number;
     name: string;
     job: string;
+    profile_path: string | null;
 }
 
 export interface CreditsResponse {
+    id: number;
     cast: CastMember[];
     crew: CrewMember[];
 }
@@ -151,28 +135,22 @@ export interface LogoImage {
 
 export interface ImageResponse {
     id: number;
+    backdrops: any[];
     logos: LogoImage[];
+    posters: any[];
 }
 
-export interface Provider {
-  logo_path: string;
-  provider_id: number;
-  provider_name: string;
-  display_priority: number;
-}
-
-export interface WatchProviderCountry {
-  link: string;
-  flatrate?: Provider[];
-  rent?: Provider[];
-  buy?: Provider[];
-}
-
-export interface WatchProviderResponse {
-  id: number;
-  results: {
-    [countryCode: string]: WatchProviderCountry;
-  };
+export interface Episode {
+    air_date: string;
+    episode_number: number;
+    id: number;
+    name: string;
+    overview: string;
+    production_code: string;
+    season_number: number;
+    still_path: string | null;
+    vote_average: number;
+    vote_count: number;
 }
 
 export type FilterCategory = 'service' | 'studio' | 'network';
