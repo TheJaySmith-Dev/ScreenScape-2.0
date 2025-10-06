@@ -38,6 +38,7 @@ export interface MediaItem {
   genre_ids: number[];
   popularity: number;
   media_type: 'movie' | 'tv';
+  watchProviders?: WatchProviderCountry | null;
 }
 
 export interface MovieDetails extends Movie {

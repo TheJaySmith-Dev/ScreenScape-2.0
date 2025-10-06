@@ -90,24 +90,17 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
     
     const voiceSessionPromise = useRef<any>(null);
 
-    // FIX: Corrected multiple useRef hooks that were missing an initial value.
-    // FIX: useRef must be called with an initial value.
+    // FIX: All useRef hooks must be initialized with a value.
     const inputAudioContext = useRef<AudioContext | undefined>(undefined);
-    // FIX: useRef must be called with an initial value.
     const outputAudioContext = useRef<AudioContext | undefined>(undefined);
     const nextStartTime = useRef(0);
     const audioSources = useRef(new Set<AudioBufferSourceNode>());
-    // FIX: useRef must be called with an initial value.
     const mediaStream = useRef<MediaStream | undefined>(undefined);
-    // FIX: useRef must be called with an initial value.
     const scriptProcessor = useRef<ScriptProcessorNode | undefined>(undefined);
     
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    // FIX: useRef must be called with an initial value.
     const inputAnalyser = useRef<AnalyserNode | undefined>(undefined);
-    // FIX: useRef must be called with an initial value.
     const outputAnalyser = useRef<AnalyserNode | undefined>(undefined);
-    // FIX: useRef must be called with an initial value.
     const animationFrameId = useRef<number | undefined>(undefined);
 
     useEffect(() => {
