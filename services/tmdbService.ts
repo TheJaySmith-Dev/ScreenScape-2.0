@@ -1,4 +1,3 @@
-
 import type { Movie, TVShow, MediaItem, PaginatedResponse, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, WatchProviderResponse } from '../types';
 
 const API_BASE_URL = 'https://api.themoviedb.org/3';
@@ -41,7 +40,20 @@ export const getTrendingAll = (apiKey: string) => fetchFromTMDB<PaginatedRespons
 export const searchMulti = (apiKey: string, query: string, page: number = 1) => fetchFromTMDB<PaginatedResponse<Movie | TVShow>>(apiKey, 'search/multi', { query, page });
 export const getPopularMovies = (apiKey: string) => fetchFromTMDB<PaginatedResponse<Movie>>(apiKey, 'movie/popular');
 export const getPopularTVShows = (apiKey: string) => fetchFromTMDB<PaginatedResponse<TVShow>>(apiKey, 'tv/popular');
-export const getUpcomingMovies = (apiKey: string) => fetchFromTMDB<PaginatedResponse<Movie>>(apiKey, 'movie/upcoming');
+export const getUpcomingMovies = (apiKey: string) => {
+  const today = new Date();
+  const future = new Date();
+  future.setMonth(today.getMonth() + 6);
+
+  const todayString = today.toISOString().split('T')[0];
+  const futureString = future.toISOString().split('T')[0];
+
+  return discoverMovies(apiKey, {
+    'primary_release_date.gte': todayString,
+    'primary_release_date.lte': futureString,
+    sort_by: 'popularity.desc',
+  });
+};
 export const getOnTheAirTVShows = (apiKey: string) => fetchFromTMDB<PaginatedResponse<TVShow>>(apiKey, 'tv/on_the_air');
 export const getMovieVideos = (apiKey: string, id: number) => fetchFromTMDB<{id: number; results: Video[]}>(apiKey, `movie/${id}/videos`).then(res => res.results);
 export const getTVShowVideos = (apiKey: string, id: number) => fetchFromTMDB<{id: number; results: Video[]}>(apiKey, `tv/${id}/videos`).then(res => res.results);

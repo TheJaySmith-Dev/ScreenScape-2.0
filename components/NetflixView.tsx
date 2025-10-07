@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { ViewType } from '../App';
 import type { MediaItem, Movie, TVShow, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, LogoImage, Episode, CastMember, CrewMember, WatchProviderResponse, WatchProviderCountry, ActiveFilter, PaginatedResponse } from '../types';
@@ -27,11 +28,13 @@ import {
   getMoviesByCompany,
   discoverTVShows,
   getNewMoviesByProvider,
+  // FIX: Corrected typo in function name from getNewTVShowsProvider to getNewTVShowsByProvider.
   getNewTVShowsByProvider,
   getTopRatedMoviesByCompany,
   getTopRatedTVShowsByNetwork,
 } from '../services/tmdbService';
 import { usePreferences } from '../hooks/usePreferences';
+import { useCountdown } from '../hooks/useCountdown';
 import Loader from './Loader';
 import { PlayIcon, StarIcon, StarIconSolid, XIcon, MuteIcon, UnmuteIcon, InfoIcon } from './Icons';
 import VideoPlayer from './VideoPlayer';
@@ -96,12 +99,31 @@ const DisneyPlusLogoOverlay: React.FC<{className?: string}> = ({ className = '' 
     />
 );
 
+const CountdownTimer: React.FC<{ releaseDate: string }> = ({ releaseDate }) => {
+    const { days, hours, minutes, seconds, hasEnded } = useCountdown(releaseDate);
+
+    if (hasEnded) {
+        return (
+            <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-2 py-1 text-center text-xs font-semibold text-green-400 backdrop-blur-sm">
+                Released!
+            </div>
+        );
+    }
+
+    return (
+        <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-2 py-1 text-center text-xs text-white backdrop-blur-sm">
+            <span className="font-bold">{days}</span>d <span className="font-bold">{hours}</span>h <span className="font-bold">{minutes}</span>m <span className="font-bold">{seconds}</span>s
+        </div>
+    );
+};
+
 interface MediaItemCardProps {
     item: MediaItem;
     onSelect: (item: MediaItem) => void;
+    isUpcoming?: boolean;
 }
 
-const MediaItemCard: React.FC<MediaItemCardProps> = React.memo(({ item, onSelect }) => {
+const MediaItemCard: React.FC<MediaItemCardProps> = React.memo(({ item, onSelect, isUpcoming }) => {
     const imageUrl = item.poster_path ? `${IMAGE_BASE_URL}w500${item.poster_path}` : `https://via.placeholder.com/500x750?text=No+Image`;
     const isDisneyPlus = item.watchProviders?.flatrate?.some(p => p.provider_id === 337);
 
@@ -115,10 +137,13 @@ const MediaItemCard: React.FC<MediaItemCardProps> = React.memo(({ item, onSelect
             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-70 transition-all duration-300 z-10"></div>
             <div className="absolute inset-0 p-3 flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
                 <h3 className="text-white text-base font-bold drop-shadow-lg">{item.title}</h3>
-                <div className="text-xs text-zinc-300 mt-1 flex items-center">
-                    <span>{item.release_date?.substring(0, 4)}</span>
-                </div>
+                {!isUpcoming && (
+                    <div className="text-xs text-zinc-300 mt-1 flex items-center">
+                        <span>{item.release_date?.substring(0, 4)}</span>
+                    </div>
+                )}
             </div>
+            {isUpcoming && item.release_date && <CountdownTimer releaseDate={item.release_date} />}
         </div>
     );
 });
@@ -128,9 +153,10 @@ interface MediaRowProps {
     title: string;
     items: MediaItem[];
     onSelect: (item: MediaItem) => void;
+    isUpcomingRow?: boolean;
 }
 
-const MediaRow: React.FC<MediaRowProps> = ({ title, items, onSelect }) => {
+const MediaRow: React.FC<MediaRowProps> = ({ title, items, onSelect, isUpcomingRow }) => {
     if (!items || items.length === 0) return null;
     return (
         <div className="mb-8 md:mb-12 last:mb-0">
@@ -140,7 +166,7 @@ const MediaRow: React.FC<MediaRowProps> = ({ title, items, onSelect }) => {
                     <div className="flex space-x-4">
                         {items.filter(item => item.poster_path).map(item => (
                             <div key={`${item.media_type}-${item.id}`} className="flex-shrink-0 w-36 md:w-48">
-                                <MediaItemCard item={item} onSelect={onSelect} />
+                                <MediaItemCard item={item} onSelect={onSelect} isUpcoming={isUpcomingRow} />
                             </div>
                         ))}
                     </div>
@@ -372,7 +398,11 @@ const Modal: React.FC<ModalProps> = ({ item, apiKey, onClose, onSelect }) => {
         try {
             const detailsFn = item.media_type === 'movie' ? getMovieDetails : getTVShowDetails;
             const videoFn = item.media_type === 'movie' ? getMovieVideos : getTVShowVideos;
-            const similarFn = item.media_type === 'movie' ? getSimilarMovies : (id: number) => Promise.resolve({ results: [] }); // No 'similar' for TV on this endpoint
+            // FIX: The function signature for the TV show case was updated to accept two arguments,
+            // matching the signature of `getSimilarMovies`. This resolves a TypeScript error when
+            // calling `similarFn` within `Promise.all`, as it ensures a consistent function signature
+            // for both movie and TV show types.
+            const similarFn = item.media_type === 'movie' ? getSimilarMovies : (_apiKey: string, _id: number) => Promise.resolve({ results: [] } as PaginatedResponse<TVShow>);
 
             const [detailsData, videoData, similarData] = await Promise.all([
                 detailsFn(apiKey, item.id),
@@ -385,7 +415,7 @@ const Modal: React.FC<ModalProps> = ({ item, apiKey, onClose, onSelect }) => {
             const bestVideo = videoData.find(v => v.type === 'Trailer') || videoData.find(v => v.type === 'Teaser') || videoData[0];
             setTrailer(bestVideo || null);
 
-            const normalizedSimilar = similarData.results
+            const normalizedSimilar = (similarData.results as (Movie | TVShow)[])
                 .map(i => item.media_type === 'movie' ? normalizeMovie(i as Movie) : normalizeTVShow(i as TVShow))
                 .filter(i => i.poster_path);
             setSimilarItems(normalizedSimilar);
@@ -687,7 +717,7 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
       <>
         <Hero items={data['For You'] || []} onSelect={handleSelectMedia} apiKey={apiKey} />
         {Object.entries(data).map(([title, items]) =>
-            title !== 'For You' && <MediaRow key={title} title={title} items={items} onSelect={handleSelectMedia} />
+            title !== 'For You' && <MediaRow key={title} title={title} items={items} onSelect={handleSelectMedia} isUpcomingRow={title === 'Upcoming Movies'} />
         )}
       </>
     );
