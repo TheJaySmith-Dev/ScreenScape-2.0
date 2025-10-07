@@ -23,6 +23,26 @@ export interface TVShow {
   genre_ids: number[];
 }
 
+export interface Person {
+    id: number;
+    name: string;
+    profile_path: string | null;
+    known_for_department: string;
+}
+
+export interface PersonMovieCredit {
+    id: number;
+    title: string;
+    poster_path: string | null;
+    character: string;
+    release_date: string;
+}
+
+export interface PersonMovieCreditsResponse {
+    cast: PersonMovieCredit[];
+    id: number;
+}
+
 export interface WatchProvider {
     logo_path: string;
     provider_id: number;

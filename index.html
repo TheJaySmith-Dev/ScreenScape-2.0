@@ -16,6 +16,13 @@
               primary: '#0D1321',
               glass: 'rgba(255, 255, 255, 0.05)',
               'glass-edge': 'rgba(255, 255, 255, 0.2)',
+              cyan: {
+                300: 'var(--color-accent-300)',
+                400: 'var(--color-accent-400)',
+                500: 'var(--color-accent-500)',
+                600: 'var(--color-accent-600)',
+                700: 'var(--color-accent-700)',
+              },
             },
             animation: {
                 'text-focus-in': 'text-focus-in 1s cubic-bezier(0.550, 0.085, 0.680, 0.530) both',
@@ -38,7 +45,10 @@
                 },
                 'pulse-ring': { '0%': { transform: 'scale(1)', opacity: '0.8' }, '100%': { transform: 'scale(1.8)', opacity: '0' } },
                 'speaking-glow': { 'from': { boxShadow: '0 0 5px 2px rgba(74, 222, 128, 0.4)' }, 'to': { boxShadow: '0 0 20px 8px rgba(74, 222, 128, 0.2)' } },
-                glow: { 'from': { textShadow: '0 0 5px #fff, 0 0 10px #fff, 0 0 15px #0073e6, 0 0 20px #0073e6, 0 0 25px #0073e6, 0 0 30px #0073e6, 0 0 35px #0073e6' }, 'to': { textShadow: '0 0 10px #fff, 0 0 20px #fff, 0 0 30px #0073e6, 0 0 40px #0073e6, 0 0 50px #0073e6, 0 0 60px #0073e6, 0 0 70px #0073e6' } },
+                glow: { 
+                  'from': { textShadow: '0 0 5px #fff, 0 0 10px #fff, 0 0 15px var(--glow-color), 0 0 20px var(--glow-color), 0 0 25px var(--glow-color), 0 0 30px var(--glow-color), 0 0 35px var(--glow-color)' }, 
+                  'to': { textShadow: '0 0 10px #fff, 0 0 20px #fff, 0 0 30px var(--glow-color), 0 0 40px var(--glow-color), 0 0 50px var(--glow-color), 0 0 60px var(--glow-color), 0 0 70px var(--glow-color)' } 
+                },
                 'shimmer-effect': { '0%': { backgroundPosition: '200% 0' }, '100%': { backgroundPosition: '-200% 0' } },
                 'ripple-effect': { 'to': { transform: 'scale(4)', opacity: '0' } }
             },
@@ -50,6 +60,12 @@
       :root {
         --mouse-x: 0.5;
         --mouse-y: 0.5;
+        --color-accent-300: #93d4ff;
+        --color-accent-400: #64b5f6;
+        --color-accent-500: #2196f3;
+        --color-accent-600: #0073e6;
+        --color-accent-700: #0d47a1;
+        --glow-color: #0073e6;
       }
       /* --- Glass Morphism Panels --- */
       .glass-panel {
@@ -63,7 +79,7 @@
       }
       .glass-panel:hover {
         transform: scale(1.03);
-        border-color: rgba(0, 231, 255, 0.5);
+        border-color: var(--color-accent-400);
       }
       
       /* --- Liquid Progress Bar --- */
@@ -92,7 +108,7 @@
         border-radius: 4px;
         transition: width 0.1s linear;
         position: relative;
-        background: linear-gradient(90deg, #93d4ff, #ffffff, #64b5f6, #93d4ff);
+        background: linear-gradient(90deg, var(--color-accent-300), #ffffff, var(--color-accent-400), var(--color-accent-300));
         background-size: 200% 100%;
         animation: shimmer-effect 2s infinite linear;
       }
@@ -108,15 +124,15 @@
       }
       .glass-button:hover {
         transform: scale(1.05);
-        box-shadow: 0 0 15px rgba(0, 231, 255, 0.4);
-        border-color: rgba(0, 231, 255, 0.7);
+        box-shadow: 0 0 15px color-mix(in srgb, var(--color-accent-500) 40%, transparent);
+        border-color: color-mix(in srgb, var(--color-accent-400) 70%, transparent);
       }
       .glass-button:active {
         transform: scale(0.98);
       }
 
       .glass-button-primary {
-        background: linear-gradient(135deg, rgba(25, 118, 210, 0.7), rgba(100, 181, 246, 0.7));
+        background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-700) 70%, transparent), color-mix(in srgb, var(--color-accent-400) 70%, transparent));
       }
       .glass-button-secondary {
         background: rgba(255, 255, 255, 0.15);
@@ -147,12 +163,12 @@
         transform: translateX(-50%);
         width: 0;
         height: 2px;
-        background: linear-gradient(90deg, #93d4ff, #64b5f6);
+        background: linear-gradient(90deg, var(--color-accent-300), var(--color-accent-400));
         border-radius: 2px;
         transition: width 0.3s ease;
       }
       .glass-tab.active {
-        color: #93d4ff;
+        color: var(--color-accent-300);
       }
       .glass-tab.active::after {
         width: 80%;

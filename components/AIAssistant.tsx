@@ -1,6 +1,11 @@
 
 
 
+
+
+
+
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Chat, FunctionDeclaration, Type, LiveServerMessage, Modality, Blob as GenAIBlob } from '@google/genai';
 import { SparklesIcon, XIcon, PaperAirplaneIcon, MicrophoneIcon, GearIcon } from './Icons';
@@ -75,8 +80,6 @@ const MediaCard: React.FC<{ item: MediaItem, onClick: () => void }> = ({ item, o
     </div>
 );
 
-// FIX: Removed geminiApiKey from props to align with Gemini API guidelines.
-// The key will be sourced from `process.env.API_KEY`.
 const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -89,20 +92,25 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [selectedVoice, setSelectedVoice] = useState('Zephyr');
     
-    const voiceSessionPromise = useRef<any>(null);
-
-    // FIX: All useRef hooks must be initialized with a value.
-    const inputAudioContext = useRef<AudioContext | undefined>(undefined);
-    const outputAudioContext = useRef<AudioContext | undefined>(undefined);
+    const voiceSessionPromise = useRef<Promise<any> | null>(null);
+    // FIX: Initialize useRef with null to provide an explicit initial value.
+    const inputAudioContext = useRef<AudioContext | null>(null);
+    // FIX: Initialize useRef with null to provide an explicit initial value.
+    const outputAudioContext = useRef<AudioContext | null>(null);
     const nextStartTime = useRef(0);
     const audioSources = useRef(new Set<AudioBufferSourceNode>());
-    const mediaStream = useRef<MediaStream | undefined>(undefined);
-    const scriptProcessor = useRef<ScriptProcessorNode | undefined>(undefined);
+    // FIX: Initialize useRef with null to provide an explicit initial value.
+    const mediaStream = useRef<MediaStream | null>(null);
+    // FIX: Initialize useRef with null to provide an explicit initial value.
+    const scriptProcessor = useRef<ScriptProcessorNode | null>(null);
     
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const inputAnalyser = useRef<AnalyserNode | undefined>(undefined);
-    const outputAnalyser = useRef<AnalyserNode | undefined>(undefined);
-    const animationFrameId = useRef<number | undefined>(undefined);
+    // FIX: Initialize useRef with null to provide an explicit initial value.
+    const inputAnalyser = useRef<AnalyserNode | null>(null);
+    // FIX: Initialize useRef with null to provide an explicit initial value.
+    const outputAnalyser = useRef<AnalyserNode | null>(null);
+    // FIX: Initialize useRef with null to provide an explicit initial value.
+    const animationFrameId = useRef<number | null>(null);
 
     useEffect(() => {
         const savedVoice = localStorage.getItem('screenScapeVoice');
@@ -120,9 +128,13 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
     const functions = {
         findMedia: async ({ query, type }: { query: string; type: 'movie' | 'tv' | 'any' }) => {
             const response = await tmdbService.searchMulti(tmdbApiKey, query, 1);
+            // FIX: Safely filter search results to only include movies and TV shows, as Person objects from the API lack media_type and poster_path.
             let rawResults = response.results.filter(
                 (item): item is Movie | TVShow =>
-                    (item.media_type === 'movie' || item.media_type === 'tv') && !!item.poster_path
+                    'media_type' in item &&
+                    (item.media_type === 'movie' || item.media_type === 'tv') &&
+                    'poster_path' in item &&
+                    !!item.poster_path
             );
             if (type !== 'any') {
                 rawResults = rawResults.filter((item) => item.media_type === type);
@@ -233,20 +245,13 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
 
 
     const initTextChat = useCallback(() => {
-        // FIX: Removed check for geminiApiKey as it's no longer a prop.
         if (chatRef.current) return;
-        // FIX: Initialized GoogleGenAI with API key from environment variable as per guidelines.
-        const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+        const ai = new GoogleGenAI({apiKey: process.env.API_KEY as string});
         const tools = [{ functionDeclarations: [findMediaTool, getMediaDetailsTool, navigateToMediaPageTool] }];
-        // FIX: Replaced deprecated startChat with chats.create and updated model name.
         chatRef.current = ai.chats.create({ model: 'gemini-2.5-flash', config: { tools, systemInstruction } });
         setMessages([{ type: 'text', role: 'model', content: "Hi! I'm ScreenScape AI. How can I help you find something to watch today?" }]);
-    // FIX: Removed geminiApiKey from dependency array.
     }, [systemInstruction]);
 
-// FIX: Replaced the stopVoiceSession function with a more robust version that properly cleans up all Web Audio API resources.
-// The previous implementation was missing cleanup for several audio nodes and contexts, which can lead to memory leaks and errors.
-// This new version disconnects all nodes in the input and output audio graphs and closes both audio contexts.
     const stopVoiceSession = useCallback(async () => {
         setIsVoiceMode(false);
         setVoiceStatus('idle');
@@ -288,7 +293,6 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
     }, []);
 
     const startVoiceSession = useCallback(async () => {
-        // FIX: Removed check for geminiApiKey. The environment variable is assumed to be present.
         setIsVoiceMode(true);
         setVoiceStatus('connecting');
 
@@ -300,11 +304,9 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
             return;
         }
 
-        // FIX: Initialized GoogleGenAI with API key from environment variable as per guidelines.
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
         voiceSessionPromise.current = ai.live.connect({
-            // FIX: Updated to the correct model for live audio sessions.
             model: 'gemini-2.5-flash-native-audio-preview-09-2025',
             callbacks: {
                 onopen: () => {
@@ -391,7 +393,6 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } } }
             },
         });
-    // FIX: Removed geminiApiKey from dependency array.
     }, [stopVoiceSession, functions, selectedVoice, messages.length]);
 
     // Animation loop for visualizer
@@ -491,9 +492,8 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
         setInput('');
         setIsLoading(true);
         try {
-            // FIX: Updated sendMessage to pass an object and handle the response from the new SDK version.
             let result = await chatRef.current.sendMessage({ message: currentInput });
-            // FIX: Updated property from function_calls to functionCalls.
+
             while (result.functionCalls && result.functionCalls.length > 0) {
                 const fc = result.functionCalls[0];
                 const functionToCall = functions[fc.name as keyof typeof functions];
@@ -502,17 +502,17 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
                 const functionResult = await functionToCall(fc.args as any);
                 if (fc.name === 'findMedia' && Array.isArray(functionResult) && functionResult.length > 0) {
                     const detailedItems = await tmdbService.searchMulti(tmdbApiKey, (fc.args as any).query, 1);
-                    const normalized = detailedItems.results.map(i => i.media_type === 'movie' ? tmdbService.normalizeMovie(i as Movie) : tmdbService.normalizeTVShow(i as TVShow));
+                    // FIX: Safely filter search results to only include movies and TV shows before normalization.
+                    const mediaItems = detailedItems.results.filter((i): i is Movie | TVShow => 'media_type' in i && (i.media_type === 'movie' || i.media_type === 'tv'));
+                    const normalized = mediaItems.map(i => i.media_type === 'movie' ? tmdbService.normalizeMovie(i as Movie) : tmdbService.normalizeTVShow(i as TVShow));
                     const validItems = normalized.filter(item => item.poster_path);
                     if (validItems.length > 0) {
                         setMessages(prev => [...prev, { type: 'cards', role: 'model', items: validItems.slice(0, 5) }]);
                     }
                 }
                 const apiResponse = Array.isArray(functionResult) ? { results: functionResult } : functionResult;
-                // FIX: Updated sendMessage to pass an object for function responses.
                 result = await chatRef.current.sendMessage({ message: [{ functionResponse: { id: fc.id, name: fc.name, response: apiResponse } }] });
             }
-            // FIX: Updated to access the .text property directly instead of calling a function.
             const text = result.text;
             if (text) setMessages(prev => [...prev, { type: 'text', role: 'model', content: text }]);
         } catch (error) {

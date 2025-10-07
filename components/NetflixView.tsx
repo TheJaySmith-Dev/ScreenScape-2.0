@@ -1,7 +1,9 @@
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { ViewType } from '../App';
 import type { MediaItem, Movie, TVShow, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, LogoImage, Episode, CastMember, CrewMember, WatchProviderResponse, WatchProviderCountry, ActiveFilter, PaginatedResponse } from '../types';
+import type { Game } from './GameView';
 import {
   getTrendingAll,
   searchMulti,
@@ -18,6 +20,7 @@ import {
   getMovieCredits,
   getTVShowCredits,
   getSimilarMovies,
+  getSimilarTVShows,
   getTVShowSeasonDetails,
   getMovieImages,
   getTVShowImages,
@@ -28,7 +31,6 @@ import {
   getMoviesByCompany,
   discoverTVShows,
   getNewMoviesByProvider,
-  // FIX: Corrected typo in function name from getNewTVShowsProvider to getNewTVShowsByProvider.
   getNewTVShowsByProvider,
   getTopRatedMoviesByCompany,
   getTopRatedTVShowsByNetwork,
@@ -337,6 +339,61 @@ const Hero: React.FC<HeroProps> = ({ items, onSelect, apiKey }) => {
 };
 
 
+const GamePromoCard: React.FC<{ title: string; imageUrl: string; onClick: () => void }> = ({ title, imageUrl, onClick }) => (
+    <div
+        className="group relative w-full aspect-video rounded-lg overflow-hidden cursor-pointer transform transition-all duration-300 ease-in-out hover:scale-105 hover:z-20 shadow-lg hover:shadow-cyan-500/20"
+        onClick={onClick}
+    >
+        <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
+        {/* Add a subtle overlay on hover for feedback, but no text */}
+        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300 z-10"></div>
+    </div>
+);
+
+interface GameRowProps {
+    onSelectGame: (game: Game) => void;
+}
+
+const GameRow: React.FC<GameRowProps> = ({ onSelectGame }) => {
+    const games = [
+        {
+            id: 'trivia',
+            title: 'Movie Trivia',
+            imageUrl: 'https://i.postimg.cc/j55v2NhM/Movie-Trivia.avif',
+        },
+        {
+            id: 'six-degrees',
+            title: 'Six Degrees',
+            imageUrl: 'https://i.postimg.cc/SQcVsy65/Six-Degrees.avif',
+        },
+        {
+            id: 'guess-poster',
+            title: 'Guess The Poster',
+            imageUrl: 'https://i.postimg.cc/RV7MXncF/Guess-The-Poster.avif',
+        }
+    ];
+
+    return (
+        <div className="mb-8 md:mb-12">
+            <h2 className="text-xl md:text-3xl font-bold mb-4 px-4 md:px-12">SS Games</h2>
+            <div className="pl-4 md:pl-12 overflow-x-auto overflow-y-hidden pb-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+                <div className="flex space-x-4">
+                    {games.map(game => (
+                        <div key={game.id} className="flex-shrink-0 w-64 md:w-80">
+                           <GamePromoCard
+                                title={game.title}
+                                imageUrl={game.imageUrl}
+                                onClick={() => onSelectGame(game.id as Game)}
+                           />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 interface ResultsGridProps {
     title?: string;
     items: MediaItem[];
@@ -398,11 +455,7 @@ const Modal: React.FC<ModalProps> = ({ item, apiKey, onClose, onSelect }) => {
         try {
             const detailsFn = item.media_type === 'movie' ? getMovieDetails : getTVShowDetails;
             const videoFn = item.media_type === 'movie' ? getMovieVideos : getTVShowVideos;
-            // FIX: The function signature for the TV show case was updated to accept two arguments,
-            // matching the signature of `getSimilarMovies`. This resolves a TypeScript error when
-            // calling `similarFn` within `Promise.all`, as it ensures a consistent function signature
-            // for both movie and TV show types.
-            const similarFn = item.media_type === 'movie' ? getSimilarMovies : (_apiKey: string, _id: number) => Promise.resolve({ results: [] } as PaginatedResponse<TVShow>);
+            const similarFn = item.media_type === 'movie' ? getSimilarMovies : getSimilarTVShows;
 
             const [detailsData, videoData, similarData] = await Promise.all([
                 detailsFn(apiKey, item.id),
@@ -416,7 +469,7 @@ const Modal: React.FC<ModalProps> = ({ item, apiKey, onClose, onSelect }) => {
             setTrailer(bestVideo || null);
 
             const normalizedSimilar = (similarData.results as (Movie | TVShow)[])
-                .map(i => item.media_type === 'movie' ? normalizeMovie(i as Movie) : normalizeTVShow(i as TVShow))
+                .map(i => i.media_type === 'movie' ? normalizeMovie(i as Movie) : normalizeTVShow(i as TVShow))
                 .filter(i => i.poster_path);
             setSimilarItems(normalizedSimilar);
 
@@ -511,9 +564,10 @@ interface NetflixViewProps {
   onInvalidApiKey: () => void;
   view: ViewType;
   activeFilter: ActiveFilter | null;
+  onSelectGame: (game: Game) => void;
 }
 
-const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvalidApiKey, view, activeFilter }) => {
+const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvalidApiKey, view, activeFilter, onSelectGame }) => {
   const [data, setData] = useState<{ [key: string]: MediaItem[] }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -548,7 +602,7 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
     setError(null);
     try {
         const [trending, popularMovies, popularTV, upcomingMovies, onTheAirTV] = await Promise.all([
-            getTrendingAll(apiKey).then(res => processApiResponse(res, item => item.media_type === 'movie' ? normalizeMovie(item) : normalizeTVShow(item))),
+            getTrendingAll(apiKey).then(res => processApiResponse(res, item => item.media_type === 'movie' ? normalizeMovie(item as Movie) : normalizeTVShow(item as TVShow))),
             getPopularMovies(apiKey).then(res => processApiResponse(res, normalizeMovie)),
             getPopularTVShows(apiKey).then(res => processApiResponse(res, normalizeTVShow)),
             getUpcomingMovies(apiKey).then(res => processApiResponse(res, normalizeMovie)),
@@ -588,7 +642,12 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
       setIsLoading(true);
       try {
           const response = await searchMulti(apiKey, query, page);
-          const newResults = processApiResponse(response, item => item.media_type === 'movie' ? normalizeMovie(item) : normalizeTVShow(item));
+          // FIX: Add type guard to safely filter for only Movie or TVShow types, as Person type does not have media_type.
+          const newResults = response.results
+            .filter((item): item is Movie | TVShow => ('media_type' in item && (item.media_type === 'movie' || item.media_type === 'tv')))
+            .map(item => item.media_type === 'movie' ? normalizeMovie(item) : normalizeTVShow(item))
+            .filter(item => item.poster_path && !isDisliked(item.id));
+            
           setSearchResults(prev => page === 1 ? newResults : [...prev, ...newResults]);
           setHasMoreResults(response.page < response.total_pages);
       } catch (e) {
@@ -596,7 +655,7 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
       } finally {
           setIsLoading(false);
       }
-  }, [apiKey, processApiResponse]);
+  }, [apiKey, isDisliked]);
 
   const handleFilter = useCallback(async (filter: ActiveFilter) => {
       setIsLoading(true);
@@ -666,7 +725,7 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
   useEffect(() => {
       setSearchPage(1); // Reset page on new query
       handleSearch(searchQuery, 1);
-  }, [searchQuery]);
+  }, [searchQuery, handleSearch]);
 
   // Effect for handling filters
   useEffect(() => {
@@ -716,8 +775,10 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
     return (
       <>
         <Hero items={data['For You'] || []} onSelect={handleSelectMedia} apiKey={apiKey} />
+        {data['Trending Now'] && <MediaRow key="Trending Now" title="Trending Now" items={data['Trending Now']} onSelect={handleSelectMedia} />}
+        <GameRow onSelectGame={onSelectGame} />
         {Object.entries(data).map(([title, items]) =>
-            title !== 'For You' && <MediaRow key={title} title={title} items={items} onSelect={handleSelectMedia} isUpcomingRow={title === 'Upcoming Movies'} />
+            (title !== 'For You' && title !== 'Trending Now') && <MediaRow key={title} title={title} items={items} onSelect={handleSelectMedia} isUpcomingRow={title === 'Upcoming Movies'} />
         )}
       </>
     );

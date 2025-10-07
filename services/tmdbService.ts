@@ -1,4 +1,4 @@
-import type { Movie, TVShow, MediaItem, PaginatedResponse, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, WatchProviderResponse } from '../types';
+import type { Movie, TVShow, MediaItem, PaginatedResponse, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, WatchProviderResponse, Person, PersonMovieCreditsResponse } from '../types';
 
 const API_BASE_URL = 'https://api.themoviedb.org/3';
 
@@ -37,7 +37,7 @@ export const normalizeTVShow = (tvShow: TVShow): MediaItem => ({
 });
 
 export const getTrendingAll = (apiKey: string) => fetchFromTMDB<PaginatedResponse<Movie | TVShow>>(apiKey, 'trending/all/week');
-export const searchMulti = (apiKey: string, query: string, page: number = 1) => fetchFromTMDB<PaginatedResponse<Movie | TVShow>>(apiKey, 'search/multi', { query, page });
+export const searchMulti = (apiKey: string, query: string, page: number = 1) => fetchFromTMDB<PaginatedResponse<Movie | TVShow | Person>>(apiKey, 'search/multi', { query, page });
 export const getPopularMovies = (apiKey: string) => fetchFromTMDB<PaginatedResponse<Movie>>(apiKey, 'movie/popular');
 export const getPopularTVShows = (apiKey: string) => fetchFromTMDB<PaginatedResponse<TVShow>>(apiKey, 'tv/popular');
 export const getUpcomingMovies = (apiKey: string) => {
@@ -62,8 +62,9 @@ export const getTVShowDetails = (apiKey: string, id: number) => fetchFromTMDB<TV
 export const getMovieCredits = (apiKey: string, id: number) => fetchFromTMDB<CreditsResponse>(apiKey, `movie/${id}/credits`);
 export const getTVShowCredits = (apiKey: string, id: number) => fetchFromTMDB<CreditsResponse>(apiKey, `tv/${id}/credits`);
 export const getSimilarMovies = (apiKey: string, id: number) => fetchFromTMDB<PaginatedResponse<Movie>>(apiKey, `movie/${id}/similar`);
-export const getMovieImages = (apiKey: string, id: number) => fetchFromTMDB<ImageResponse>(apiKey, `movie/${id}/images`, { include_image_language: 'en' });
-export const getTVShowImages = (apiKey: string, id: number) => fetchFromTMDB<ImageResponse>(apiKey, `tv/${id}/images`, { include_image_language: 'en' });
+export const getSimilarTVShows = (apiKey: string, id: number) => fetchFromTMDB<PaginatedResponse<TVShow>>(apiKey, `tv/${id}/similar`);
+export const getMovieImages = (apiKey: string, id: number) => fetchFromTMDB<ImageResponse>(apiKey, `movie/${id}/images`);
+export const getTVShowImages = (apiKey: string, id: number) => fetchFromTMDB<ImageResponse>(apiKey, `tv/${id}/images`);
 export const getMovieWatchProviders = (apiKey: string, id: number) => fetchFromTMDB<WatchProviderResponse>(apiKey, `movie/${id}/watch/providers`);
 export const getTVShowWatchProviders = (apiKey: string, id: number) => fetchFromTMDB<WatchProviderResponse>(apiKey, `tv/${id}/watch/providers`);
 
@@ -79,3 +80,7 @@ export const getTopRatedMoviesByCompany = (apiKey: string, companyId: number) =>
 export const getTopRatedTVShowsByNetwork = (apiKey: string, networkId: number) => discoverTVShows(apiKey, { with_networks: networkId, sort_by: 'vote_average.desc', 'vote_count.gte': 100 });
 
 export const getTVShowSeasonDetails = (apiKey: string, tvId: number, seasonNumber: number) => fetchFromTMDB<any>(apiKey, `tv/${tvId}/season/${seasonNumber}`);
+
+// Person-related API calls for games
+export const searchPerson = (apiKey: string, query: string) => fetchFromTMDB<PaginatedResponse<Person>>(apiKey, 'search/person', { query });
+export const getPersonMovieCredits = (apiKey: string, personId: number) => fetchFromTMDB<PersonMovieCreditsResponse>(apiKey, `person/${personId}/movie_credits`);

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SearchIcon, StarIcon, UserIcon, ChevronDownIcon, MenuIcon, XIcon } from './Icons';
+import { SearchIcon, StarIcon, UserIcon, ChevronDownIcon, MenuIcon, XIcon, CheckIcon } from './Icons';
 import type { ViewType } from '../App';
 import type { ActiveFilter, FilterCategory } from '../types';
+import { useTheme } from '../hooks/useTheme';
 
 interface HeaderProps {
   searchQuery: string;
@@ -61,7 +62,10 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openMobileSubMenu, setOpenMobileSubMenu] = useState<string | null>(null);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const { theme, setCurrentTheme, themes } = useTheme();
 
   useEffect(() => {
     if (isSearchVisible) {
@@ -84,6 +88,17 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
       document.body.style.overflow = '';
     };
   }, [isMobileMenuOpen]);
+  
+  // Close profile menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+        if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+            setIsProfileMenuOpen(false);
+        }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSelect = (type: FilterCategory, id: number, name: string) => {
     setActiveFilter({ type, id, name });
@@ -113,7 +128,7 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
     const isCategoryActive = item !== 'For You' && item !== 'Games' && activeFilter?.type === menuData[item]?.type;
     return `glass-tab px-4 py-2 text-sm font-semibold whitespace-nowrap ${
         isForYouActive || isCategoryActive || isGameActive
-        ? 'active text-cyan-300'
+        ? 'active'
         : 'text-zinc-300 hover:text-white'
     }`;
   }
@@ -218,9 +233,28 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
             <StarIcon className="w-6 h-6" isActive={view === 'watchlist'} />
           </button>
 
-          <button className="text-zinc-300 hover:text-white transition-colors" aria-label="Profile">
-            <UserIcon className="w-6 h-6" />
-          </button>
+          <div className="relative" ref={profileMenuRef}>
+            <button onClick={() => setIsProfileMenuOpen(prev => !prev)} className="text-zinc-300 hover:text-white transition-colors" aria-label="Profile">
+              <UserIcon className="w-6 h-6" />
+            </button>
+            {isProfileMenuOpen && (
+              <div className="absolute top-full mt-3 right-0 w-64 bg-primary/80 backdrop-blur-md border border-glass-edge rounded-lg shadow-2xl p-3 z-50">
+                  <span className="text-xs text-zinc-400 font-semibold px-2">APPEARANCE</span>
+                  <div className="mt-2 space-y-1">
+                      {themes.map(themeOption => (
+                          <button
+                              key={themeOption.key}
+                              onClick={() => setCurrentTheme(themeOption.key as any)}
+                              className={`w-full text-left flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${theme === themeOption.key ? 'bg-cyan-500/20 text-cyan-300' : 'hover:bg-white/10 text-zinc-200'}`}
+                          >
+                              <span>{themeOption.name}</span>
+                              {theme === themeOption.key && <CheckIcon className="w-5 h-5 text-cyan-400" />}
+                          </button>
+                      ))}
+                  </div>
+              </div>
+            )}
+          </div>
           
            {/* Hamburger Menu Button */}
           <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden text-zinc-300 hover:text-white transition-colors" aria-label="Open menu">
