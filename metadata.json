@@ -1,7 +1,5 @@
 {
   "name": "ScreenScape",
   "description": "A next-generation movie and TV show recommendation web app featuring a Liquid Glass UI, multiple viewing styles, and a privacy-focused, browser-based recommendation engine powered by the TMDb API.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
+  "requestFramePermissions": []
 }
