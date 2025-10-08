@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { ViewType } from '../App';
 import type { MediaItem, Movie, TVShow, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, LogoImage, Episode, CastMember, CrewMember, WatchProviderResponse, WatchProviderCountry, ActiveFilter, PaginatedResponse } from '../types';
 import type { Game } from './GameView';
@@ -42,6 +42,11 @@ import { PlayIcon, StarIcon, StarIconSolid, XIcon, MuteIcon, UnmuteIcon, InfoIco
 import VideoPlayer from './VideoPlayer';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
+const STREAMING_SECTIONS: { key: keyof WatchProviderCountry; label: string }[] = [
+    { key: 'flatrate', label: 'Stream' },
+    { key: 'rent', label: 'Rent' },
+    { key: 'buy', label: 'Buy' },
+];
 
 // --- Interaction Helpers ---
 const createRipple = (event: React.MouseEvent<HTMLElement>) => {
@@ -370,6 +375,11 @@ const GameRow: React.FC<GameRowProps> = ({ onSelectGame }) => {
             id: 'guess-poster',
             title: 'Guess The Poster',
             imageUrl: 'https://i.postimg.cc/RV7MXncF/Guess-The-Poster.avif',
+        },
+        {
+            id: 'box-office',
+            title: 'Box Office Compare',
+            imageUrl: 'https://i.postimg.cc/x1sCK9bY/Box-Office-Compare.avif',
         }
     ];
 
@@ -441,14 +451,29 @@ interface ModalProps {
   apiKey: string;
   onClose: () => void;
   onSelect: (item: MediaItem) => void;
+  userCountry: string;
 }
 
-const Modal: React.FC<ModalProps> = ({ item, apiKey, onClose, onSelect }) => {
+const Modal: React.FC<ModalProps> = ({ item, apiKey, onClose, onSelect, userCountry }) => {
   const [details, setDetails] = useState<MovieDetails | TVShowDetails | null>(null);
   const [trailer, setTrailer] = useState<Video | null>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [similarItems, setSimilarItems] = useState<MediaItem[]>([]);
   const { isInWatchlist, toggleWatchlist } = usePreferences();
+  const countryDisplayName = useMemo(() => {
+    if (!userCountry) return 'your region';
+    try {
+        const locale = navigator?.language || 'en';
+        const displayNames = new Intl.DisplayNames([locale], { type: 'region' });
+        return displayNames.of(userCountry) || userCountry;
+    } catch {
+        return userCountry;
+    }
+  }, [userCountry]);
+  const hasAvailability = useMemo(
+    () => STREAMING_SECTIONS.some(section => (item.watchProviders?.[section.key]?.length ?? 0) > 0),
+    [item.watchProviders]
+  );
   
   useEffect(() => {
     const fetchDetails = async () => {
@@ -533,7 +558,55 @@ const Modal: React.FC<ModalProps> = ({ item, apiKey, onClose, onSelect }) => {
                         {isInWatchlist(item.id) ? 'In Watchlist' : 'Add to Watchlist'}
                     </button>
                 </div>
-                
+
+                {item.watchProviders && (
+                    <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+                        <h2 className="text-lg font-semibold text-white mb-3">Streaming availability in {countryDisplayName}</h2>
+                        {hasAvailability ? (
+                            <div className="space-y-3">
+                                {STREAMING_SECTIONS.map(section => {
+                                    const providers = item.watchProviders?.[section.key];
+                                    if (!providers || providers.length === 0) return null;
+                                    return (
+                                        <div key={section.key}>
+                                            <div className="text-xs uppercase tracking-widest text-zinc-500">{section.label}</div>
+                                            <div className="mt-2 flex flex-wrap gap-3">
+                                                {providers.map(provider => (
+                                                    <div key={provider.provider_id} className="flex items-center gap-2 rounded-lg bg-zinc-800/60 px-3 py-2">
+                                                        {provider.logo_path && (
+                                                            <img
+                                                                src={`${IMAGE_BASE_URL}w45${provider.logo_path}`}
+                                                                alt={provider.provider_name}
+                                                                className="h-6 w-6 rounded object-contain"
+                                                            />
+                                                        )}
+                                                        <span className="text-sm text-zinc-100">{serviceNameMap[provider.provider_id] || provider.provider_name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-zinc-400">We couldn't find streaming information for {countryDisplayName}. Check back soon!</p>
+                        )}
+                        {item.watchProviders?.link && (
+                            <div className="mt-4">
+                                <a
+                                    href={item.watchProviders.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-sm font-semibold text-cyan-300 hover:text-cyan-100"
+                                >
+                                    Explore all options on TMDb
+                                    <span aria-hidden="true">→</span>
+                                </a>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <p className="text-zinc-300 mb-6">{item.overview}</p>
 
                 {details && details.genres && details.genres.length > 0 && (
@@ -565,9 +638,10 @@ interface NetflixViewProps {
   view: ViewType;
   activeFilter: ActiveFilter | null;
   onSelectGame: (game: Game) => void;
+  userCountry: string;
 }
 
-const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvalidApiKey, view, activeFilter, onSelectGame }) => {
+const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvalidApiKey, view, activeFilter, onSelectGame, userCountry }) => {
   const [data, setData] = useState<{ [key: string]: MediaItem[] }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -588,14 +662,16 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
         const providerFn = item.media_type === 'movie' ? getMovieWatchProviders : getTVShowWatchProviders;
         try {
             const providers = await providerFn(apiKey, item.id);
-            const gbProviders = providers.results?.GB;
-            return { ...item, watchProviders: gbProviders || null };
+            const regionCode = userCountry?.toUpperCase();
+            const countryProviders = regionCode ? providers.results?.[regionCode] : undefined;
+            const fallbackProviders = providers.results?.US || providers.results?.GB || null;
+            return { ...item, watchProviders: countryProviders || fallbackProviders || null };
         } catch {
             return { ...item, watchProviders: null };
         }
     });
     return Promise.all(providerPromises);
-  }, [apiKey]);
+  }, [apiKey, userCountry]);
   
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -664,8 +740,8 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
           let moviePromise, tvPromise;
           switch (filter.type) {
               case 'service':
-                  moviePromise = getMoviesByProvider(apiKey, filter.id);
-                  tvPromise = getTVShowsByProvider(apiKey, filter.id);
+                  moviePromise = getMoviesByProvider(apiKey, filter.id, userCountry);
+                  tvPromise = getTVShowsByProvider(apiKey, filter.id, userCountry);
                   break;
               case 'studio':
                   moviePromise = getMoviesByCompany(apiKey, filter.id);
@@ -694,7 +770,7 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
       } finally {
           setIsLoading(false);
       }
-  }, [apiKey, processApiResponse]);
+  }, [apiKey, processApiResponse, userCountry]);
 
   const handleSelectMedia = useCallback(async (item: MediaItem) => {
       const providers = await fetchWithWatchProviders([item]);
@@ -788,11 +864,12 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvali
     <>
       {renderContent()}
       {selectedItem && (
-        <Modal 
-            item={selectedItem} 
-            apiKey={apiKey} 
+        <Modal
+            item={selectedItem}
+            apiKey={apiKey}
             onClose={handleCloseModal}
             onSelect={handleSelectMedia}
+            userCountry={userCountry}
         />
       )}
     </>
