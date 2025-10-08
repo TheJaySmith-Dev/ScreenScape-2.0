@@ -1,8 +1,8 @@
 
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useId } from 'react';
 import type { ViewType } from '../App';
-import type { MediaItem, Movie, TVShow, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, LogoImage, Episode, CastMember, CrewMember, WatchProviderResponse, WatchProviderCountry, ActiveFilter, PaginatedResponse } from '../types';
+import type { MediaItem, Movie, TVShow, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, Episode, CastMember, CrewMember, WatchProviderResponse, WatchProviderCountry, ActiveFilter, PaginatedResponse } from '../types';
 import type { Game } from './GameView';
 import {
   getTrendingAll,
@@ -42,6 +42,7 @@ import { PlayIcon, StarIcon, StarIconSolid, XIcon, MuteIcon, UnmuteIcon, InfoIco
 import VideoPlayer from './VideoPlayer';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
+const ENABLE_MODAL_IMAGE_BETA = (import.meta.env.VITE_ENABLE_MODAL_IMAGE_BETA ?? 'false') === 'true';
 
 // --- Interaction Helpers ---
 const createRipple = (event: React.MouseEvent<HTMLElement>) => {
@@ -91,6 +92,14 @@ const formatRuntime = (runtime: number) => {
 const serviceNameMap: { [key: number]: string } = {
   8: 'Netflix', 337: 'Disney+', 1899: 'Max', 9: 'Prime Video', 119: 'Prime Video',
   15: 'Hulu', 2: 'Apple TV+', 531: 'Paramount+', 387: 'Peacock'
+};
+
+type TMDBImage = {
+  file_path?: string | null;
+  aspect_ratio?: number | null;
+  width?: number;
+  height?: number;
+  iso_639_1?: string | null;
 };
 
 const DisneyPlusLogoOverlay: React.FC<{className?: string}> = ({ className = '' }) => (
@@ -448,26 +457,137 @@ interface ModalProps {
   onSelect: (item: MediaItem) => void;
 }
 
+interface ImageCarouselProps {
+  title: string;
+  images: TMDBImage[];
+  size: string;
+  altPrefix: string;
+  isLogo?: boolean;
+}
+
+const ArrowIcon: React.FC<{ direction: 'left' | 'right'; className?: string }> = ({ direction, className = '' }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={1.5}
+    stroke="currentColor"
+    className={`w-5 h-5 ${className}`}
+  >
+    {direction === 'left' ? (
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+    ) : (
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+    )}
+  </svg>
+);
+
+const ImageCarousel: React.FC<ImageCarouselProps> = ({ title, images, size, altPrefix, isLogo }) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const carouselId = useId();
+  const scrollAmount = 600;
+
+  const validImages = images.filter((img): img is TMDBImage & { file_path: string } => Boolean(img.file_path));
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  const itemSizeClass = isLogo
+    ? 'h-28 md:h-32 min-w-[180px] md:min-w-[220px]'
+    : size === 'w780'
+      ? 'h-44 md:h-56 min-w-[260px] md:min-w-[320px]'
+      : 'h-48 min-w-[150px] md:min-w-[190px]';
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center justify-between gap-4 mb-3">
+        <h3 className="text-lg font-semibold text-white">{title}</h3>
+        {validImages.length > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleScroll('left')}
+              aria-label={`Scroll ${title} left`}
+              aria-controls={carouselId}
+              className="w-9 h-9 rounded-full border border-glass-edge bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >
+              <ArrowIcon direction="left" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleScroll('right')}
+              aria-label={`Scroll ${title} right`}
+              aria-controls={carouselId}
+              className="w-9 h-9 rounded-full border border-glass-edge bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >
+              <ArrowIcon direction="right" />
+            </button>
+          </div>
+        )}
+      </div>
+      {validImages.length > 0 ? (
+        <div className="relative">
+          <div
+            id={carouselId}
+            ref={scrollContainerRef}
+            className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent snap-x snap-mandatory focus:outline-none"
+            tabIndex={0}
+            role="list"
+          >
+            {validImages.map((image, index) => (
+              <div
+                key={`${image.file_path}-${index}`}
+                className={`flex-shrink-0 ${itemSizeClass} rounded-xl border border-glass-edge bg-black/40 backdrop-blur-md overflow-hidden snap-start`}
+                role="listitem"
+              >
+                <img
+                  src={`${IMAGE_BASE_URL}${size}${image.file_path}`}
+                  alt={`${altPrefix} ${index + 1}`}
+                  className={`w-full h-full ${isLogo ? 'object-contain p-4 bg-white/10' : 'object-cover'}`}
+                  loading="lazy"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-glass border border-glass-edge rounded-lg px-4 py-6 text-center text-sm text-zinc-400">
+          No {title.toLowerCase()} available.
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Modal: React.FC<ModalProps> = ({ item, apiKey, onClose, onSelect }) => {
   const [details, setDetails] = useState<MovieDetails | TVShowDetails | null>(null);
   const [trailer, setTrailer] = useState<Video | null>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [similarItems, setSimilarItems] = useState<MediaItem[]>([]);
+  const [images, setImages] = useState<ImageResponse | null>(null);
   const { isInWatchlist, toggleWatchlist } = usePreferences();
-  
+
   useEffect(() => {
     const fetchDetails = async () => {
         try {
             const detailsFn = item.media_type === 'movie' ? getMovieDetails : getTVShowDetails;
             const videoFn = item.media_type === 'movie' ? getMovieVideos : getTVShowVideos;
             const similarFn = item.media_type === 'movie' ? getSimilarMovies : getSimilarTVShows;
+            const imagesFn = item.media_type === 'movie' ? getMovieImages : getTVShowImages;
 
-            const [detailsData, videoData, similarData] = await Promise.all([
+            const [detailsData, videoData, similarData, imagesData] = await Promise.all([
                 detailsFn(apiKey, item.id),
                 videoFn(apiKey, item.id),
                 similarFn(apiKey, item.id),
+                ENABLE_MODAL_IMAGE_BETA ? imagesFn(apiKey, item.id) : Promise.resolve(null as ImageResponse | null),
             ]);
-            
+
             setDetails(detailsData);
 
             const bestVideo = videoData.find(v => v.type === 'Trailer') || videoData.find(v => v.type === 'Teaser') || videoData[0];
@@ -478,15 +598,24 @@ const Modal: React.FC<ModalProps> = ({ item, apiKey, onClose, onSelect }) => {
                 .filter(i => i.poster_path);
             setSimilarItems(normalizedSimilar);
 
+            setImages(ENABLE_MODAL_IMAGE_BETA ? imagesData : null);
+
         } catch (e) {
             console.error("Failed to fetch modal details", e);
         }
     };
+    setDetails(null);
+    setTrailer(null);
+    setSimilarItems([]);
+    setImages(null);
     fetchDetails();
   }, [item, apiKey]);
 
   const backdropPath = details?.backdrop_path ? `${IMAGE_BASE_URL}original${details.backdrop_path}` : '';
   const flatrateProvider = item.watchProviders?.flatrate?.[0];
+  const backdropImages = (images?.backdrops ?? []) as TMDBImage[];
+  const posterImages = (images?.posters ?? []) as TMDBImage[];
+  const logoImages = (images?.logos ?? []) as TMDBImage[];
 
   return (
     <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center animate-scale-up-center" onClick={onClose}>
@@ -538,7 +667,7 @@ const Modal: React.FC<ModalProps> = ({ item, apiKey, onClose, onSelect }) => {
                         {isInWatchlist(item.id) ? 'In Watchlist' : 'Add to Watchlist'}
                     </button>
                 </div>
-                
+
                 <p className="text-zinc-300 mb-6">{item.overview}</p>
 
                 {details && details.genres && details.genres.length > 0 && (
@@ -547,7 +676,33 @@ const Modal: React.FC<ModalProps> = ({ item, apiKey, onClose, onSelect }) => {
                         {details.genres.map(g => g.name).join(', ')}
                     </div>
                 )}
-                
+
+                {ENABLE_MODAL_IMAGE_BETA && (
+                  <div className="space-y-4">
+                    <ImageCarousel
+                      title="Backdrops"
+                      images={backdropImages}
+                      size="w780"
+                      altPrefix={`${item.title} backdrop`}
+                    />
+
+                    <ImageCarousel
+                      title="Posters"
+                      images={posterImages}
+                      size="w300"
+                      altPrefix={`${item.title} poster`}
+                    />
+
+                    <ImageCarousel
+                      title="Logos"
+                      images={logoImages}
+                      size="w300"
+                      altPrefix={`${item.title} logo`}
+                      isLogo
+                    />
+                  </div>
+                )}
+
                 {similarItems.length > 0 && (
                     <div className="mt-8">
                          <MediaRow title="More Like This" items={similarItems} onSelect={(selected) => {

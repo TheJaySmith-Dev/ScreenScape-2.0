@@ -18,3 +18,13 @@ View your app in AI Studio: https://ai.studio/apps/drive/1Mymikt_aeX4dqCm2wQj8ja
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Beta Features
+
+Image carousels in the detail modal are available as an opt-in beta feature. To experiment with them locally:
+
+1. Check out the `Beta` branch: `git checkout Beta`
+2. Enable the flag by setting `VITE_ENABLE_MODAL_IMAGE_BETA=true` in your environment (e.g., add it to `.env.local`).
+3. Run the development server (`npm run dev`) and open a title to view the additional image carousels.
+
+The beta branch can be merged into other branches whenever you want to include the experiment.
