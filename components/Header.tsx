@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { SearchIcon, StarIcon, UserIcon, ChevronDownIcon, MenuIcon, XIcon, CheckIcon } from './Icons';
 import type { ViewType } from '../App';
 import type { ActiveFilter, FilterCategory } from '../types';
@@ -11,6 +11,7 @@ interface HeaderProps {
   setView: (view: ViewType) => void;
   activeFilter: ActiveFilter | null;
   setActiveFilter: (filter: ActiveFilter | null) => void;
+  userCountry: string;
 }
 
 const services = [
@@ -57,7 +58,7 @@ const menuData: { [key: string]: { type: FilterCategory, items: {id: number, nam
 };
 
 
-const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setView, activeFilter, setActiveFilter }) => {
+const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setView, activeFilter, setActiveFilter, userCountry }) => {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -66,6 +67,16 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
   const searchInputRef = useRef<HTMLInputElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const { theme, setCurrentTheme, themes } = useTheme();
+  const countryDisplayName = useMemo(() => {
+    if (!userCountry) return 'Unknown region';
+    try {
+        const locale = navigator?.language || 'en';
+        const displayNames = new Intl.DisplayNames([locale], { type: 'region' });
+        return displayNames.of(userCountry) || userCountry;
+    } catch {
+        return userCountry;
+    }
+  }, [userCountry]);
 
   useEffect(() => {
     if (isSearchVisible) {
@@ -204,6 +215,10 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
 
         {/* Right Section */}
         <div className="flex items-center gap-4">
+          <div className="hidden md:flex flex-col text-right">
+            <span className="text-[10px] uppercase tracking-wider text-zinc-500">Streaming in</span>
+            <span className="text-sm font-semibold text-white">{countryDisplayName}</span>
+          </div>
           <div className={`flex items-center transition-all duration-300 ${isSearchVisible ? 'w-48 md:w-64' : 'w-0'}`}>
             <div className="relative w-full">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -272,6 +287,10 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
           </div>
           <nav className="flex flex-col items-center justify-center h-full -mt-20 text-center">
               <ul className="space-y-8">
+                  <li>
+                      <div className="text-sm uppercase tracking-widest text-zinc-500">Streaming in</div>
+                      <div className="text-xl font-semibold text-white mt-1">{countryDisplayName}</div>
+                  </li>
                   <li>
                       <button 
                           onClick={handleForYouClick} 

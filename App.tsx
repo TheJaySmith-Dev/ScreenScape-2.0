@@ -18,7 +18,7 @@ const App: React.FC = () => {
     const [activeFilter, setActiveFilter] = useState<ActiveFilter | null>(null);
     // In a real application, this would be determined dynamically via GeoIP or a user setting.
     // Defaulting to 'ZA' to fulfill the user request for South Africa / Disney+ UK content.
-    const [userCountry, _] = useState('ZA');
+    const [userCountry, setUserCountry] = useState('US');
 
     useTheme();
 
@@ -53,6 +53,59 @@ const App: React.FC = () => {
         window.addEventListener('storage', handleStorageChange);
         return () => window.removeEventListener('storage', handleStorageChange);
 
+    }, []);
+
+    useEffect(() => {
+        const storedCountry = localStorage.getItem('tmdb_user_country');
+        if (storedCountry) {
+            setUserCountry(storedCountry);
+            return;
+        }
+
+        let isMounted = true;
+
+        const detectCountry = async () => {
+            const fallbackCountry = () => {
+                const locale = navigator?.language || navigator?.languages?.[0];
+                if (!locale) return null;
+                const parts = locale.split('-');
+                if (parts.length > 1) {
+                    return parts[1].toUpperCase();
+                }
+                return null;
+            };
+
+            try {
+                const response = await fetch('https://ipapi.co/json/');
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch IP info: ${response.status}`);
+                }
+                const data = await response.json();
+                const countryCode = data?.country_code;
+                if (countryCode && typeof countryCode === 'string' && isMounted) {
+                    const normalized = countryCode.toUpperCase();
+                    setUserCountry(normalized);
+                    localStorage.setItem('tmdb_user_country', normalized);
+                    return;
+                }
+            } catch (error) {
+                console.warn('Unable to detect location via IP lookup. Falling back to locale.', error);
+            }
+
+            if (isMounted) {
+                const fallback = fallbackCountry();
+                if (fallback) {
+                    setUserCountry(fallback);
+                    localStorage.setItem('tmdb_user_country', fallback);
+                }
+            }
+        };
+
+        detectCountry();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     const handleInvalidApiKey = useCallback(() => {
