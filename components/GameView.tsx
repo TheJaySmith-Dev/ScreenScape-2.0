@@ -3,8 +3,9 @@ import React, { useState, useEffect } from 'react';
 import TriviaGame from './TriviaGame';
 import SixDegreesGame from './SixDegreesGame';
 import GuessThePosterGame from './GuessThePosterGame';
+import BoxOfficeCompareGame from './BoxOfficeCompareGame';
 
-export type Game = 'trivia' | 'six-degrees' | 'guess-poster' | null;
+export type Game = 'trivia' | 'six-degrees' | 'guess-poster' | 'box-office-compare' | null;
 
 interface GameViewProps {
   apiKey: string;
@@ -29,6 +30,8 @@ const GameView: React.FC<GameViewProps> = ({ apiKey, onInvalidApiKey, initialGam
         return <SixDegreesGame apiKey={apiKey} onInvalidApiKey={onInvalidApiKey} onExit={() => setActiveGame(null)} />;
       case 'guess-poster':
         return <GuessThePosterGame apiKey={apiKey} onInvalidApiKey={onInvalidApiKey} onExit={() => setActiveGame(null)} />;
+      case 'box-office-compare':
+        return <BoxOfficeCompareGame apiKey={apiKey} onInvalidApiKey={onInvalidApiKey} onExit={() => setActiveGame(null)} />;
       default:
         return (
           <div className="text-center animate-text-focus-in">
@@ -44,10 +47,15 @@ const GameView: React.FC<GameViewProps> = ({ apiKey, onInvalidApiKey, initialGam
                 description="Connect any two actors through their movie roles in six steps or less."
                 onClick={() => setActiveGame('six-degrees')}
               />
-              <GameCard 
+              <GameCard
                 title="Guess The Poster"
                 description="How well do you know movie posters? Guess the film from a single image."
                 onClick={() => setActiveGame('guess-poster')}
+              />
+              <GameCard
+                title="Box Office Compare"
+                description="Decide which blockbuster earned more at the worldwide box office."
+                onClick={() => setActiveGame('box-office-compare')}
               />
             </div>
           </div>

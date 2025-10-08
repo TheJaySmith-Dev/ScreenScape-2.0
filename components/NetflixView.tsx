@@ -370,6 +370,11 @@ const GameRow: React.FC<GameRowProps> = ({ onSelectGame }) => {
             id: 'guess-poster',
             title: 'Guess The Poster',
             imageUrl: 'https://i.postimg.cc/RV7MXncF/Guess-The-Poster.avif',
+        },
+        {
+            id: 'box-office-compare',
+            title: 'Box Office Compare',
+            imageUrl: 'https://i.postimg.cc/6QcMy6kc/Box-Office-Compare.png',
         }
     ];
 
