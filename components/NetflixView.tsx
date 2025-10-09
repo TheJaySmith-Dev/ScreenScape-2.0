@@ -1,807 +1,625 @@
-
-
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { ViewType } from '../App';
-import type { MediaItem, Movie, TVShow, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, LogoImage, Episode, CastMember, CrewMember, WatchProviderResponse, WatchProviderCountry, ActiveFilter, PaginatedResponse } from '../types';
-import type { Game } from './GameView';
+import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import {
-  getTrendingAll,
-  searchMulti,
-  getPopularMovies,
-  getPopularTVShows,
-  getUpcomingMovies,
-  getOnTheAirTVShows,
-  normalizeMovie,
-  normalizeTVShow,
-  getMovieVideos,
-  getTVShowVideos,
-  getMovieDetails,
-  getTVShowDetails,
-  getMovieCredits,
-  getTVShowCredits,
-  getSimilarMovies,
-  getSimilarTVShows,
-  getTVShowSeasonDetails,
-  getMovieImages,
-  getTVShowImages,
-  getMoviesByProvider,
-  getTVShowsByProvider,
-  getMovieWatchProviders,
-  getTVShowWatchProviders,
-  getMoviesByCompany,
-  discoverTVShows,
-  getNewMoviesByProvider,
-  getNewTVShowsByProvider,
-  getTopRatedMoviesByCompany,
-  getTopRatedTVShowsByNetwork,
+    getTrending,
+    discoverMedia,
+    searchMulti,
+    normalizeMovie,
+    normalizeTVShow,
+    getMovieDetails,
+    getTVShowDetails,
+    getMediaVideos,
+    getMediaImages,
+    getMediaWatchProviders,
+    getTopRatedMoviesByProvider,
+    getTopRatedTVShowsByProvider,
+    getUpcomingMovies,
+    getOnTheAirTVShows,
 } from '../services/tmdbService';
 import { usePreferences } from '../hooks/usePreferences';
 import { useCountdown } from '../hooks/useCountdown';
+import { MediaItem, ActiveFilter, Movie, TVShow, Video, LogoImage, WatchProvider, MovieDetails, TVShowDetails } from '../types';
 import Loader from './Loader';
-import { PlayIcon, StarIcon, StarIconSolid, XIcon, MuteIcon, UnmuteIcon, InfoIcon } from './Icons';
 import VideoPlayer from './VideoPlayer';
+import { Game } from './GameView';
+import { DisneyPillLogo, HuluPillLogo, DisneyBrandLogo, PixarBrandLogo, MarvelBrandLogo, StarWarsBrandLogo, NationalGeographicBrandLogo, VolumeUpIcon, VolumeOffIcon } from './Icons';
+
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 
-// --- Interaction Helpers ---
-const createRipple = (event: React.MouseEvent<HTMLElement>) => {
-    const element = event.currentTarget;
-    element.style.position = 'relative'; 
-    element.style.overflow = 'hidden';
+// --- Helper Components ---
 
-    const circle = document.createElement("span");
-    const diameter = Math.max(element.clientWidth, element.clientHeight);
-    const radius = diameter / 2;
-    const rect = element.getBoundingClientRect();
-
-    circle.style.width = circle.style.height = `${diameter}px`;
-    circle.style.left = `${event.clientX - rect.left - radius}px`;
-    circle.style.top = `${event.clientY - rect.top - radius}px`;
-    circle.classList.add("ripple");
+const HeroCarousel: React.FC<{ items: MediaItem[], onCardClick: (item: MediaItem) => void, apiKey: string }> = ({ items, onCardClick, apiKey }) => {
+    const [currentItemIndex, setCurrentItemIndex] = useState(0);
+    const [trailerKey, setTrailerKey] = useState<string | null>(null);
+    const [logo, setLogo] = useState<LogoImage | null>(null);
+    const [isLoadingTrailer, setIsLoadingTrailer] = useState(true);
+    // FIX: The type `NodeJS.Timeout` is not available in browser environments. The correct type for the return value of `setTimeout` in the browser is `number`.
+    const timeoutRef = useRef<number | null>(null);
     
-    const oldRipple = element.querySelector(".ripple");
-    if (oldRipple) oldRipple.remove();
-    
-    element.appendChild(circle);
+    const currentItem = items[currentItemIndex];
 
-    setTimeout(() => circle.remove(), 600);
-};
-
-// Helper function to shuffle an array
-const shuffleArray = <T,>(array: T[]): T[] => {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
-};
-
-
-// Helper function
-const formatRuntime = (runtime: number) => {
-    const hours = Math.floor(runtime / 60);
-    const minutes = runtime % 60;
-    if (hours > 0) {
-        return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-};
-
-const serviceNameMap: { [key: number]: string } = {
-  8: 'Netflix', 337: 'Disney+', 1899: 'Max', 9: 'Prime Video', 119: 'Prime Video',
-  15: 'Hulu', 2: 'Apple TV+', 531: 'Paramount+', 387: 'Peacock'
-};
-
-const DisneyPlusLogoOverlay: React.FC<{className?: string}> = ({ className = '' }) => (
-    <img
-        src="https://i.ibb.co/WWNxt1Gy/IMG-3932.png"
-        alt="Available on Disney+"
-        className={`absolute bottom-2 right-2 w-10 md:w-12 h-auto z-30 opacity-90 rounded-sm pointer-events-none ${className}`}
-    />
-);
-
-const CountdownTimer: React.FC<{ releaseDate: string }> = ({ releaseDate }) => {
-    const { days, hours, minutes, seconds, hasEnded } = useCountdown(releaseDate);
-
-    if (hasEnded) {
-        return (
-            <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-2 py-1 text-center text-xs font-semibold text-green-400 backdrop-blur-sm">
-                Released!
-            </div>
-        );
-    }
-
-    return (
-        <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-2 py-1 text-center text-xs text-white backdrop-blur-sm">
-            <span className="font-bold">{days}</span>d <span className="font-bold">{hours}</span>h <span className="font-bold">{minutes}</span>m <span className="font-bold">{seconds}</span>s
-        </div>
-    );
-};
-
-interface MediaItemCardProps {
-    item: MediaItem;
-    onSelect: (item: MediaItem) => void;
-    isUpcoming?: boolean;
-}
-
-const MediaItemCard: React.FC<MediaItemCardProps> = React.memo(({ item, onSelect, isUpcoming }) => {
-    const imageUrl = item.poster_path ? `${IMAGE_BASE_URL}w500${item.poster_path}` : `https://via.placeholder.com/500x750?text=No+Image`;
-    const isDisneyPlus = item.watchProviders?.flatrate?.some(p => p.provider_id === 337);
-
-    return (
-        <div 
-            className="group relative w-full aspect-[2/3] rounded-lg overflow-hidden cursor-pointer transform transition-all duration-300 ease-in-out hover:scale-105 hover:z-20 shadow-lg hover:shadow-cyan-500/20"
-            onClick={() => onSelect(item)}
-        >
-            <img src={imageUrl} alt={item.title} className="w-full h-full object-cover" />
-            {isDisneyPlus && <DisneyPlusLogoOverlay />}
-            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-70 transition-all duration-300 z-10"></div>
-            <div className="absolute inset-0 p-3 flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-                <h3 className="text-white text-base font-bold drop-shadow-lg">{item.title}</h3>
-                {!isUpcoming && (
-                    <div className="text-xs text-zinc-300 mt-1 flex items-center">
-                        <span>{item.release_date?.substring(0, 4)}</span>
-                    </div>
-                )}
-            </div>
-            {isUpcoming && item.release_date && <CountdownTimer releaseDate={item.release_date} />}
-        </div>
-    );
-});
-
-
-interface MediaRowProps {
-    title: string;
-    items: MediaItem[];
-    onSelect: (item: MediaItem) => void;
-    isUpcomingRow?: boolean;
-}
-
-const MediaRow: React.FC<MediaRowProps> = ({ title, items, onSelect, isUpcomingRow }) => {
-    if (!items || items.length === 0) return null;
-    return (
-        <div className="mb-8 md:mb-12 last:mb-0">
-            <h2 className="text-xl md:text-3xl font-bold mb-4 px-4 md:px-12">{title}</h2>
-            <div className="relative">
-                <div className="pl-4 md:pl-12 overflow-x-auto overflow-y-hidden pb-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-                    <div className="flex space-x-4">
-                        {items.filter(item => item.poster_path).map(item => (
-                            <div key={`${item.media_type}-${item.id}`} className="flex-shrink-0 w-36 md:w-48">
-                                <MediaItemCard item={item} onSelect={onSelect} isUpcoming={isUpcomingRow} />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
-};
-
-
-interface HeroProps {
-    items: MediaItem[];
-    onSelect: (item: MediaItem) => void;
-    apiKey: string;
-}
-
-const Hero: React.FC<HeroProps> = ({ items, onSelect, apiKey }) => {
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [trailer, setTrailer] = useState<Video | null>(null);
-    const progressBarRef = useRef<HTMLDivElement>(null);
-    const animationFrameRef = useRef<number | undefined>(undefined);
-    const heroContainerRef = useRef<HTMLDivElement>(null);
-    
-    const item = items[currentIndex];
-
-    useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!heroContainerRef.current) return;
-            const { clientX, clientY } = e;
-            const { offsetWidth, offsetHeight } = heroContainerRef.current;
-            const x = clientX / offsetWidth;
-            const y = clientY / offsetHeight;
-
-            heroContainerRef.current.style.setProperty('--mouse-x', `${x}`);
-            heroContainerRef.current.style.setProperty('--mouse-y', `${y}`);
-        };
-
-        const currentHero = heroContainerRef.current;
-        currentHero?.addEventListener('mousemove', handleMouseMove);
-        return () => currentHero?.removeEventListener('mousemove', handleMouseMove);
+    const resetTimeout = useCallback(() => {
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+        }
     }, []);
 
-    const advanceSlide = useCallback(() => {
+    useEffect(() => {
+        resetTimeout();
         if (items.length > 1) {
-            setCurrentIndex(prevIndex => (prevIndex + 1) % items.length);
+            timeoutRef.current = setTimeout(() => {
+                setCurrentItemIndex((prevIndex) => (prevIndex + 1) % items.length);
+            }, 12000); // Change slide every 12 seconds to allow trailer to play
         }
-    }, [items.length]);
 
-    useEffect(() => {
-        if (items.length <= 1) return;
-        let timerId: ReturnType<typeof setTimeout> | null = null;
-        if (!trailer) {
-            timerId = setTimeout(advanceSlide, 8000);
-        }
         return () => {
-            if (timerId) clearTimeout(timerId);
+            resetTimeout();
         };
-    }, [currentIndex, trailer, advanceSlide, items.length]);
-
+    }, [currentItemIndex, items.length, resetTimeout]);
 
     useEffect(() => {
-        const fetchHeroExtras = async () => {
-            if (!item) return;
-            setTrailer(null);
-            
-            const videoFn = item.media_type === 'movie' ? getMovieVideos : getTVShowVideos;
-            
+        if (!currentItem) return;
+
+        let isActive = true;
+        setIsLoadingTrailer(true);
+        setTrailerKey(null);
+        setLogo(null);
+
+        const fetchMediaAssets = async () => {
             try {
-                const videos = await videoFn(apiKey, item.id)
-                const bestVideo = videos.find(v => v.type === 'Clip') || videos.find(v => v.type === 'Teaser');
-                setTrailer(bestVideo || null);
-            } catch (e) {
-                if (!(e instanceof Error && e.message.includes('(Status: 404)'))) {
-                    console.warn(`Could not fetch videos for hero item ${item.id}`, e);
-                }
-                setTrailer(null);
+                const [videosData, imagesData] = await Promise.all([
+                    getMediaVideos(apiKey, currentItem.id, currentItem.media_type),
+                    getMediaImages(apiKey, currentItem.id, currentItem.media_type)
+                ]);
+                
+                if (!isActive) return;
+
+                // Prioritize clips/teasers for the hero carousel, fallback to trailer
+                const officialClip = videosData.results.find(v => v.type === 'Clip' && v.official) || videosData.results.find(v => v.type === 'Clip');
+                const officialTeaser = videosData.results.find(v => v.type === 'Teaser' && v.official) || videosData.results.find(v => v.type === 'Teaser');
+                const officialTrailer = videosData.results.find(v => v.type === 'Trailer' && v.official) || videosData.results.find(v => v.type === 'Trailer');
+
+                setTrailerKey(officialClip?.key || officialTeaser?.key || officialTrailer?.key || null);
+
+                const bestLogo = imagesData.logos.find(l => l.iso_639_1 === 'en') || imagesData.logos[0] || null;
+                setLogo(bestLogo);
+
+            } catch (error) {
+                console.error(`Failed to fetch assets for ${currentItem.title}`, error);
+                setTrailerKey(null);
+                setLogo(null);
+            } finally {
+                if (isActive) setIsLoadingTrailer(false);
             }
         };
-        fetchHeroExtras();
-    }, [item, apiKey]);
 
-    useEffect(() => {
-        const progress = progressBarRef.current;
-        if (!progress) return;
+        fetchMediaAssets();
 
-        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-
-        if (trailer) {
-            progress.style.transition = 'none';
-            progress.style.width = '100%';
-        } else {
-            const duration = 8000;
-            progress.style.transition = '';
-            progress.style.width = '0%';
-            let start: number | null = null;
-
-            const step = (timestamp: number) => {
-                if (!start) start = timestamp;
-                const elapsed = timestamp - start;
-                const percent = Math.min((elapsed / duration) * 100, 100);
-                if (progress) progress.style.width = percent + '%';
-                if (percent < 100) animationFrameRef.current = requestAnimationFrame(step);
-            };
-            animationFrameRef.current = requestAnimationFrame(step);
-        }
-
-        return () => {
-            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-        };
-    }, [currentIndex, trailer]);
+        return () => { isActive = false; };
+    }, [currentItem, apiKey]);
 
 
-    if (!item) {
-        return <div className="h-[85vh] md:h-[56.25vw] md:max-h-[80vh] w-full bg-zinc-900 animate-pulse"></div>;
-    }
-    
-    const backdropPath = item.backdrop_path ? `${IMAGE_BASE_URL}original${item.backdrop_path}` : '';
-    const flatrateProvider = item.watchProviders?.flatrate?.[0];
-    const isDisneyPlus = item.watchProviders?.flatrate?.some(p => p.provider_id === 337);
+    if (!items || items.length === 0) return null;
 
     return (
-        <div ref={heroContainerRef} className="hero-container relative w-full text-white overflow-hidden h-[85vh] md:h-auto md:aspect-[16/9] md:max-h-[80vh]">
-            <div className="absolute inset-0 z-0 animate-scale-up-center">
-                <div className="w-full h-full relative hero-light-effect">
-                    {trailer?.key ? (
-                       <VideoPlayer videoKey={trailer.key} isMuted={true} onEnd={() => advanceSlide()} loop={false} />
-                    ) : (
-                       backdropPath && <img src={backdropPath} alt={item.title} className="w-full h-full object-cover" />
-                    )}
-                    {isDisneyPlus && <DisneyPlusLogoOverlay className="!bottom-4 !right-4 md:!bottom-6 md:!right-6 !w-12 md:!w-16" />}
-                </div>
+        <div className="relative h-[60vh] -mt-20 w-full hero-container bg-black" style={{ '--mouse-x': 0.5, '--mouse-y': 0.5 } as React.CSSProperties}
+             onMouseMove={(e) => {
+                 const rect = e.currentTarget.getBoundingClientRect();
+                 const x = (e.clientX - rect.left) / rect.width;
+                 const y = (e.clientY - rect.top) / rect.height;
+                 e.currentTarget.style.setProperty('--mouse-x', `${x}`);
+                 e.currentTarget.style.setProperty('--mouse-y', `${y}`);
+             }}>
+            <div className="absolute inset-0">
+                {isLoadingTrailer ? (
+                    <div className="w-full h-full bg-zinc-900 animate-pulse" />
+                ) : trailerKey ? (
+                    <VideoPlayer videoKey={trailerKey} isMuted={true} loop />
+                ) : (
+                    <img
+                        src={`${IMAGE_BASE_URL}original${currentItem.backdrop_path}`}
+                        alt={currentItem.title}
+                        className="w-full h-full object-cover"
+                    />
+                )}
             </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-primary via-transparent to-transparent z-10" />
+            <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary/70 to-transparent z-10 hero-light-effect" />
 
-            <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/70 to-transparent"></div>
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/50 to-transparent"></div>
-            
-            <div className="absolute bottom-[10%] left-4 right-4 md:left-12 md:right-auto z-20 md:max-w-lg animate-text-focus-in text-center md:text-left hero-parallax-content">
-                <h1 className="text-3xl md:text-6xl font-extrabold drop-shadow-lg mb-2 md:mb-4">{item.title}</h1>
-                <p className="text-sm md:text-base line-clamp-2 md:line-clamp-3 mb-4 md:mb-6 drop-shadow-md text-zinc-300">{item.overview}</p>
-                <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start space-y-3 sm:space-y-0 sm:space-x-3">
-                    {flatrateProvider ? (
-                        <a href={item.watchProviders?.link} target="_blank" rel="noopener noreferrer" onClick={createRipple} className="w-full sm:w-auto flex items-center justify-center glass-button glass-button-primary px-6 py-3 rounded-full font-bold text-white text-lg">
-                            <PlayIcon className="w-6 h-6 mr-2" />
-                            Play on {serviceNameMap[flatrateProvider.provider_id] || flatrateProvider.provider_name}
-                        </a>
-                    ) : (
-                        <button onClick={(e) => { onSelect(item); createRipple(e); }} className="w-full sm:w-auto flex items-center justify-center glass-button glass-button-primary px-6 py-3 rounded-full font-bold text-white text-lg">
-                            <PlayIcon className="w-6 h-6 mr-2" />
-                            Play
-                        </button>
-                    )}
-                    <button 
-                        onClick={(e) => { onSelect(item); createRipple(e); }}
-                        className="w-full sm:w-auto flex items-center justify-center glass-button glass-button-secondary text-white px-6 py-3 rounded-full font-semibold"
-                    >
-                        <InfoIcon className="w-6 h-6 mr-2" />
-                        More Info
-                    </button>
-                </div>
-            </div>
-            <div className="liquid-progress-bar">
-                <div className="liquid-bar-bg">
-                    <div className="liquid-bar-fill" ref={progressBarRef}></div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
-const GamePromoCard: React.FC<{ title: string; imageUrl: string; onClick: () => void }> = ({ title, imageUrl, onClick }) => (
-    <div
-        className="group relative w-full aspect-video rounded-lg overflow-hidden cursor-pointer transform transition-all duration-300 ease-in-out hover:scale-105 hover:z-20 shadow-lg hover:shadow-cyan-500/20"
-        onClick={onClick}
-    >
-        <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
-        {/* Add a subtle overlay on hover for feedback, but no text */}
-        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300 z-10"></div>
-    </div>
-);
-
-interface GameRowProps {
-    onSelectGame: (game: Game) => void;
-}
-
-const GameRow: React.FC<GameRowProps> = ({ onSelectGame }) => {
-    const games = [
-        {
-            id: 'trivia',
-            title: 'Movie Trivia',
-            imageUrl: 'https://i.postimg.cc/j55v2NhM/Movie-Trivia.avif',
-        },
-        {
-            id: 'six-degrees',
-            title: 'Six Degrees',
-            imageUrl: 'https://i.postimg.cc/SQcVsy65/Six-Degrees.avif',
-        },
-        {
-            id: 'guess-poster',
-            title: 'Guess The Poster',
-            imageUrl: 'https://i.postimg.cc/RV7MXncF/Guess-The-Poster.avif',
-        },
-        {
-            id: 'box-office-compare',
-            title: 'Box Office Compare',
-            imageUrl: 'https://i.postimg.cc/6QcMy6kc/Box-Office-Compare.png',
-        }
-    ];
-
-    return (
-        <div className="mb-8 md:mb-12">
-            <h2 className="text-xl md:text-3xl font-bold mb-4 px-4 md:px-12">SS Games</h2>
-            <div className="pl-4 md:pl-12 overflow-x-auto overflow-y-hidden pb-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-                <div className="flex space-x-4">
-                    {games.map(game => (
-                        <div key={game.id} className="flex-shrink-0 w-64 md:w-80">
-                           <GamePromoCard
-                                title={game.title}
-                                imageUrl={game.imageUrl}
-                                onClick={() => onSelectGame(game.id as Game)}
-                           />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
-interface ResultsGridProps {
-    title?: string;
-    items: MediaItem[];
-    onSelect: (item: MediaItem) => void;
-    isLoading: boolean;
-    loadMore?: () => void;
-    hasMore?: boolean;
-}
-
-const ResultsGrid: React.FC<ResultsGridProps> = ({ title, items, onSelect, isLoading, loadMore, hasMore }) => {
-    const observer = useRef<IntersectionObserver | undefined>(undefined);
-    const lastElementRef = useCallback(node => {
-        if (isLoading) return;
-        if (observer.current) observer.current.disconnect();
-        observer.current = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting && hasMore && loadMore) {
-                loadMore();
-            }
-        });
-        if (node) observer.current.observe(node);
-    }, [isLoading, hasMore, loadMore]);
-    
-    return (
-        <div className="px-4 md:px-12 pb-12 min-h-screen">
-            {title && <h1 className="text-3xl md:text-5xl font-bold mb-8">{title}</h1>}
-            {items.length === 0 && !isLoading && <p className="text-center text-zinc-400 mt-8">No results found.</p>}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                 {items.map((item, index) => {
-                    const isLastElement = items.length === index + 1;
-                    return (
-                        <div ref={isLastElement ? lastElementRef : null} key={`${item.media_type}-${item.id}`}>
-                          <MediaItemCard item={item} onSelect={onSelect} />
-                        </div>
-                    )
-                })}
-            </div>
-            {isLoading && <Loader />}
-        </div>
-    );
-};
-
-
-interface ModalProps {
-  item: MediaItem;
-  apiKey: string;
-  onClose: () => void;
-  onSelect: (item: MediaItem) => void;
-}
-
-const Modal: React.FC<ModalProps> = ({ item, apiKey, onClose, onSelect }) => {
-  const [details, setDetails] = useState<MovieDetails | TVShowDetails | null>(null);
-  const [trailer, setTrailer] = useState<Video | null>(null);
-  const [isMuted, setIsMuted] = useState(true);
-  const [similarItems, setSimilarItems] = useState<MediaItem[]>([]);
-  const { isInWatchlist, toggleWatchlist } = usePreferences();
-  
-  useEffect(() => {
-    const fetchDetails = async () => {
-        try {
-            const detailsFn = item.media_type === 'movie' ? getMovieDetails : getTVShowDetails;
-            const videoFn = item.media_type === 'movie' ? getMovieVideos : getTVShowVideos;
-            const similarFn = item.media_type === 'movie' ? getSimilarMovies : getSimilarTVShows;
-
-            const [detailsData, videoData, similarData] = await Promise.all([
-                detailsFn(apiKey, item.id),
-                videoFn(apiKey, item.id),
-                similarFn(apiKey, item.id),
-            ]);
-            
-            setDetails(detailsData);
-
-            const bestVideo = videoData.find(v => v.type === 'Trailer') || videoData.find(v => v.type === 'Teaser') || videoData[0];
-            setTrailer(bestVideo || null);
-
-            const normalizedSimilar = (similarData.results as (Movie | TVShow)[])
-                .map(i => i.media_type === 'movie' ? normalizeMovie(i as Movie) : normalizeTVShow(i as TVShow))
-                .filter(i => i.poster_path);
-            setSimilarItems(normalizedSimilar);
-
-        } catch (e) {
-            console.error("Failed to fetch modal details", e);
-        }
-    };
-    fetchDetails();
-  }, [item, apiKey]);
-
-  const backdropPath = details?.backdrop_path ? `${IMAGE_BASE_URL}original${details.backdrop_path}` : '';
-  const flatrateProvider = item.watchProviders?.flatrate?.[0];
-
-  return (
-    <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center animate-scale-up-center" onClick={onClose}>
-        <div className="w-full h-full md:h-auto md:w-full max-w-4xl bg-primary md:rounded-xl overflow-hidden shadow-2xl relative" onClick={e => e.stopPropagation()}>
-            <div className="absolute top-3 right-3 z-50">
-                <button onClick={onClose} className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-white hover:text-black transition-colors">
-                    <XIcon className="w-6 h-6" />
+            <div className="absolute bottom-8 md:bottom-10 left-4 md:left-8 z-20 max-w-md hero-parallax-content">
+                {logo ? (
+                    <img src={`${IMAGE_BASE_URL}w500${logo.file_path}`} alt={`${currentItem.title} logo`} className="max-h-16 md:max-h-20 max-w-[70%] mb-3 drop-shadow-lg" />
+                ) : (
+                    <h1 className="text-2xl md:text-4xl font-bold drop-shadow-lg animate-glow" style={{'--glow-color': 'var(--color-accent-600)'} as React.CSSProperties}>{currentItem.title}</h1>
+                )}
+                <p className="mt-2 text-xs md:text-sm max-w-sm text-zinc-300 drop-shadow-md line-clamp-2">{currentItem.overview}</p>
+                 <button onClick={() => onCardClick(currentItem)} className="mt-3 glass-button glass-button-primary px-4 py-1.5 rounded-full font-bold text-xs">
+                    More Info
                 </button>
             </div>
-            
-            <div className="relative aspect-video">
-                {trailer?.key ? (
-                    <>
-                    <VideoPlayer videoKey={trailer.key} isMuted={isMuted} loop={true} />
-                    <div className="absolute bottom-4 right-4 z-40">
-                        <button onClick={() => setIsMuted(!isMuted)} className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-white hover:text-black transition-colors">
-                            {isMuted ? <MuteIcon className="w-6 h-6" /> : <UnmuteIcon className="w-6 h-6" />}
-                        </button>
-                    </div>
-                    </>
-                ) : (
-                    backdropPath && <img src={backdropPath} alt={item.title} className="w-full h-full object-cover" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/50 to-transparent"></div>
+             <div className="absolute bottom-4 right-4 z-20 flex space-x-2">
+                {items.slice(0, 5).map((_, index) => (
+                    <button
+                        key={index}
+                        onClick={() => setCurrentItemIndex(index)}
+                        className={`w-2 h-2 rounded-full transition-all duration-300 ${currentItemIndex === index ? 'bg-white w-4' : 'bg-white/50'}`}
+                    />
+                ))}
             </div>
+        </div>
+    );
+};
 
-            <div className="p-6 md:p-8 max-h-[calc(100vh-56.25vw)] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-                <h1 className="text-3xl md:text-5xl font-bold mb-2">{item.title}</h1>
-                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-zinc-400 text-sm mb-4">
-                    <span>{item.release_date?.substring(0, 4)}</span>
-                    <span className="font-bold text-green-400 border border-green-400/50 px-1.5 py-0.5 rounded text-xs">{item.vote_average?.toFixed(1)}</span>
-                    {details && 'runtime' in details && details.runtime && <span>{formatRuntime(details.runtime)}</span>}
-                    {details && 'number_of_seasons' in details && <span>{details.number_of_seasons} Season{details.number_of_seasons !== 1 ? 's' : ''}</span>}
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                    {flatrateProvider ? (
-                        <a href={item.watchProviders?.link} target="_blank" rel="noopener noreferrer" onClick={createRipple} className="w-full sm:w-auto flex-grow sm:flex-grow-0 flex items-center justify-center glass-button glass-button-primary px-6 py-3 rounded-full font-bold text-white text-lg">
-                            <PlayIcon className="w-6 h-6 mr-2" />
-                            Play on {serviceNameMap[flatrateProvider.provider_id] || flatrateProvider.provider_name}
-                        </a>
-                    ) : (
-                         <button onClick={createRipple} className="w-full sm:w-auto flex-grow sm:flex-grow-0 flex items-center justify-center glass-button glass-button-primary px-6 py-3 rounded-full font-bold text-white text-lg">
-                            <PlayIcon className="w-6 h-6 mr-2" />
-                            Play Trailer
-                        </button>
-                    )}
-                     <button onClick={(e) => { toggleWatchlist(item.id); createRipple(e); }} className={`w-full sm:w-auto flex-grow sm:flex-grow-0 flex items-center justify-center glass-button glass-button-secondary px-5 py-3 rounded-full font-semibold ${isInWatchlist(item.id) ? 'text-cyan-300' : 'text-white'}`}>
-                        <StarIcon className="w-6 h-6 mr-2" isActive={isInWatchlist(item.id)} />
-                        {isInWatchlist(item.id) ? 'In Watchlist' : 'Add to Watchlist'}
-                    </button>
-                </div>
-                
-                <p className="text-zinc-300 mb-6">{item.overview}</p>
-
-                {details && details.genres && details.genres.length > 0 && (
-                     <div className="flex flex-wrap gap-2 text-sm text-zinc-400">
-                        <span className="font-semibold text-zinc-200">Genres:</span>
-                        {details.genres.map(g => g.name).join(', ')}
+const Row: React.FC<{ title: string; items: MediaItem[]; onCardClick: (item: MediaItem) => void; }> = memo(({ title, items, onCardClick }) => (
+    <div className="py-4 md:py-6">
+        <h2 className="text-xl md:text-2xl font-bold px-4 md:px-8 mb-4">{title}</h2>
+        <div className="relative">
+            <div className="flex space-x-4 overflow-x-auto pb-4 px-4 md:px-8 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+                {items.map(item => (
+                    <div
+                        key={`${item.id}-${item.media_type}`}
+                        className="flex-shrink-0 w-36 md:w-48 group cursor-pointer"
+                        onClick={() => onCardClick(item)}
+                    >
+                        <div className="aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden transform group-hover:scale-105 transition-transform duration-300">
+                           <img
+                                src={item.poster_path ? `${IMAGE_BASE_URL}w500${item.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'}
+                                alt={item.title}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                            />
+                        </div>
                     </div>
-                )}
-                
-                {similarItems.length > 0 && (
-                    <div className="mt-8">
-                         <MediaRow title="More Like This" items={similarItems} onSelect={(selected) => {
-                             onClose(); // Close current modal first
-                             setTimeout(() => onSelect(selected), 150); // Open new one after transition
-                         }} />
-                    </div>
-                )}
+                ))}
             </div>
         </div>
     </div>
-  );
+));
+
+const UpcomingMovieCard: React.FC<{ item: MediaItem; onCardClick: (item: MediaItem) => void; }> = ({ item, onCardClick }) => {
+    const { days, hours, minutes, seconds, hasEnded } = useCountdown(`${item.release_date}T00:00:00`);
+
+    return (
+        <div
+            className="flex-shrink-0 w-36 md:w-48 group cursor-pointer"
+            onClick={() => onCardClick(item)}
+        >
+            <div className="relative aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden transform group-hover:scale-105 transition-transform duration-300">
+                <img
+                    src={item.poster_path ? `${IMAGE_BASE_URL}w500${item.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'}
+                    alt={item.title}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                />
+                <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 via-black/50 to-transparent">
+                    {hasEnded ? (
+                        <div className="text-center font-bold text-green-400 text-sm">Released!</div>
+                    ) : (
+                        <div className="text-white text-center text-xs font-bold leading-tight">
+                            <div className="grid grid-cols-4 gap-1">
+                                <div>{String(days).padStart(2, '0')}<span className="block text-[8px] opacity-70">DAYS</span></div>
+                                <div>{String(hours).padStart(2, '0')}<span className="block text-[8px] opacity-70">HRS</span></div>
+                                <div>{String(minutes).padStart(2, '0')}<span className="block text-[8px] opacity-70">MIN</span></div>
+                                <div>{String(seconds).padStart(2, '0')}<span className="block text-[8px] opacity-70">SEC</span></div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 };
 
 
-interface NetflixViewProps {
-  apiKey: string;
-  searchQuery: string;
-  onInvalidApiKey: () => void;
-  view: ViewType;
-  activeFilter: ActiveFilter | null;
-  onSelectGame: (game: Game) => void;
-}
+// A simplified modal for showing item details.
+const Modal: React.FC<{ item: MediaItem | null; onClose: () => void; apiKey: string; userCountry: string; }> = ({ item, onClose, apiKey, userCountry }) => {
+    const [details, setDetails] = useState<MovieDetails | TVShowDetails | null>(null);
+    const [trailerKey, setTrailerKey] = useState<string | null>(null);
+    const [logo, setLogo] = useState<LogoImage | null>(null);
+    const [isMuted, setIsMuted] = useState(true);
+    const [providers, setProviders] = useState<WatchProvider[]>([]);
 
-const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvalidApiKey, view, activeFilter, onSelectGame }) => {
-  const [data, setData] = useState<{ [key: string]: MediaItem[] }>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
-  const { watchlistIds, dislikeItem, isDisliked } = usePreferences();
-  const [searchResults, setSearchResults] = useState<MediaItem[]>([]);
-  const [searchPage, setSearchPage] = useState(1);
-  const [hasMoreResults, setHasMoreResults] = useState(false);
-  
-  const processApiResponse = useCallback(<T extends Movie | TVShow>(response: PaginatedResponse<T>, normalizeFn: (item: T) => MediaItem) => {
-      return response.results
-        .map(normalizeFn)
-        .filter(item => item.poster_path && !isDisliked(item.id));
-  }, [isDisliked]);
+    useEffect(() => {
+        if (!item) return;
 
-  const fetchWithWatchProviders = useCallback(async (items: MediaItem[]): Promise<MediaItem[]> => {
-    const providerPromises = items.map(async (item) => {
-        const providerFn = item.media_type === 'movie' ? getMovieWatchProviders : getTVShowWatchProviders;
-        try {
-            const providers = await providerFn(apiKey, item.id);
-            const gbProviders = providers.results?.GB;
-            return { ...item, watchProviders: gbProviders || null };
-        } catch {
-            return { ...item, watchProviders: null };
-        }
-    });
-    return Promise.all(providerPromises);
-  }, [apiKey]);
-  
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-        const [trending, popularMovies, popularTV, upcomingMovies, onTheAirTV] = await Promise.all([
-            getTrendingAll(apiKey).then(res => processApiResponse(res, item => item.media_type === 'movie' ? normalizeMovie(item as Movie) : normalizeTVShow(item as TVShow))),
-            getPopularMovies(apiKey).then(res => processApiResponse(res, normalizeMovie)),
-            getPopularTVShows(apiKey).then(res => processApiResponse(res, normalizeTVShow)),
-            getUpcomingMovies(apiKey).then(res => processApiResponse(res, normalizeMovie)),
-            getOnTheAirTVShows(apiKey).then(res => processApiResponse(res, normalizeTVShow))
-        ]);
+        const fetchDetails = async () => {
+            try {
+                const detailsFn = item.media_type === 'movie' ? getMovieDetails : getTVShowDetails;
+                
+                const [detailsData, videosData, imagesData, providersData] = await Promise.all([
+                    detailsFn(apiKey, item.id),
+                    getMediaVideos(apiKey, item.id, item.media_type),
+                    getMediaImages(apiKey, item.id, item.media_type),
+                    getMediaWatchProviders(apiKey, item.id, item.media_type)
+                ]);
 
-        const trendingWithProviders = await fetchWithWatchProviders(trending);
-        const upcomingWithProviders = await fetchWithWatchProviders(upcomingMovies);
+                setDetails(detailsData);
+                // Prioritize full trailer for the modal view
+                const officialTrailer = videosData.results.find(v => v.type === 'Trailer' && v.official) || videosData.results.find(v => v.type === 'Trailer') || null;
+                setTrailerKey(officialTrailer?.key || null);
+                setLogo(imagesData.logos.find(l => l.iso_639_1 === 'en') || imagesData.logos[0] || null);
+
+                // Streaming availability logic
+                let countryProviders = providersData.results[userCountry];
+                 if (userCountry === 'ZA') {
+                    const ukProviders = providersData.results['GB'];
+                    if (ukProviders?.flatrate?.some(p => p.provider_id === 337)) { // Disney+ in UK
+                        if (!countryProviders) countryProviders = { link: ukProviders.link, flatrate: [] };
+                        if (!countryProviders.flatrate) countryProviders.flatrate = [];
+                        countryProviders.flatrate.push(...ukProviders.flatrate.filter(p => p.provider_id === 337));
+                    }
+                }
+                
+                if (countryProviders?.flatrate) {
+                    setProviders(countryProviders.flatrate);
+                } else {
+                    setProviders([]);
+                }
+
+            } catch (error) {
+                console.error("Failed to fetch item details:", error);
+            }
+        };
+
+        fetchDetails();
         
-        const heroItems = shuffleArray([...trendingWithProviders.slice(0, 5), ...upcomingWithProviders.slice(0, 5)]).slice(0, 10);
-        
-        setData({
-            'For You': heroItems,
-            'Trending Now': trendingWithProviders,
-            'Popular Movies': popularMovies,
-            'Popular TV Shows': popularTV,
-            'Upcoming Movies': upcomingWithProviders,
-            'On The Air': onTheAirTV,
-        });
-    } catch (e: any) {
-        if (e.message.includes("Invalid API Key")) {
-            onInvalidApiKey();
-        }
-        setError('Failed to fetch data.');
-        console.error(e);
-    } finally {
-        setIsLoading(false);
-    }
-  }, [apiKey, onInvalidApiKey, processApiResponse, fetchWithWatchProviders]);
+        // Cleanup
+        return () => {
+            setDetails(null);
+            setTrailerKey(null);
+            setLogo(null);
+            setProviders([]);
+        };
+    }, [item, apiKey, userCountry]);
 
-  const handleSearch = useCallback(async (query: string, page: number = 1) => {
-      if (!query) {
-          setSearchResults([]);
-          setHasMoreResults(false);
-          return;
-      }
-      setIsLoading(true);
-      try {
-          const response = await searchMulti(apiKey, query, page);
-          // FIX: Add type guard to safely filter for only Movie or TVShow types, as Person type does not have media_type.
-          const newResults = response.results
-            .filter((item): item is Movie | TVShow => ('media_type' in item && (item.media_type === 'movie' || item.media_type === 'tv')))
-            .map(item => item.media_type === 'movie' ? normalizeMovie(item) : normalizeTVShow(item))
-            .filter(item => item.poster_path && !isDisliked(item.id));
-            
-          setSearchResults(prev => page === 1 ? newResults : [...prev, ...newResults]);
-          setHasMoreResults(response.page < response.total_pages);
-      } catch (e) {
-          console.error("Search failed:", e);
-      } finally {
-          setIsLoading(false);
-      }
-  }, [apiKey, isDisliked]);
+    if (!item) return null;
 
-  const handleFilter = useCallback(async (filter: ActiveFilter) => {
-      setIsLoading(true);
-      setSearchResults([]); // Clear previous results
-      try {
-          let moviePromise, tvPromise;
-          switch (filter.type) {
-              case 'service':
-                  moviePromise = getMoviesByProvider(apiKey, filter.id);
-                  tvPromise = getTVShowsByProvider(apiKey, filter.id);
-                  break;
-              case 'studio':
-                  moviePromise = getMoviesByCompany(apiKey, filter.id);
-                  tvPromise = Promise.resolve(null); // No direct TV equivalent for studio
-                  break;
-              case 'network':
-                  moviePromise = Promise.resolve(null); // No movie equivalent for network
-                  tvPromise = discoverTVShows(apiKey, { with_networks: filter.id, sort_by: 'popularity.desc' });
-                  break;
-          }
-          const [movieRes, tvRes] = await Promise.all([moviePromise, tvPromise]);
-          const movies = movieRes ? processApiResponse(movieRes, normalizeMovie) : [];
-          const tvShows = tvRes ? processApiResponse(tvRes, normalizeTVShow) : [];
-          
-          // Simple interleaving for better mix
-          const combined = [];
-          const maxLength = Math.max(movies.length, tvShows.length);
-          for (let i = 0; i < maxLength; i++) {
-              if (movies[i]) combined.push(movies[i]);
-              if (tvShows[i]) combined.push(tvShows[i]);
-          }
-          setSearchResults(combined);
-          setHasMoreResults(false); // Pagination not handled for filters for simplicity
-      } catch (e) {
-          console.error("Filter failed:", e);
-      } finally {
-          setIsLoading(false);
-      }
-  }, [apiKey, processApiResponse]);
+    const runtime = details ? ('runtime' in details ? details.runtime : (details.episode_run_time?.[0] || null)) : null;
 
-  const handleSelectMedia = useCallback(async (item: MediaItem) => {
-      const providers = await fetchWithWatchProviders([item]);
-      setSelectedItem(providers[0]);
-  }, [fetchWithWatchProviders]);
+    return (
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center animate-scale-up-center" onClick={onClose}>
+            <div className="bg-primary w-full h-full md:max-h-[90vh] md:w-[90vw] max-w-4xl md:rounded-xl shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+                    <div className="absolute top-4 right-4 z-40">
+                        <button onClick={onClose} className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-white hover:text-black transition-colors">
+                            &times;
+                        </button>
+                    </div>
 
-  const handleCloseModal = () => {
-    setSelectedItem(null);
-  }
-  
-  // Custom event listener for AI assistant navigation
-  useEffect(() => {
-    const handleSelectEvent = (event: CustomEvent<MediaItem>) => {
-        handleSelectMedia(event.detail);
-    };
-    window.addEventListener('selectMediaItem', handleSelectEvent as EventListener);
-    return () => window.removeEventListener('selectMediaItem', handleSelectEvent as EventListener);
-  }, [handleSelectMedia]);
+                    <div className="relative h-[40vh] md:h-[60vh] bg-black">
+                        {trailerKey ? (
+                           <>
+                             <VideoPlayer videoKey={trailerKey} isMuted={isMuted} loop />
+                             <div className="absolute bottom-4 right-4 z-30">
+                                 <button onClick={() => setIsMuted(!isMuted)} className="w-10 h-10 rounded-full bg-black/50 border border-white/50 text-white flex items-center justify-center transition-opacity hover:opacity-80">
+                                     {isMuted ? <VolumeOffIcon className="w-6 h-6" /> : <VolumeUpIcon className="w-6 h-6" />}
+                                 </button>
+                             </div>
+                           </>
+                        ) : (
+                             item.backdrop_path && <img src={`${IMAGE_BASE_URL}original${item.backdrop_path}`} alt={item.title} className="w-full h-full object-cover" />
+                        )}
+                         <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/30 to-transparent z-10 pointer-events-none" />
+                    </div>
 
-  // Main effect to fetch data
-  useEffect(() => {
-    if (view === 'home' && !searchQuery && !activeFilter) {
-      fetchData();
-    }
-  }, [view, searchQuery, activeFilter, fetchData]);
-
-  // Effect for handling search
-  useEffect(() => {
-      setSearchPage(1); // Reset page on new query
-      handleSearch(searchQuery, 1);
-  }, [searchQuery, handleSearch]);
-
-  // Effect for handling filters
-  useEffect(() => {
-      if(activeFilter) {
-          handleFilter(activeFilter);
-      }
-  }, [activeFilter, handleFilter]);
-  
-  const loadMoreResults = () => {
-      const newPage = searchPage + 1;
-      setSearchPage(newPage);
-      handleSearch(searchQuery, newPage);
-  };
-
-  const renderContent = () => {
-    if (isLoading && searchResults.length === 0 && view !== 'watchlist') {
-        return (
-            <>
-                <div className="h-[85vh] md:h-auto md:aspect-[16/9] md:max-h-[80vh] w-full bg-zinc-900 animate-pulse mb-8"></div>
-                <div className="px-4 md:px-12">
-                    <div className="h-8 w-1/4 bg-zinc-800 rounded mb-4 animate-pulse"></div>
-                    <div className="flex space-x-4">
-                        {[...Array(5)].map((_, i) => <div key={i} className="flex-shrink-0 w-36 md:w-48 aspect-[2/3] bg-zinc-800 rounded-lg animate-pulse"></div>)}
+                    <div className="p-6 md:p-8 -mt-16 relative z-20">
+                       {logo && (
+                            <img src={`${IMAGE_BASE_URL}w500${logo.file_path}`} alt={`${item.title} logo`} className="max-h-24 max-w-[70%] mb-4" />
+                        )}
+                        <h1 className={`text-3xl md:text-4xl font-bold ${logo ? 'hidden' : ''}`}>{item.title}</h1>
+                        <div className="flex items-center space-x-4 text-zinc-400 mt-2 text-sm">
+                            <span>{item.release_date?.substring(0, 4)}</span>
+                            {runtime && <span>{runtime} min</span>}
+                            <span className="border border-zinc-500 px-1 rounded text-xs">HD</span>
+                            <span>⭐ {item.vote_average.toFixed(1)}</span>
+                        </div>
+                        <p className="mt-4 text-zinc-300 max-w-2xl">{item.overview}</p>
+                        
+                        {providers.length > 0 && (
+                            <div className="mt-6">
+                                <h3 className="font-bold text-lg mb-2">Available on:</h3>
+                                <div className="flex flex-wrap gap-4">
+                                    {providers.map(p => (
+                                        <div key={p.provider_id} className="flex items-center gap-2 bg-glass p-2 rounded-lg">
+                                            <img src={`${IMAGE_BASE_URL}w92${p.logo_path}`} alt={p.provider_name} className="w-8 h-8 rounded-md" />
+                                            <span className="font-semibold">{p.provider_name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
-            </>
+            </div>
+        </div>
+    );
+};
+
+const GamePromoRow: React.FC<{ onSelectGame: (game: Game) => void }> = ({ onSelectGame }) => {
+    const GameCard: React.FC<{ title: string; description: string; onClick: () => void; }> = ({ title, description, onClick }) => (
+        <button onClick={onClick} className="glass-panel text-left p-6 flex flex-col items-start !rounded-xl h-full">
+            <h3 className="text-xl font-bold text-cyan-400 mb-2">{title}</h3>
+            <p className="text-zinc-300 text-sm flex-grow">{description}</p>
+        </button>
+    );
+    return (
+        <div className="py-4 md:py-6">
+            <h2 className="text-xl md:text-2xl font-bold px-4 md:px-8 mb-4">Play a Game</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 px-4 md:px-8">
+                <GameCard title="Movie Trivia" description="Test your film knowledge against the clock." onClick={() => onSelectGame('trivia')} />
+                <GameCard title="Six Degrees" description="Connect any two actors in six steps or less." onClick={() => onSelectGame('six-degrees')} />
+                <GameCard title="Guess The Poster" description="Identify the movie from its poster." onClick={() => onSelectGame('guess-poster')} />
+                <GameCard title="Box Office Compare" description="Higher or lower? Guess the box office smash." onClick={() => onSelectGame('box-office-compare')} />
+            </div>
+        </div>
+    );
+}
+
+// --- Main Component ---
+
+interface NetflixViewProps {
+    apiKey: string;
+    searchQuery: string;
+    onInvalidApiKey: () => void;
+    view: 'home' | 'watchlist';
+    activeFilter: ActiveFilter | null;
+    onSelectGame: (game: Game) => void;
+    userCountry: string;
+}
+
+const companyIDs = {
+    'Disney': 2, 'Pixar': 3, 'Marvel': 420, 'Star Wars': 1, 'National Geographic': 7521,
+    '20th Century': 25, 'Searchlight': 43,
+};
+
+const networkIDs = {
+    'Hulu': 453,
+};
+
+const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onInvalidApiKey, view, activeFilter, onSelectGame, userCountry }) => {
+    const [heroItems, setHeroItems] = useState<MediaItem[]>([]);
+    const [rows, setRows] = useState<{ title: string; items: MediaItem[] }[]>([]);
+    const [searchResults, setSearchResults] = useState<MediaItem[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
+    const { watchlistIds } = usePreferences();
+    const [disneyPlusHub, setDisneyPlusHub] = useState<'disney' | 'hulu'>('disney');
+    const [activeDisneyBrand, setActiveDisneyBrand] = useState<string>('Disney');
+
+    // Effect to lock body scroll when modal is open
+    useEffect(() => {
+        if (selectedItem) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        // Cleanup function
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [selectedItem]);
+
+    const fetchAndSetContent = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            if (searchQuery) {
+                const response = await searchMulti(apiKey, searchQuery);
+                const validResults = response.results
+                    .filter((item): item is Movie | TVShow => ('media_type' in item && (item.media_type === 'movie' || item.media_type === 'tv')) && !!item.poster_path)
+                    .map(item => item.media_type === 'movie' ? normalizeMovie(item as Movie) : normalizeTVShow(item as TVShow));
+                setSearchResults(validResults);
+                setHeroItems([]);
+                setRows([]);
+            } else if (activeFilter) {
+                let heroParams: Record<string, string | number> = { sort_by: 'popularity.desc' };
+                let newRows: { title: string, items: MediaItem[] }[] = [];
+                const today = new Date().toISOString().split('T')[0];
+
+                if (activeFilter.name === 'Disney+') {
+                    // DISNEY+ SPECIFIC LOGIC
+                    let contentParams: Record<string, string | number> = {};
+                    let pageTitle = 'Disney+';
+
+                    if (disneyPlusHub === 'disney') {
+                        const brandCompanyId = companyIDs[activeDisneyBrand as keyof typeof companyIDs];
+                        contentParams['with_companies'] = brandCompanyId;
+                        pageTitle = activeDisneyBrand;
+                    } else if (disneyPlusHub === 'hulu') {
+                        contentParams['with_networks'] = networkIDs['Hulu'];
+                        contentParams['with_companies'] = `${companyIDs['20th Century']}|${companyIDs['Searchlight']}`;
+                        pageTitle = 'Hulu';
+                    }
+                    
+                    heroParams = { ...heroParams, ...contentParams };
+                    
+                    const heroResponse = await discoverMedia(apiKey, heroParams);
+                    const heroMedia = heroResponse.results.map(i => normalizeMovie(i)).filter(i => i.backdrop_path);
+                    setHeroItems(heroMedia.slice(0, 5));
+                    
+                    // Fetch 3 curated rows of content for the selected brand/hub
+                    const popularPromise = discoverMedia(apiKey, { ...contentParams, sort_by: 'popularity.desc' });
+                    const topRatedPromise = discoverMedia(apiKey, { ...contentParams, sort_by: 'vote_average.desc', 'vote_count.gte': 100 });
+                    const newReleasesPromise = discoverMedia(apiKey, { ...contentParams, sort_by: 'primary_release_date.desc', 'primary_release_date.lte': today });
+
+                    const [popularData, topRatedData, newReleasesData] = await Promise.all([popularPromise, topRatedPromise, newReleasesPromise]);
+
+                    newRows.push({ title: `Popular on ${pageTitle}`, items: popularData.results.map(i => normalizeMovie(i)) });
+                    newRows.push({ title: `Top Rated on ${pageTitle}`, items: topRatedData.results.map(i => normalizeMovie(i)) });
+                    newRows.push({ title: `New Releases on ${pageTitle}`, items: newReleasesData.results.map(i => normalizeMovie(i)) });
+
+                } else {
+                    // GENERIC SERVICE/STUDIO/NETWORK LOGIC
+                    if (activeFilter.type === 'service') {
+                        heroParams['with_watch_providers'] = activeFilter.id;
+                        heroParams['watch_region'] = userCountry; 
+                    }
+                    if (activeFilter.type === 'studio') heroParams['with_companies'] = activeFilter.id;
+                    if (activeFilter.type === 'network') heroParams['with_networks'] = activeFilter.id;
+                    
+                    const heroResponse = await discoverMedia(apiKey, heroParams);
+                    const heroMedia = heroResponse.results.map(i => normalizeMovie(i)).filter(i => i.backdrop_path);
+                    setHeroItems(heroMedia.slice(0, 5));
+
+                    const topMoviesPromise = getTopRatedMoviesByProvider(apiKey, String(activeFilter.id), userCountry);
+                    const topShowsPromise = getTopRatedTVShowsByProvider(apiKey, String(activeFilter.id), userCountry);
+
+                    const [topMovies, topShows] = await Promise.all([topMoviesPromise, topShowsPromise]);
+                    
+                    newRows.push({ title: `Popular on ${activeFilter.name}`, items: heroMedia.slice(5) });
+                    newRows.push({ title: `Top Rated Movies on ${activeFilter.name}`, items: topMovies.results.map(i => normalizeMovie(i as Movie)) });
+                    newRows.push({ title: `Top Rated Shows on ${activeFilter.name}`, items: topShows.results.map(i => normalizeTVShow(i as TVShow)) });
+                }
+                setRows(newRows);
+
+            } else { // Home view ("For You")
+                const [
+                    trendingResponse, 
+                    popularResponse, 
+                    upcomingMovies, 
+                    onTheAirShows
+                ] = await Promise.all([
+                    getTrending(apiKey),
+                    discoverMedia(apiKey, { sort_by: 'popularity.desc' }),
+                    getUpcomingMovies(apiKey, userCountry),
+                    getOnTheAirTVShows(apiKey)
+                ]);
+
+                const trendingItems = trendingResponse.results
+                  .filter((item): item is Movie | TVShow => (item.media_type === 'movie' || item.media_type === 'tv') && !!item.backdrop_path)
+                  .map(item => item.media_type === 'movie' ? normalizeMovie(item) : normalizeTVShow(item));
+
+                if (trendingItems.length > 0) {
+                    setHeroItems(trendingItems.slice(0, 5));
+                }
+
+                const newRows = [
+                    { title: "Trending This Week", items: trendingItems.slice(5) },
+                    { title: "Popular Movies", items: popularResponse.results.map(i => normalizeMovie(i)) },
+                    { title: "Coming Soon to Theaters", items: upcomingMovies.results.map(normalizeMovie) },
+                    { title: "Currently On Air", items: onTheAirShows.results.map(normalizeTVShow) }
+                ];
+                setRows(newRows);
+            }
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('Invalid API Key')) {
+                onInvalidApiKey();
+            }
+            console.error(error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [apiKey, onInvalidApiKey, searchQuery, activeFilter, userCountry, disneyPlusHub, activeDisneyBrand]);
+
+
+    useEffect(() => {
+        fetchAndSetContent();
+    }, [fetchAndSetContent]);
+    
+    const handleCardClick = (item: MediaItem) => {
+        setSelectedItem(item);
+    };
+
+    const disneyBrandButtons = [
+        { name: 'Disney', logo: DisneyBrandLogo, id: companyIDs['Disney'] },
+        { name: 'Pixar', logo: PixarBrandLogo, id: companyIDs['Pixar'] },
+        { name: 'Marvel', logo: MarvelBrandLogo, id: companyIDs['Marvel'] },
+        { name: 'Star Wars', logo: StarWarsBrandLogo, id: companyIDs['Star Wars'] },
+        { name: 'National Geographic', logo: NationalGeographicBrandLogo, id: companyIDs['National Geographic'] },
+    ];
+
+    if (isLoading) {
+        return <div className="pt-20"><Loader /></div>;
+    }
+    
+    const renderContent = () => {
+        if (searchQuery) {
+            return (
+                 <div className="container mx-auto px-4 md:px-8 py-8">
+                    <h2 className="text-2xl font-bold mb-6">Results for "{searchQuery}"</h2>
+                    {searchResults.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                            {searchResults.map(item => (
+                                <div key={`${item.id}-${item.media_type}`} className="group cursor-pointer" onClick={() => handleCardClick(item)}>
+                                    <div className="aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden transform group-hover:scale-105 transition-transform duration-300">
+                                    <img
+                                            src={item.poster_path ? `${IMAGE_BASE_URL}w500${item.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'}
+                                            alt={item.title}
+                                            className="w-full h-full object-cover"
+                                            loading="lazy"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-zinc-400">No results found.</p>
+                    )}
+                </div>
+            )
+        }
+
+        const isHomeView = !activeFilter;
+        
+        return (
+             <div className={activeFilter ? 'pt-8' : ''}>
+                {activeFilter?.name === 'Disney+' && (
+                    <div className="px-4 md:px-8 mb-6 flex items-center justify-center gap-2 md:gap-4 bg-primary/30 backdrop-blur-sm py-2 sticky top-20 z-30">
+                        <button onClick={() => setDisneyPlusHub('disney')} className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${disneyPlusHub === 'disney' ? 'bg-white text-black scale-105' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                           <DisneyPillLogo className="h-5 w-auto" />
+                        </button>
+                        <button onClick={() => setDisneyPlusHub('hulu')} className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${disneyPlusHub === 'hulu' ? 'bg-white text-black scale-105' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                           <HuluPillLogo className="h-4 w-auto" />
+                        </button>
+                    </div>
+                )}
+
+                {activeFilter?.name === 'Disney+' && disneyPlusHub === 'disney' && (
+                     <div className="px-4 md:px-8 mb-6 flex items-center justify-center gap-2 md:gap-4 py-2">
+                        {disneyBrandButtons.map(brand => (
+                            <button
+                                key={brand.name}
+                                onClick={() => setActiveDisneyBrand(brand.name)}
+                                className={`px-4 py-2 rounded-full transition-all duration-300 flex items-center justify-center bg-zinc-800/60 border-2 ${activeDisneyBrand === brand.name ? 'border-white scale-105' : 'border-transparent hover:bg-zinc-700'}`}
+                            >
+                                <brand.logo className="h-6 md:h-8 w-auto" />
+                            </button>
+                        ))}
+                    </div>
+                )}
+                
+                {isHomeView && <GamePromoRow onSelectGame={onSelectGame} />}
+
+                {rows.map(row => {
+                    if (row.items && row.items.length > 0) {
+                        if (row.title === "Coming Soon to Theaters") {
+                            return (
+                                <div key={row.title} className="py-4 md:py-6">
+                                    <h2 className="text-xl md:text-2xl font-bold px-4 md:px-8 mb-4">{row.title}</h2>
+                                    <div className="relative">
+                                        <div className="flex space-x-4 overflow-x-auto pb-4 px-4 md:px-8 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+                                            {row.items.map(item => (
+                                                <UpcomingMovieCard key={`${item.id}-upcoming`} item={item} onCardClick={handleCardClick} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        }
+                        return <Row key={row.title} title={row.title} items={row.items} onCardClick={handleCardClick} />;
+                    }
+                    return null;
+                })}
+            </div>
         )
     }
 
-    if (error) {
-      return <p className="text-center text-red-500">{error}</p>;
-    }
-
-    if (searchQuery || activeFilter) {
-      const title = activeFilter ? `Discover on ${activeFilter.name}` : `Results for "${searchQuery}"`;
-      return <ResultsGrid title={title} items={searchResults} onSelect={handleSelectMedia} isLoading={isLoading} loadMore={loadMoreResults} hasMore={hasMoreResults} />
-    }
-    
-    if (view === 'watchlist') {
-        // This is a simplified client-side watchlist. For larger lists, pagination/API would be needed.
-        const watchlistItems = [...(data['Trending Now'] || []), ...(data['Popular Movies'] || []), ...(data['Popular TV Shows'] || [])];
-        const uniqueItems = Array.from(new Map(watchlistItems.map(item => [item.id, item])).values());
-        const filteredWatchlist = uniqueItems.filter(item => watchlistIds.has(item.id));
-        return <ResultsGrid title="My Watchlist" items={filteredWatchlist} onSelect={handleSelectMedia} isLoading={false} />
-    }
-
     return (
-      <>
-        <Hero items={data['For You'] || []} onSelect={handleSelectMedia} apiKey={apiKey} />
-        {data['Trending Now'] && <MediaRow key="Trending Now" title="Trending Now" items={data['Trending Now']} onSelect={handleSelectMedia} />}
-        <GameRow onSelectGame={onSelectGame} />
-        {Object.entries(data).map(([title, items]) =>
-            (title !== 'For You' && title !== 'Trending Now') && <MediaRow key={title} title={title} items={items} onSelect={handleSelectMedia} isUpcomingRow={title === 'Upcoming Movies'} />
-        )}
-      </>
+        <div>
+            <HeroCarousel items={heroItems} onCardClick={handleCardClick} apiKey={apiKey} />
+            {renderContent()}
+            <Modal item={selectedItem} onClose={() => setSelectedItem(null)} apiKey={apiKey} userCountry={userCountry} />
+        </div>
     );
-  };
-  
-  return (
-    <>
-      {renderContent()}
-      {selectedItem && (
-        <Modal 
-            item={selectedItem} 
-            apiKey={apiKey} 
-            onClose={handleCloseModal}
-            onSelect={handleSelectMedia}
-        />
-      )}
-    </>
-  );
 };
 
 export default NetflixView;

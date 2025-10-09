@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Loader from './Loader';
 import { triviaQuestions, TriviaQuestion } from '../services/triviaQuestions';
@@ -31,7 +32,8 @@ const TriviaGame: React.FC<TriviaGameProps> = ({ onExit }) => {
     const [timer, setTimer] = useState(15);
     const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
     const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    // FIX: The type `NodeJS.Timeout` is not available in browser environments. The correct type for the return value of `setInterval` in the browser is `number`.
+    const timerRef = useRef<number | null>(null);
 
     const generateQuestions = useCallback(() => {
         setGameState('loading');

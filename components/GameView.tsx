@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import TriviaGame from './TriviaGame';
 import SixDegreesGame from './SixDegreesGame';
@@ -36,7 +35,7 @@ const GameView: React.FC<GameViewProps> = ({ apiKey, onInvalidApiKey, initialGam
         return (
           <div className="text-center animate-text-focus-in">
             <h1 className="text-5xl font-bold mb-8 animate-glow">Choose a Game</h1>
-            <div className="flex flex-wrap items-stretch justify-center gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
               <GameCard 
                 title="Movie Trivia"
                 description="Test your film knowledge against the clock. How many questions can you answer?"
@@ -47,14 +46,14 @@ const GameView: React.FC<GameViewProps> = ({ apiKey, onInvalidApiKey, initialGam
                 description="Connect any two actors through their movie roles in six steps or less."
                 onClick={() => setActiveGame('six-degrees')}
               />
-              <GameCard
+              <GameCard 
                 title="Guess The Poster"
                 description="How well do you know movie posters? Guess the film from a single image."
                 onClick={() => setActiveGame('guess-poster')}
               />
               <GameCard
                 title="Box Office Compare"
-                description="Decide which blockbuster earned more at the worldwide box office."
+                description="Which movie was a bigger hit? Guess higher or lower based on worldwide box office."
                 onClick={() => setActiveGame('box-office-compare')}
               />
             </div>
@@ -79,7 +78,7 @@ interface GameCardProps {
 const GameCard: React.FC<GameCardProps> = ({ title, description, onClick }) => (
     <button 
         onClick={onClick}
-        className="w-full max-w-sm p-8 bg-glass border border-glass-edge rounded-xl shadow-2xl text-left transform hover:scale-105 hover:border-cyan-500/50 transition-all duration-300 backdrop-blur-md flex flex-col"
+        className="w-full p-8 bg-glass border border-glass-edge rounded-xl shadow-2xl text-left transform hover:scale-105 hover:border-cyan-500/50 transition-all duration-300 backdrop-blur-md flex flex-col"
     >
         <h2 className="text-3xl font-bold text-cyan-400 mb-4">{title}</h2>
         <p className="text-zinc-300 flex-grow">{description}</p>

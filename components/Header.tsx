@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SearchIcon, StarIcon, UserIcon, ChevronDownIcon, MenuIcon, XIcon, CheckIcon } from './Icons';
+import { SearchIcon, StarIcon, GearIcon, ChevronDownIcon, MenuIcon, XIcon, CheckIcon, ClockIcon, TrashIcon } from './Icons';
 import type { ViewType } from '../App';
 import type { ActiveFilter, FilterCategory } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useSearchHistory } from '../hooks/useSearchHistory';
 
 interface HeaderProps {
   searchQuery: string;
@@ -11,18 +12,27 @@ interface HeaderProps {
   setView: (view: ViewType) => void;
   activeFilter: ActiveFilter | null;
   setActiveFilter: (filter: ActiveFilter | null) => void;
+  userCountry: string;
 }
 
-const services = [
-  { id: 8, name: 'Netflix' },
-  { id: 337, name: 'Disney+' },
-  { id: 1899, name: 'Max' },
-  { id: 9, name: 'Prime Video' },
-  { id: 15, name: 'Hulu' },
-  { id: 2, name: 'Apple TV+' },
-  { id: 531, name: 'Paramount+' },
-  { id: 387, name: 'Peacock' },
-];
+const servicesByCountry: { [key: string]: { id: number; name: string }[] } = {
+    'ZA': [
+      { id: 8, name: 'Netflix' },
+      { id: 119, name: 'Prime Video' },
+      { id: 337, name: 'Disney+' },
+    ],
+    // Default/global list for other regions
+    'default': [
+      { id: 8, name: 'Netflix' },
+      { id: 337, name: 'Disney+' },
+      { id: 1899, name: 'Max' },
+      { id: 9, name: 'Prime Video' },
+      { id: 15, name: 'Hulu' },
+      { id: 2, name: 'Apple TV+' },
+      { id: 531, name: 'Paramount+' },
+      { id: 387, name: 'Peacock' },
+    ]
+};
 
 const studios = [
   { id: 2, name: 'Walt Disney' },
@@ -50,22 +60,29 @@ const networks = [
 ];
 
 const mainNavItems = ['For You', 'Games', 'Stream', 'Studios', 'Networks'];
-const menuData: { [key: string]: { type: FilterCategory, items: {id: number, name: string}[] } } = {
-    'Stream': { type: 'service', items: services },
-    'Studios': { type: 'studio', items: studios },
-    'Networks': { type: 'network', items: networks },
-};
 
 
-const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setView, activeFilter, setActiveFilter }) => {
+const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setView, activeFilter, setActiveFilter, userCountry }) => {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openMobileSubMenu, setOpenMobileSubMenu] = useState<string | null>(null);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const { theme, setCurrentTheme, themes } = useTheme();
+  const { history: searchHistory, addSearchQuery, clearHistory: clearSearchHistory } = useSearchHistory();
+
+  const services = servicesByCountry[userCountry] || servicesByCountry['default'];
+
+  const menuData: { [key: string]: { type: FilterCategory, items: {id: number, name: string}[] } } = {
+      'Stream': { type: 'service', items: services },
+      'Studios': { type: 'studio', items: studios },
+      'Networks': { type: 'network', items: networks },
+  };
+
 
   useEffect(() => {
     if (isSearchVisible) {
@@ -89,16 +106,22 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
     };
   }, [isMobileMenuOpen]);
   
-  // Close profile menu on outside click
+  // Close profile and search menus on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
         if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
             setIsProfileMenuOpen(false);
         }
+        if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+            setIsHistoryVisible(false);
+            if (!searchQuery) {
+                setIsSearchVisible(false);
+            }
+        }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [searchQuery]);
 
   const handleSelect = (type: FilterCategory, id: number, name: string) => {
     setActiveFilter({ type, id, name });
@@ -204,7 +227,7 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
 
         {/* Right Section */}
         <div className="flex items-center gap-4">
-          <div className={`flex items-center transition-all duration-300 ${isSearchVisible ? 'w-48 md:w-64' : 'w-0'}`}>
+          <div ref={searchContainerRef} className={`flex items-center transition-all duration-300 ${isSearchVisible ? 'w-48 md:w-64' : 'w-0'}`}>
             <div className="relative w-full">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                 <SearchIcon className="text-zinc-400" />
@@ -214,10 +237,59 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onBlur={() => { if (!searchQuery) setIsSearchVisible(false) }}
+                onFocus={() => setIsHistoryVisible(true)}
+                onBlur={() => {
+                    // Save to history when user leaves the input field
+                    if (searchQuery.trim()) {
+                        addSearchQuery(searchQuery.trim());
+                    }
+                }}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchQuery.trim()) {
+                        addSearchQuery(searchQuery.trim());
+                        searchInputRef.current?.blur();
+                        setIsHistoryVisible(false);
+                    }
+                }}
                 placeholder="Search..."
+                autoComplete="off"
                 className={`w-full bg-glass border border-glass-edge rounded-full py-2 pl-10 pr-3 text-white placeholder:text-zinc-400 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all duration-300 ${isSearchVisible ? 'opacity-100' : 'opacity-0'}`}
               />
+              {isHistoryVisible && searchHistory.length > 0 && (
+                  <div className="absolute top-full mt-2 w-full bg-primary/80 backdrop-blur-md border border-glass-edge rounded-lg shadow-2xl p-2 z-50">
+                      <ul>
+                          {searchHistory.map((query, index) => (
+                              <li key={index}>
+                                  <button
+                                      onMouseDown={(e) => e.preventDefault()} // Prevents input blur before click registers
+                                      onClick={() => {
+                                          setSearchQuery(query);
+                                          addSearchQuery(query); // To move it to the top
+                                          setIsHistoryVisible(false);
+                                          searchInputRef.current?.blur();
+                                      }}
+                                      className="w-full text-left flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-colors hover:bg-white/10 text-zinc-200"
+                                  >
+                                      <ClockIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                                      <span className="truncate">{query}</span>
+                                  </button>
+                              </li>
+                          ))}
+                      </ul>
+                      <hr className="border-zinc-700 my-1" />
+                      <button
+                          onMouseDown={(e) => e.preventDefault()} // Prevents input blur before click registers
+                          onClick={() => {
+                              clearSearchHistory();
+                              setIsHistoryVisible(false);
+                          }}
+                          className="w-full text-left flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-colors hover:bg-red-500/20 text-red-400"
+                      >
+                          <TrashIcon className="w-4 h-4 flex-shrink-0" />
+                          <span>Clear history</span>
+                      </button>
+                  </div>
+              )}
             </div>
           </div>
           
@@ -234,8 +306,8 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
           </button>
 
           <div className="relative" ref={profileMenuRef}>
-            <button onClick={() => setIsProfileMenuOpen(prev => !prev)} className="text-zinc-300 hover:text-white transition-colors" aria-label="Profile">
-              <UserIcon className="w-6 h-6" />
+            <button onClick={() => setIsProfileMenuOpen(prev => !prev)} className="text-zinc-300 hover:text-white transition-colors" aria-label="Settings">
+              <GearIcon className="w-6 h-6" />
             </button>
             {isProfileMenuOpen && (
               <div className="absolute top-full mt-3 right-0 w-64 bg-primary/80 backdrop-blur-md border border-glass-edge rounded-lg shadow-2xl p-3 z-50">

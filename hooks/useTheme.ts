@@ -72,5 +72,7 @@ export const useTheme = () => {
     setTheme(newTheme);
   }, []);
   
-  return { theme, setCurrentTheme, themes: Object.entries(themes).map(([key, value]) => ({ key, ...value })) };
+  // FIX: The original implementation using `Object.entries` resulted in the `key` property being typed as a generic `string`, causing a type mismatch with `ThemeKey`.
+  // Using `Object.keys` with a type assertion ensures that the `key` in the returned `themes` array is correctly typed as `ThemeKey`.
+  return { theme, setCurrentTheme, themes: (Object.keys(themes) as ThemeKey[]).map(key => ({ key, ...themes[key] })) };
 };

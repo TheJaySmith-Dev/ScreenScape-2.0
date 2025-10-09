@@ -1,86 +1,157 @@
-import type { Movie, TVShow, MediaItem, PaginatedResponse, Video, MovieDetails, TVShowDetails, CreditsResponse, ImageResponse, WatchProviderResponse, Person, PersonMovieCreditsResponse } from '../types';
+import type {
+    PaginatedResponse,
+    Movie,
+    TVShow,
+    Person,
+    MediaItem,
+    MovieDetails,
+    TVShowDetails,
+    WatchProviderResponse,
+    CreditsResponse,
+    ImageResponse,
+    PersonMovieCreditsResponse,
+    Video,
+    Genre
+} from '../types';
 
 const API_BASE_URL = 'https://api.themoviedb.org/3';
 
-const fetchFromTMDB = async <T>(apiKey: string, endpoint: string, params: Record<string, string | number> = {}): Promise<T> => {
-  const url = new URL(`${API_BASE_URL}/${endpoint}`);
-  url.searchParams.append('api_key', apiKey);
-  Object.entries(params).forEach(([key, value]) => url.searchParams.append(key, String(value)));
-
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const status = errorData.status_code || response.status;
-    const message = errorData.status_message || `An error occurred (Status: ${response.status})`;
-    
-    if (status === 7 || status === 34) { // Invalid API Key or resource not found
-      throw new Error("Invalid API Key or resource not found.");
+class ApiError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ApiError';
     }
-    
-    throw new Error(`${message} (Status: ${response.status})`);
-  }
-  return response.json();
+}
+
+const apiCall = async <T,>(endpoint: string, apiKey: string): Promise<T> => {
+    const url = `${API_BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}api_key=${apiKey}&language=en-US`;
+    try {
+        const response = await fetch(url);
+        if (response.status === 401) {
+            throw new ApiError('Invalid API Key');
+        }
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("TMDB API call failed:", error);
+        throw error;
+    }
 };
 
 export const normalizeMovie = (movie: Movie): MediaItem => ({
-  ...movie,
-  title: movie.title,
-  release_date: movie.release_date,
-  media_type: 'movie',
+    id: movie.id,
+    title: movie.title,
+    poster_path: movie.poster_path,
+    backdrop_path: movie.backdrop_path,
+    overview: movie.overview,
+    release_date: movie.release_date,
+    vote_average: movie.vote_average,
+    media_type: 'movie',
 });
 
 export const normalizeTVShow = (tvShow: TVShow): MediaItem => ({
-  ...tvShow,
-  title: tvShow.name,
-  release_date: tvShow.first_air_date,
-  media_type: 'tv',
+    id: tvShow.id,
+    title: tvShow.name,
+    poster_path: tvShow.poster_path,
+    backdrop_path: tvShow.backdrop_path,
+    overview: tvShow.overview,
+    release_date: tvShow.first_air_date,
+    vote_average: tvShow.vote_average,
+    media_type: 'tv',
 });
 
-export const getTrendingAll = (apiKey: string) => fetchFromTMDB<PaginatedResponse<Movie | TVShow>>(apiKey, 'trending/all/week');
-export const searchMulti = (apiKey: string, query: string, page: number = 1) => fetchFromTMDB<PaginatedResponse<Movie | TVShow | Person>>(apiKey, 'search/multi', { query, page });
-export const getPopularMovies = (apiKey: string) => fetchFromTMDB<PaginatedResponse<Movie>>(apiKey, 'movie/popular');
-export const getPopularTVShows = (apiKey: string) => fetchFromTMDB<PaginatedResponse<TVShow>>(apiKey, 'tv/popular');
-export const getUpcomingMovies = (apiKey: string) => {
-  const today = new Date();
-  const future = new Date();
-  future.setMonth(today.getMonth() + 6);
+// Search
+export const searchMulti = (apiKey: string, query: string, page: number = 1): Promise<PaginatedResponse<Movie | TVShow | Person>> =>
+    apiCall(`/search/multi?query=${encodeURIComponent(query)}&page=${page}&include_adult=false`, apiKey);
 
-  const todayString = today.toISOString().split('T')[0];
-  const futureString = future.toISOString().split('T')[0];
+export const searchPerson = (apiKey: string, query: string, page: number = 1): Promise<PaginatedResponse<Person>> =>
+    apiCall(`/search/person?query=${encodeURIComponent(query)}&page=${page}&include_adult=false`, apiKey);
 
-  return discoverMovies(apiKey, {
-    'primary_release_date.gte': todayString,
-    'primary_release_date.lte': futureString,
-    sort_by: 'popularity.desc',
-  });
+// Movies
+export const getMovieDetails = (apiKey: string, movieId: number): Promise<MovieDetails> =>
+    apiCall(`/movie/${movieId}`, apiKey);
+
+export const getMovieCredits = (apiKey: string, movieId: number): Promise<CreditsResponse> =>
+    apiCall(`/movie/${movieId}/credits`, apiKey);
+
+export const getMovieImages = (apiKey: string, movieId: number): Promise<ImageResponse> =>
+    apiCall(`/movie/${movieId}/images?include_image_language=en,null,xx`, apiKey);
+
+export const getMovieWatchProviders = (apiKey: string, movieId: number): Promise<WatchProviderResponse> =>
+    apiCall(`/movie/${movieId}/watch/providers`, apiKey);
+    
+export const getMovieVideos = (apiKey: string, movieId: number): Promise<{ id: number, results: Video[] }> =>
+    apiCall(`/movie/${movieId}/videos`, apiKey);
+
+export const getPopularMovies = (apiKey: string, page: number = 1): Promise<PaginatedResponse<Movie>> =>
+    apiCall(`/movie/popular?page=${page}`, apiKey);
+
+export const getTrending = (apiKey: string, timeWindow: 'day' | 'week' = 'week'): Promise<PaginatedResponse<Movie | TVShow>> =>
+    apiCall(`/trending/all/${timeWindow}`, apiKey);
+
+export const getUpcomingMovies = (apiKey: string, region: string, page: number = 1): Promise<PaginatedResponse<Movie>> => {
+    // Using the official '/movie/upcoming' endpoint is more reliable for theatrical releases
+    // and correctly filters by region to avoid showing movies already out elsewhere.
+    return apiCall(`/movie/upcoming?page=${page}&region=${region}`, apiKey);
+}
+
+// TV Shows
+export const getTVShowDetails = (apiKey: string, tvId: number): Promise<TVShowDetails> =>
+    apiCall(`/tv/${tvId}`, apiKey);
+
+export const getTVShowVideos = (apiKey: string, tvId: number): Promise<{ id: number, results: Video[] }> =>
+    apiCall(`/tv/${tvId}/videos`, apiKey);
+
+export const getTVShowImages = (apiKey: string, tvId: number): Promise<ImageResponse> =>
+    apiCall(`/tv/${tvId}/images?include_image_language=en,null,xx`, apiKey);
+
+export const getTVShowWatchProviders = (apiKey: string, tvId: number): Promise<WatchProviderResponse> =>
+    apiCall(`/tv/${tvId}/watch/providers`, apiKey);
+    
+export const getOnTheAirTVShows = (apiKey: string, page: number = 1): Promise<PaginatedResponse<TVShow>> =>
+    apiCall(`/tv/on_the_air?page=${page}`, apiKey);
+
+export const getMediaVideos = (apiKey:string, mediaId: number, mediaType: 'movie' | 'tv'): Promise<{ id: number, results: Video[] }> => {
+    if (mediaType === 'movie') {
+        return getMovieVideos(apiKey, mediaId);
+    } else {
+        return getTVShowVideos(apiKey, mediaId);
+    }
+}
+
+export const getMediaImages = (apiKey: string, mediaId: number, mediaType: 'movie' | 'tv'): Promise<ImageResponse> => {
+    if (mediaType === 'movie') {
+        return getMovieImages(apiKey, mediaId);
+    } else {
+        return getTVShowImages(apiKey, mediaId);
+    }
+}
+
+export const getMediaWatchProviders = (apiKey: string, mediaId: number, mediaType: 'movie' | 'tv'): Promise<WatchProviderResponse> => {
+    if (mediaType === 'movie') {
+        return getMovieWatchProviders(apiKey, mediaId);
+    } else {
+        return getTVShowWatchProviders(apiKey, mediaId);
+    }
+}
+
+// People
+export const getPersonMovieCredits = (apiKey: string, personId: number): Promise<PersonMovieCreditsResponse> =>
+    apiCall(`/person/${personId}/movie_credits`, apiKey);
+
+// Discover
+export const discoverMedia = (apiKey: string, params: Record<string, string | number>): Promise<PaginatedResponse<Movie>> => {
+    const query = new URLSearchParams(params as Record<string, string>).toString();
+    return apiCall(`/discover/movie?${query}`, apiKey);
 };
-export const getOnTheAirTVShows = (apiKey: string) => fetchFromTMDB<PaginatedResponse<TVShow>>(apiKey, 'tv/on_the_air');
-export const getMovieVideos = (apiKey: string, id: number) => fetchFromTMDB<{id: number; results: Video[]}>(apiKey, `movie/${id}/videos`).then(res => res.results);
-export const getTVShowVideos = (apiKey: string, id: number) => fetchFromTMDB<{id: number; results: Video[]}>(apiKey, `tv/${id}/videos`).then(res => res.results);
-export const getMovieDetails = (apiKey: string, id: number) => fetchFromTMDB<MovieDetails>(apiKey, `movie/${id}`);
-export const getTVShowDetails = (apiKey: string, id: number) => fetchFromTMDB<TVShowDetails>(apiKey, `tv/${id}`);
-export const getMovieCredits = (apiKey: string, id: number) => fetchFromTMDB<CreditsResponse>(apiKey, `movie/${id}/credits`);
-export const getTVShowCredits = (apiKey: string, id: number) => fetchFromTMDB<CreditsResponse>(apiKey, `tv/${id}/credits`);
-export const getSimilarMovies = (apiKey: string, id: number) => fetchFromTMDB<PaginatedResponse<Movie>>(apiKey, `movie/${id}/similar`);
-export const getSimilarTVShows = (apiKey: string, id: number) => fetchFromTMDB<PaginatedResponse<TVShow>>(apiKey, `tv/${id}/similar`);
-export const getMovieImages = (apiKey: string, id: number) => fetchFromTMDB<ImageResponse>(apiKey, `movie/${id}/images`);
-export const getTVShowImages = (apiKey: string, id: number) => fetchFromTMDB<ImageResponse>(apiKey, `tv/${id}/images`);
-export const getMovieWatchProviders = (apiKey: string, id: number) => fetchFromTMDB<WatchProviderResponse>(apiKey, `movie/${id}/watch/providers`);
-export const getTVShowWatchProviders = (apiKey: string, id: number) => fetchFromTMDB<WatchProviderResponse>(apiKey, `tv/${id}/watch/providers`);
 
-export const discoverMovies = (apiKey: string, params: Record<string, any>) => fetchFromTMDB<PaginatedResponse<Movie>>(apiKey, 'discover/movie', params);
-export const discoverTVShows = (apiKey: string, params: Record<string, any>) => fetchFromTMDB<PaginatedResponse<TVShow>>(apiKey, 'discover/tv', params);
+export const getTopRatedMoviesByProvider = (apiKey: string, providerId: string, region: string): Promise<PaginatedResponse<Movie>> =>
+    apiCall(`/discover/movie?sort_by=vote_average.desc&vote_count.gte=200&with_watch_providers=${providerId}&watch_region=${region}`, apiKey);
 
-export const getMoviesByProvider = (apiKey: string, providerId: number) => discoverMovies(apiKey, { with_watch_providers: providerId, watch_region: 'GB', sort_by: 'popularity.desc' });
-export const getTVShowsByProvider = (apiKey: string, providerId: number) => discoverTVShows(apiKey, { with_watch_providers: providerId, watch_region: 'GB', sort_by: 'popularity.desc' });
-export const getNewMoviesByProvider = (apiKey: string, providerId: number) => discoverMovies(apiKey, { with_watch_providers: providerId, watch_region: 'GB', 'primary_release_date.gte': new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
-export const getNewTVShowsByProvider = (apiKey: string, providerId: number) => discoverTVShows(apiKey, { with_watch_providers: providerId, watch_region: 'GB', 'first_air_date.gte': new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
-export const getMoviesByCompany = (apiKey: string, companyId: number) => discoverMovies(apiKey, { with_companies: companyId, sort_by: 'popularity.desc' });
-export const getTopRatedMoviesByCompany = (apiKey: string, companyId: number) => discoverMovies(apiKey, { with_companies: companyId, sort_by: 'vote_average.desc', 'vote_count.gte': 200 });
-export const getTopRatedTVShowsByNetwork = (apiKey: string, networkId: number) => discoverTVShows(apiKey, { with_networks: networkId, sort_by: 'vote_average.desc', 'vote_count.gte': 100 });
+export const getTopRatedTVShowsByProvider = (apiKey: string, providerId: string, region: string): Promise<PaginatedResponse<TVShow>> =>
+    apiCall(`/discover/tv?sort_by=vote_average.desc&vote_count.gte=200&with_watch_providers=${providerId}&watch_region=${region}`, apiKey);
 
-export const getTVShowSeasonDetails = (apiKey: string, tvId: number, seasonNumber: number) => fetchFromTMDB<any>(apiKey, `tv/${tvId}/season/${seasonNumber}`);
-
-// Person-related API calls for games
-export const searchPerson = (apiKey: string, query: string) => fetchFromTMDB<PaginatedResponse<Person>>(apiKey, 'search/person', { query });
-export const getPersonMovieCredits = (apiKey: string, personId: number) => fetchFromTMDB<PersonMovieCreditsResponse>(apiKey, `person/${personId}/movie_credits`);
+export const getGenres = (apiKey: string): Promise<{ genres: Genre[] }> =>
+    apiCall(`/genre/movie/list`, apiKey);

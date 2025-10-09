@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Chat, FunctionDeclaration, Type, LiveServerMessage, Modality, Blob as GenAIBlob } from '@google/genai';
 import { SparklesIcon, XIcon, PaperAirplaneIcon, MicrophoneIcon, GearIcon } from './Icons';
@@ -93,23 +85,16 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
     const [selectedVoice, setSelectedVoice] = useState('Zephyr');
     
     const voiceSessionPromise = useRef<Promise<any> | null>(null);
-    // FIX: Initialize useRef with null to provide an explicit initial value.
     const inputAudioContext = useRef<AudioContext | null>(null);
-    // FIX: Initialize useRef with null to provide an explicit initial value.
     const outputAudioContext = useRef<AudioContext | null>(null);
     const nextStartTime = useRef(0);
     const audioSources = useRef(new Set<AudioBufferSourceNode>());
-    // FIX: Initialize useRef with null to provide an explicit initial value.
     const mediaStream = useRef<MediaStream | null>(null);
-    // FIX: Initialize useRef with null to provide an explicit initial value.
     const scriptProcessor = useRef<ScriptProcessorNode | null>(null);
     
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    // FIX: Initialize useRef with null to provide an explicit initial value.
     const inputAnalyser = useRef<AnalyserNode | null>(null);
-    // FIX: Initialize useRef with null to provide an explicit initial value.
     const outputAnalyser = useRef<AnalyserNode | null>(null);
-    // FIX: Initialize useRef with null to provide an explicit initial value.
     const animationFrameId = useRef<number | null>(null);
 
     useEffect(() => {
@@ -128,7 +113,6 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
     const functions = {
         findMedia: async ({ query, type }: { query: string; type: 'movie' | 'tv' | 'any' }) => {
             const response = await tmdbService.searchMulti(tmdbApiKey, query, 1);
-            // FIX: Safely filter search results to only include movies and TV shows, as Person objects from the API lack media_type and poster_path.
             let rawResults = response.results.filter(
                 (item): item is Movie | TVShow =>
                     'media_type' in item &&
@@ -502,7 +486,6 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
                 const functionResult = await functionToCall(fc.args as any);
                 if (fc.name === 'findMedia' && Array.isArray(functionResult) && functionResult.length > 0) {
                     const detailedItems = await tmdbService.searchMulti(tmdbApiKey, (fc.args as any).query, 1);
-                    // FIX: Safely filter search results to only include movies and TV shows before normalization.
                     const mediaItems = detailedItems.results.filter((i): i is Movie | TVShow => 'media_type' in i && (i.media_type === 'movie' || i.media_type === 'tv'));
                     const normalized = mediaItems.map(i => i.media_type === 'movie' ? tmdbService.normalizeMovie(i as Movie) : tmdbService.normalizeTVShow(i as TVShow));
                     const validItems = normalized.filter(item => item.poster_path);

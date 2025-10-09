@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { searchPerson, getPersonMovieCredits, getMovieCredits } from '../services/tmdbService';
 import { Person, PersonMovieCredit, CastMember } from '../types';
@@ -21,7 +22,8 @@ const ActorSearch: React.FC<{ onSelect: (actor: Person) => void, apiKey: string 
     const [results, setResults] = useState<Person[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     // FIX: Initialize useRef with null for explicit type safety.
-    const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+    // FIX: The type `NodeJS.Timeout` is not available in browser environments. The correct type for the return value of `setTimeout` in the browser is `number`.
+    const debounceTimeout = useRef<number | null>(null);
 
     const handleSearch = useCallback(async (searchQuery: string) => {
         if (searchQuery.length < 2) {
