@@ -67,8 +67,10 @@ const SimpleMarkdown: React.FC<{ text: string }> = ({ text }) => {
 
 const MediaCard: React.FC<{ item: MediaItem, onClick: () => void }> = ({ item, onClick }) => (
     <div onClick={onClick} className="w-full flex items-start p-2 bg-zinc-800/50 rounded-lg cursor-pointer hover:bg-zinc-800 transition-colors">
-        <img src={item.poster_path ? `${IMAGE_BASE_URL}w200${item.poster_path}` : 'https://via.placeholder.com/200x300?text=No+Image'} alt={item.title} className="w-16 h-24 object-cover rounded-md mr-3" />
-        <div className="flex-1"><h4 className="font-bold text-sm">{item.title}</h4><p className="text-xs text-zinc-400 line-clamp-3">{item.overview}</p></div>
+        {/* FIX: Safely access title from MediaItem union type */}
+        <img src={item.poster_path ? `${IMAGE_BASE_URL}w200${item.poster_path}` : 'https://via.placeholder.com/200x300?text=No+Image'} alt={item.media_type === 'movie' ? item.title : item.name} className="w-16 h-24 object-cover rounded-md mr-3" />
+        {/* FIX: Safely access title from MediaItem union type */}
+        <div className="flex-1"><h4 className="font-bold text-sm">{item.media_type === 'movie' ? item.title : item.name}</h4><p className="text-xs text-zinc-400 line-clamp-3">{item.overview}</p></div>
     </div>
 );
 
@@ -133,8 +135,9 @@ const AIAssistant: React.FC<{ tmdbApiKey: string; }> = ({ tmdbApiKey }) => {
 
             return normalizedResults.map(item => ({
                 id: item.id,
-                title: item.title,
-                release_date: item.release_date,
+                // FIX: Safely access title and release_date from MediaItem union type
+                title: 'title' in item ? item.title : item.name,
+                release_date: 'release_date' in item ? item.release_date : item.first_air_date,
                 media_type: item.media_type,
             }));
         },

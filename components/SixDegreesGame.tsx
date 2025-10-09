@@ -1,8 +1,6 @@
-
-
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { searchPerson, getPersonMovieCredits, getMovieCredits } from '../services/tmdbService';
+// Fix: Add missing imports for TMDb service functions and types
+import { searchMulti as searchPerson, getPersonMovieCredits, getMovieCredits } from '../services/tmdbService';
 import { Person, PersonMovieCredit, CastMember } from '../types';
 import Loader from './Loader';
 
@@ -32,7 +30,9 @@ const ActorSearch: React.FC<{ onSelect: (actor: Person) => void, apiKey: string 
         }
         try {
             const response = await searchPerson(apiKey, searchQuery);
-            setResults(response.results.filter(p => p.known_for_department === 'Acting' && p.profile_path));
+            // Fix: Cast results to Person[] since searchMulti can return other types.
+            const persons = response.results.filter(p => 'known_for_department' in p && p.known_for_department === 'Acting' && p.profile_path) as Person[];
+            setResults(persons);
             setIsOpen(true);
         } catch (error) {
             console.error("Actor search failed:", error);
@@ -42,7 +42,8 @@ const ActorSearch: React.FC<{ onSelect: (actor: Person) => void, apiKey: string 
     useEffect(() => {
         if(debounceTimeout.current) clearTimeout(debounceTimeout.current);
         if (query) {
-            debounceTimeout.current = setTimeout(() => handleSearch(query), 300);
+            // FIX: Use window.setTimeout to ensure browser-compatible return type (number), resolving NodeJS.Timeout type error.
+            debounceTimeout.current = window.setTimeout(() => handleSearch(query), 300);
         } else {
             setResults([]);
         }
@@ -181,12 +182,12 @@ const SixDegreesGame: React.FC<SixDegreesGameProps> = ({ apiKey, onExit }) => {
                                 onClick={() => currentView === 'actor' ? handleSelectMovie(item as PersonMovieCredit) : handleSelectActor(item as CastMember)}
                             >
                                 <img
-                                    src={item.poster_path || item.profile_path ? `${IMAGE_BASE_URL}w185${item.poster_path || item.profile_path}` : 'https://via.placeholder.com/185x278?text=N/A'}
-                                    alt={(item as any).title || (item as any).name}
+                                    src={(item as PersonMovieCredit).poster_path || (item as CastMember).profile_path ? `${IMAGE_BASE_URL}w185${(item as PersonMovieCredit).poster_path || (item as CastMember).profile_path}` : 'https://via.placeholder.com/185x278?text=N/A'}
+                                    alt={(item as PersonMovieCredit).title || (item as CastMember).name}
                                     className="w-full aspect-[2/3] object-cover rounded-md mb-2"
                                 />
-                                <span className="font-semibold text-sm">{(item as any).title || (item as any).name}</span>
-                                <span className="text-xs text-zinc-400 block">as {(item as any).character}</span>
+                                <span className="font-semibold text-sm">{(item as PersonMovieCredit).title || (item as CastMember).name}</span>
+                                {(item as CastMember).character && <span className="text-xs text-zinc-400 block">as {(item as CastMember).character}</span>}
                             </li>
                         ))}
                     </ul>

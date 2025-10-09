@@ -3,9 +3,11 @@ import ApiKeySetup from './components/ApiKeySetup';
 import Header from './components/Header';
 import NetflixView from './components/NetflixView';
 import GameView, { Game } from './components/GameView';
+import MediaDetail from './components/MediaDetail';
 import AIAssistant from './components/AIAssistant';
+import Settings from './components/Settings';
 import { useTheme } from './hooks/useTheme';
-import { ActiveFilter } from './types';
+import { MediaItem } from './types';
 
 export type ViewType = 'home' | 'watchlist' | 'game';
 
@@ -15,13 +17,15 @@ const App: React.FC = () => {
     const [view, setView] = useState<ViewType>('home');
     const [activeGame, setActiveGame] = useState<Game>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeFilter, setActiveFilter] = useState<ActiveFilter | null>(null);
-    // In a real application, this would be determined dynamically via GeoIP or a user setting.
-    // Defaulting to 'ZA' to fulfill the user request for South Africa / Disney+ UK content.
-    const [userCountry, _] = useState('ZA');
+    const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-    useTheme();
+    const { theme } = useTheme();
 
+    useEffect(() => {
+        document.documentElement.className = `theme-${theme} dark`;
+    }, [theme]);
+    
     useEffect(() => {
         const apiKeyToSet = '09b97a49759876f2fde9eadb163edc44';
         let storedKey = localStorage.getItem('tmdb_api_key');
@@ -35,24 +39,19 @@ const App: React.FC = () => {
             setApiKey(storedKey);
             setIsKeyInvalid(false);
         } else {
-            setApiKey(''); // Represents no key set
+            setApiKey('');
         }
-        
-        const handleStorageChange = (event: StorageEvent) => {
-            if (event.key === 'tmdb_api_key') {
-                const newKey = event.newValue;
-                 if (newKey) {
-                    setApiKey(newKey);
-                    setIsKeyInvalid(false);
-                } else {
-                    setApiKey('');
-                }
+
+        const handleSelectMedia = (event: Event) => {
+            const detail = (event as CustomEvent<MediaItem>).detail;
+            if (detail && detail.id && detail.media_type) {
+                setSelectedMedia(detail);
+                setView('home'); // Ensure view is home to show detail over it
             }
         };
 
-        window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
-
+        window.addEventListener('selectMediaItem', handleSelectMedia);
+        return () => window.removeEventListener('selectMediaItem', handleSelectMedia);
     }, []);
 
     const handleInvalidApiKey = useCallback(() => {
@@ -60,17 +59,12 @@ const App: React.FC = () => {
         setApiKey('');
         setIsKeyInvalid(true);
     }, []);
-
+    
     const handleSetView = (newView: ViewType) => {
         setView(newView);
-        if (newView !== 'game') {
-            setActiveGame(null);
-        }
-        // Reset search/filter when changing main views
-        if (newView === 'home' || newView === 'watchlist') {
-            setSearchQuery('');
-            setActiveFilter(null);
-        }
+        setSelectedMedia(null);
+        if (newView !== 'game') setActiveGame(null);
+        if (newView === 'home' || newView === 'watchlist') setSearchQuery('');
     };
 
     const handleSelectGame = (game: Game) => {
@@ -78,6 +72,22 @@ const App: React.FC = () => {
         setActiveGame(game);
     };
     
+    const renderContent = () => {
+        if (view === 'game') {
+            return <GameView apiKey={apiKey!} onInvalidApiKey={handleInvalidApiKey} initialGame={activeGame} />;
+        }
+        return (
+            <NetflixView 
+                apiKey={apiKey!}
+                searchQuery={searchQuery}
+                onInvalidApiKey={handleInvalidApiKey}
+                onSelectItem={setSelectedMedia}
+                view={view}
+                onSelectGame={handleSelectGame}
+            />
+        );
+    };
+
     if (apiKey === null) {
         return <div className="h-screen w-screen bg-primary" />; // Loading state
     }
@@ -87,36 +97,31 @@ const App: React.FC = () => {
     }
 
     return (
-        <>
+        <div className={`theme-${theme}`}>
             <Header 
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 view={view}
                 setView={handleSetView}
-                activeFilter={activeFilter}
-                setActiveFilter={(filter) => {
-                    setView('home'); // Filters apply to home view
-                    setActiveFilter(filter);
-                }}
-                userCountry={userCountry}
+                onSettingsClick={() => setIsSettingsOpen(true)}
             />
             <main className="pt-20">
-                {view === 'game' ? (
-                    <GameView apiKey={apiKey} onInvalidApiKey={handleInvalidApiKey} initialGame={activeGame} />
-                ) : (
-                    <NetflixView 
-                        apiKey={apiKey}
-                        searchQuery={searchQuery}
-                        onInvalidApiKey={handleInvalidApiKey}
-                        view={view}
-                        activeFilter={activeFilter}
-                        onSelectGame={handleSelectGame}
-                        userCountry={userCountry}
-                    />
-                )}
+                {renderContent()}
             </main>
+
+            {selectedMedia && (
+                <MediaDetail
+                    apiKey={apiKey}
+                    item={selectedMedia}
+                    onClose={() => setSelectedMedia(null)}
+                    onInvalidApiKey={handleInvalidApiKey}
+                />
+            )}
+            
             <AIAssistant tmdbApiKey={apiKey} />
-        </>
+
+            {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} />}
+        </div>
     );
 };
 

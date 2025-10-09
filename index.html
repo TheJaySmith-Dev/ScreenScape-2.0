@@ -1,220 +1,137 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ScreenScape</title>
-    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/2.4.0/uicons-regular-rounded/css/uicons-regular-rounded.css'>
-    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/2.4.0/uicons-solid-rounded/css/uicons-solid-rounded.css'>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              primary: '#0D1321',
-              glass: 'rgba(255, 255, 255, 0.05)',
-              'glass-edge': 'rgba(255, 255, 255, 0.2)',
-              cyan: {
-                300: 'var(--color-accent-300)',
-                400: 'var(--color-accent-400)',
-                500: 'var(--color-accent-500)',
-                600: 'var(--color-accent-600)',
-                700: 'var(--color-accent-700)',
-              },
-            },
-            animation: {
-                'text-focus-in': 'text-focus-in 1s cubic-bezier(0.550, 0.085, 0.680, 0.530) both',
-                'scale-up-center': 'scale-up-center 0.4s cubic-bezier(0.390, 0.575, 0.565, 1.000) both',
-                'aurora': 'aurora 60s infinite',
-                'pulse-ring': 'pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                'speaking-glow': 'speaking-glow 1.2s ease-in-out infinite alternate',
-                'glow': 'glow 2s ease-in-out infinite alternate',
-                'shimmer-effect': 'shimmer-effect 3s infinite linear',
-            },
-            keyframes: {
-                'text-focus-in': { '0%': { filter: 'blur(12px)', opacity: '0' }, '100%': { filter: 'blur(0px)', opacity: '1' } },
-                'scale-up-center': { '0%': { transform: 'scale(0.5)' }, '100%': { transform: 'scale(1)' } },
-                aurora: {
-                  '0%': { transform: 'translate(var(--x-0), var(--y-0))' },
-                  '25%': { transform: 'translate(var(--x-1), var(--y-1))' },
-                  '50%': { transform: 'translate(var(--x-2), var(--y-2))' },
-                  '75%': { transform: 'translate(var(--x-3), var(--y-3))' },
-                  '100%': { transform: 'translate(var(--x-4), var(--y-4))' },
-                },
-                'pulse-ring': { '0%': { transform: 'scale(1)', opacity: '0.8' }, '100%': { transform: 'scale(1.8)', opacity: '0' } },
-                'speaking-glow': { 'from': { boxShadow: '0 0 5px 2px rgba(74, 222, 128, 0.4)' }, 'to': { boxShadow: '0 0 20px 8px rgba(74, 222, 128, 0.2)' } },
-                glow: { 
-                  'from': { textShadow: '0 0 5px #fff, 0 0 10px #fff, 0 0 15px var(--glow-color), 0 0 20px var(--glow-color), 0 0 25px var(--glow-color), 0 0 30px var(--glow-color), 0 0 35px var(--glow-color)' }, 
-                  'to': { textShadow: '0 0 10px #fff, 0 0 20px #fff, 0 0 30px var(--glow-color), 0 0 40px var(--glow-color), 0 0 50px var(--glow-color), 0 0 60px var(--glow-color), 0 0 70px var(--glow-color)' } 
-                },
-                'shimmer-effect': { '0%': { backgroundPosition: '200% 0' }, '100%': { backgroundPosition: '-200% 0' } },
-                'ripple-effect': { 'to': { transform: 'scale(4)', opacity: '0' } }
-            },
-          },
-        },
-      };
+    <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.23.0",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "react/": "https://aistudiocdn.com/react@^19.2.0/"
+      }
+    }
     </script>
     <style>
-      :root {
-        --mouse-x: 0.5;
-        --mouse-y: 0.5;
-        --color-accent-300: #93d4ff;
-        --color-accent-400: #64b5f6;
-        --color-accent-500: #2196f3;
-        --color-accent-600: #0073e6;
-        --color-accent-700: #0d47a1;
-        --glow-color: #0073e6;
-      }
-      /* --- Glass Morphism Panels --- */
-      .glass-panel {
-        background: rgba(255, 255, 255, 0.08);
-        -webkit-backdrop-filter: blur(20px) saturate(120%);
-        backdrop-filter: blur(20px) saturate(120%);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        border-radius: 12px;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        transition: transform 0.3s ease, border-color 0.3s ease;
-      }
-      .glass-panel:hover {
-        transform: scale(1.03);
-        border-color: var(--color-accent-400);
-      }
-      
-      /* --- Liquid Progress Bar --- */
-      .liquid-progress-bar {
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        bottom: 1.25rem;
-        z-index: 30;
-        width: 80%;
-      }
-      @media (min-width: 768px) { .liquid-progress-bar { width: 66.666667%; } }
-      .liquid-bar-bg {
-        width: 100%;
-        height: 4px;
-        background: rgba(255,255,255,0.1);
-        -webkit-backdrop-filter: blur(8px);
-        backdrop-filter: blur(8px);
-        border-radius: 4px;
-        overflow: hidden;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-      }
-      .liquid-bar-fill {
-        height: 100%;
-        width: 0;
-        border-radius: 4px;
-        transition: width 0.1s linear;
-        position: relative;
-        background: linear-gradient(90deg, var(--color-accent-300), #ffffff, var(--color-accent-400), var(--color-accent-300));
-        background-size: 200% 100%;
-        animation: shimmer-effect 2s infinite linear;
-      }
-      
-      /* --- Glass Buttons --- */
-      .glass-button {
-        position: relative;
-        overflow: hidden;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        -webkit-backdrop-filter: blur(10px);
-        backdrop-filter: blur(10px);
-        transition: all 0.2s cubic-bezier(0.390, 0.575, 0.565, 1.000);
-      }
-      .glass-button:hover {
-        transform: scale(1.05);
-        box-shadow: 0 0 15px color-mix(in srgb, var(--color-accent-500) 40%, transparent);
-        border-color: color-mix(in srgb, var(--color-accent-400) 70%, transparent);
-      }
-      .glass-button:active {
-        transform: scale(0.98);
-      }
+        :root {
+            --color-primary: #080c14;
+            --color-glass: rgba(20, 26, 42, 0.5);
+            --color-glass-edge: rgba(255, 255, 255, 0.08);
+            --color-glass-edge-hover: rgba(255, 255, 255, 0.2);
+            --color-text-primary: #f1f5f9; /* slate-100 */
+            --color-text-secondary: #94a3b8; /* slate-400 */
+            --shadow-soft: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --shadow-glow: 0 0 15px var(--glow-color-soft), 0 0 20px var(--glow-color-soft);
 
-      .glass-button-primary {
-        background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-700) 70%, transparent), color-mix(in srgb, var(--color-accent-400) 70%, transparent));
-      }
-      .glass-button-secondary {
-        background: rgba(255, 255, 255, 0.15);
-      }
-      
-      /* --- Ripple Effect --- */
-      span.ripple {
-        position: absolute;
-        border-radius: 50%;
-        transform: scale(0);
-        animation: ripple-effect 0.6s ease-out;
-        background-color: rgba(255, 255, 255, 0.4);
-        pointer-events: none;
-      }
-      
-      /* --- Header Glass Tabs --- */
-      .glass-tab {
-        background: transparent;
-        border: none;
-        position: relative;
-        transition: color 0.3s ease;
-      }
-      .glass-tab::after {
-        content: '';
-        position: absolute;
-        bottom: -4px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 0;
-        height: 2px;
-        background: linear-gradient(90deg, var(--color-accent-300), var(--color-accent-400));
-        border-radius: 2px;
-        transition: width 0.3s ease;
-      }
-      .glass-tab.active {
-        color: var(--color-accent-300);
-      }
-      .glass-tab.active::after {
-        width: 80%;
-      }
-      
-      /* --- Hero Lighting & Parallax --- */
-      .hero-container {
-        --mouse-x: 0.5;
-        --mouse-y: 0.5;
-      }
-      .hero-light-effect::after {
-        content: '';
-        position: absolute;
-        inset: -2px;
-        border-radius: inherit;
-        background: radial-gradient(circle 400px at calc(var(--mouse-x) * 100%) calc(var(--mouse-y) * 100%), rgba(255, 255, 255, 0.25), transparent);
-        opacity: 0;
-        transition: opacity 0.5s ease;
-        pointer-events: none;
-        z-index: 25;
-      }
-      .hero-container:hover .hero-light-effect::after {
-        opacity: 1;
-      }
-      .hero-parallax-content {
-        transform: translate(calc((var(--mouse-x) - 0.5) * -30px), calc((var(--mouse-y) - 0.5) * -20px));
-        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      }
+            /* Streaming Service Brand Colors */
+            --glow-netflix: #e50914;
+            --glow-disneyplus: #006eef;
+            --glow-primevideo: #00a8e1;
+            --glow-max: #9b59b6;
+            --glow-appletvplus: #ffffff;
+            --glow-hulu: #3ce192;
+        }
+
+        /* Default Theme: Cyber Blue */
+        :root, .theme-cyber-blue {
+            --color-accent-500: #2196f3;
+            --glow-color: #0073e6;
+            --glow-color-soft: rgba(0, 115, 230, 0.5);
+        }
+        /* Theme: Synthwave Sunset */
+        .theme-synthwave-sunset {
+            --color-accent-500: #e91e63;
+            --glow-color: #ff007f;
+            --glow-color-soft: rgba(255, 0, 127, 0.5);
+        }
+        /* Theme: Emerald Matrix */
+        .theme-emerald-matrix {
+            --color-accent-500: #4caf50;
+            --glow-color: #00e676;
+            --glow-color-soft: rgba(0, 230, 118, 0.5);
+        }
+        /* Theme: Cosmic Ruby */
+        .theme-cosmic-ruby {
+            --color-accent-500: #d81b60;
+            --glow-color: #f50057;
+            --glow-color-soft: rgba(245, 0, 87, 0.5);
+        }
+
+        body {
+            background-color: var(--color-primary);
+            color: var(--color-text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Liquid Glass Panels & Buttons */
+        .glass-panel, .glass-button {
+            background-color: var(--color-glass);
+            border: 1px solid var(--color-glass-edge);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: var(--shadow-soft);
+        }
+        .glass-button:hover:not(:disabled) {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: var(--color-glass-edge-hover);
+            transform: translateY(-2px);
+        }
+        .glass-button-accent {
+            background-color: rgba(var(--color-accent-500), 0.2);
+            border-color: rgba(var(--color-accent-500), 0.5);
+        }
+        .glass-button-accent:hover:not(:disabled) {
+            background-color: rgba(var(--color-accent-500), 0.4);
+            border-color: rgba(var(--color-accent-500), 0.8);
+        }
+
+        /* Brand Glow Utilities */
+        .brand-glow-netflix:hover { box-shadow: 0 0 12px rgba(229, 9, 20, 0.8); }
+        .brand-glow-disneyplus:hover { box-shadow: 0 0 12px rgba(0, 110, 239, 0.8); }
+        .brand-glow-primevideo:hover { box-shadow: 0 0 12px rgba(0, 168, 225, 0.8); }
+        .brand-glow-max:hover { box-shadow: 0 0 12px rgba(155, 89, 182, 0.8); }
+        .brand-glow-appletvplus:hover { box-shadow: 0 0 12px rgba(255, 255, 255, 0.6); }
+        .brand-glow-hulu:hover { box-shadow: 0 0 12px rgba(60, 225, 146, 0.8); }
+
+        /* Animations */
+        @keyframes fade-in { 0% { opacity: 0; } 100% { opacity: 1; } }
+        .animate-fade-in { animation: fade-in 0.8s ease-out both; }
+        
+        @keyframes fade-in-up {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up { animation: fade-in-up 0.6s cubic-bezier(0.390, 0.575, 0.565, 1.000) both; }
+        
+        @keyframes glow {
+            from { text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px var(--glow-color); }
+            to { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px var(--glow-color); }
+        }
+        .animate-glow { animation: glow 2s ease-in-out infinite alternate; }
+
+        /* Custom Scrollbar */
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thumb-accent::-webkit-scrollbar-thumb {
+            background-color: var(--color-accent-500);
+            border-radius: 3px;
+        }
+        .scrollbar-track-transparent::-webkit-scrollbar-track { background-color: transparent; }
+
+        /* For Hero Carousel and Parallax */
+        .perspective { perspective: 1000px; }
+        .preserve-3d { transform-style: preserve-3d; }
     </style>
     <script src="https://www.youtube.com/iframe_api"></script>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.1.1",
-    "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.21.0"
-  }
-}
-</script>
 </head>
-  <body class="bg-primary text-white overflow-x-hidden">
-    <div class="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden bg-primary">
-      <div class="absolute inset-[-200%] animate-aurora" style="background-image: radial-gradient(at 21% 33%, hsla(240, 90%, 10%, 0.2) 0px, transparent 50%), radial-gradient(at 79% 32%, hsla(277, 90%, 15%, 0.2) 0px, transparent 50%), radial-gradient(at 26% 83%, hsla(210, 90%, 20%, 0.25) 0px, transparent 50%), radial-gradient(at 73% 88%, hsla(300, 90%, 25%, 0.25) 0px, transparent 50%); --x-0: 10%; --y-0: 10%; --x-1: 30%; --y-1: 70%; --x-2: 80%; --y-2: 40%; --x-3: 40%; --y-3: 20%; --x-4: 10%; --y-4: 10%;"></div>
-    </div>
+<body class="bg-primary text-slate-100">
+    <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
-  </body>
+</body>
 </html>

@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Loader from './Loader';
 import { triviaQuestions, TriviaQuestion } from '../services/triviaQuestions';
@@ -58,25 +59,8 @@ const TriviaGame: React.FC<TriviaGameProps> = ({ onExit }) => {
         }, 500); // 500ms delay
     }, []);
 
-
-    useEffect(() => {
-        if (gameState === 'playing' && selectedAnswer === null) {
-            timerRef.current = setInterval(() => {
-                setTimer(prev => prev - 1);
-            }, 1000);
-        }
-        return () => {
-            if (timerRef.current) clearInterval(timerRef.current);
-        };
-    }, [gameState, selectedAnswer]);
-
-    useEffect(() => {
-        if (timer === 0) {
-            handleAnswer(-1); // Auto-submit wrong answer if timer runs out
-        }
-    }, [timer]);
-
-    const handleAnswer = (answerIndex: number) => {
+    // FIX: Moved handleAnswer before the useEffect that calls it to fix "used before declaration" error.
+    const handleAnswer = useCallback((answerIndex: number) => {
         if (timerRef.current) clearInterval(timerRef.current);
         setSelectedAnswer(answerIndex);
         const correct = answerIndex === questions[currentQuestionIndex].correctAnswerIndex;
@@ -95,7 +79,24 @@ const TriviaGame: React.FC<TriviaGameProps> = ({ onExit }) => {
                 setGameState('finished');
             }
         }, 2000);
-    };
+    }, [currentQuestionIndex, questions]);
+
+    useEffect(() => {
+        if (gameState === 'playing' && selectedAnswer === null) {
+            timerRef.current = window.setInterval(() => {
+                setTimer(prev => prev - 1);
+            }, 1000);
+        }
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
+    }, [gameState, selectedAnswer]);
+
+    useEffect(() => {
+        if (timer === 0) {
+            handleAnswer(-1); // Auto-submit wrong answer if timer runs out
+        }
+    }, [timer, handleAnswer]);
 
     const handlePlayAgain = () => {
         setGameState('idle');

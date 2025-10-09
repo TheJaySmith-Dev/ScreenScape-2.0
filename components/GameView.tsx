@@ -3,8 +3,9 @@ import TriviaGame from './TriviaGame';
 import SixDegreesGame from './SixDegreesGame';
 import GuessThePosterGame from './GuessThePosterGame';
 import BoxOfficeCompareGame from './BoxOfficeCompareGame';
+import BizIdleGame from './BizIdleGame';
 
-export type Game = 'trivia' | 'six-degrees' | 'guess-poster' | 'box-office-compare' | null;
+export type Game = 'trivia' | 'six-degrees' | 'guess-poster' | 'box-office-compare' | 'biz-idle' | null;
 
 interface GameViewProps {
   apiKey: string;
@@ -31,30 +32,37 @@ const GameView: React.FC<GameViewProps> = ({ apiKey, onInvalidApiKey, initialGam
         return <GuessThePosterGame apiKey={apiKey} onInvalidApiKey={onInvalidApiKey} onExit={() => setActiveGame(null)} />;
       case 'box-office-compare':
         return <BoxOfficeCompareGame apiKey={apiKey} onInvalidApiKey={onInvalidApiKey} onExit={() => setActiveGame(null)} />;
+      case 'biz-idle':
+        return <BizIdleGame onExit={() => setActiveGame(null)} />;
       default:
         return (
-          <div className="text-center animate-text-focus-in">
+          <div className="text-center animate-fade-in-up">
             <h1 className="text-5xl font-bold mb-8 animate-glow">Choose a Game</h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
               <GameCard 
                 title="Movie Trivia"
-                description="Test your film knowledge against the clock. How many questions can you answer?"
+                description="Race the clock with film facts."
                 onClick={() => setActiveGame('trivia')}
               />
               <GameCard 
                 title="Six Degrees"
-                description="Connect any two actors through their movie roles in six steps or less."
+                description="Link actors through their roles."
                 onClick={() => setActiveGame('six-degrees')}
               />
               <GameCard 
                 title="Guess The Poster"
-                description="How well do you know movie posters? Guess the film from a single image."
+                description="Identify iconic movie designs."
                 onClick={() => setActiveGame('guess-poster')}
               />
               <GameCard
                 title="Box Office Compare"
-                description="Which movie was a bigger hit? Guess higher or lower based on worldwide box office."
+                description="Which film earned more?"
                 onClick={() => setActiveGame('box-office-compare')}
+              />
+              <GameCard
+                title="BizIdle"
+                description="Build studios. Shape the industry."
+                onClick={() => setActiveGame('biz-idle')}
               />
             </div>
           </div>
@@ -78,12 +86,11 @@ interface GameCardProps {
 const GameCard: React.FC<GameCardProps> = ({ title, description, onClick }) => (
     <button 
         onClick={onClick}
-        className="w-full p-8 bg-glass border border-glass-edge rounded-xl shadow-2xl text-left transform hover:scale-105 hover:border-cyan-500/50 transition-all duration-300 backdrop-blur-md flex flex-col"
+        className="group w-full p-8 glass-panel rounded-2xl text-left transform hover:-translate-y-2 hover:border-accent-500/50 transition-all duration-300 flex flex-col"
     >
-        <h2 className="text-3xl font-bold text-cyan-400 mb-4">{title}</h2>
-        <p className="text-zinc-300 flex-grow">{description}</p>
+        <h2 className="text-3xl font-bold text-accent-500 mb-4 transition-colors duration-300 group-hover:text-white">{title}</h2>
+        <p className="text-slate-300 flex-grow">{description}</p>
     </button>
 );
-
 
 export default GameView;
