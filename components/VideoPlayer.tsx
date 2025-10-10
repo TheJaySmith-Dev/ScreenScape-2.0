@@ -20,6 +20,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
         playerInstance.current.mute();
       } else {
         playerInstance.current.unMute();
+        // Re-issuing the play command is necessary as some browsers pause
+        // auto-playing videos when they are unmuted programmatically.
+        playerInstance.current.playVideo();
       }
     }
   }, [isMuted, isPlayerReady]);
