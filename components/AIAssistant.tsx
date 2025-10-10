@@ -113,7 +113,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             microphoneStreamRef.current = stream;
 
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: 'AIzaSyAwVYbiniK2rxvaPnVymSZN6bBND9NURjc' });
 
             const selectMediaItemDeclaration: FunctionDeclaration = {
                 name: 'selectMediaItem',
