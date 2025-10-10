@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MediaItem, Video, TVShow } from '../types';
 import { getTrending, getMovieDetails, getTVShowDetails } from '../services/tmdbService';
 import VideoPlayer from './VideoPlayer';
@@ -62,19 +62,18 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
         }
     }, [currentIndex, items, apiKey, trailers]);
 
-    const goToNext = () => {
-        setCurrentIndex(prevIndex => (prevIndex + 1) % items.length);
-    };
+    const goToNext = useCallback(() => {
+        setCurrentIndex(prevIndex => (prevIndex + 1) % (items.length || 1));
+    }, [items.length]);
 
     useEffect(() => {
-        if (!isHovered) {
-            // FIX: Use window.setInterval to ensure browser-compatible return type (number), resolving NodeJS.Timeout type error.
+        if (!isHovered && items.length > 0) {
             intervalRef.current = window.setInterval(goToNext, 7000);
         }
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
-    }, [isHovered, items.length]);
+    }, [isHovered, items.length, goToNext]);
 
     const activeItem = items[currentIndex];
     const activeTrailerKey = activeItem ? trailers[activeItem.id] : null;
@@ -96,7 +95,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                         </div>
                     ) : (
                         <img
-                            // Fix: Safely access title from MediaItem union type for alt text
                             src={`${IMAGE_BASE_URL}${item.backdrop_path}`}
                             alt={item.media_type === 'movie' ? item.title : (item as TVShow).name}
                             className="w-full h-full object-cover scale-110"
@@ -111,7 +109,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
             <div className="relative h-full flex flex-col justify-end container mx-auto px-4 sm:px-6 lg:px-8 pb-32 md:pb-40 z-10">
                 {activeItem && (
                     <div className="w-full md:w-1/2 lg:w-2/5 animate-fade-in-up">
-                        {/* Fix: Safely access title from MediaItem union type for display */}
                         <h2 className="text-4xl md:text-6xl font-bold drop-shadow-lg">{activeItem.media_type === 'movie' ? activeItem.title : (activeItem as TVShow).name}</h2>
                         <p className="mt-4 text-lg text-slate-200 line-clamp-3 drop-shadow-md">{activeItem.overview}</p>
                         <div className="mt-6 flex items-center gap-4">

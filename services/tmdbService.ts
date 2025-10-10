@@ -13,7 +13,8 @@ import {
 
 const API_BASE_URL = 'https://api.themoviedb.org/3';
 
-const apiFetch = async <T>(apiKey: string, endpoint: string, params: Record<string, string | number> = {}): Promise<T> => {
+// FIX: Allow boolean values in params to support a wider range of API queries, like those from discoverMedia.
+const apiFetch = async <T>(apiKey: string, endpoint: string, params: Record<string, string | number | boolean> = {}): Promise<T> => {
   const url = new URL(`${API_BASE_URL}${endpoint}`);
   url.searchParams.append('api_key', apiKey);
   for (const key in params) {
@@ -60,6 +61,28 @@ export const getMoviesByProviders = (apiKey: string, providerIds: number[], page
         watch_region: 'US', // Or make this dynamic
         page 
     });
+};
+
+export const discoverMedia = (apiKey: string, type: 'movie' | 'tv', params: Record<string, string | number | boolean>): Promise<PaginatedResponse<MediaItem>> => {
+    return apiFetch(apiKey, `/discover/${type}`, params);
+};
+
+export const getMovieRecommendations = (apiKey: string, movieId: number): Promise<PaginatedResponse<Movie>> => {
+    return apiFetch(apiKey, `/movie/${movieId}/recommendations`);
+};
+
+export const getGenres = async (apiKey: string): Promise<{movie: Record<string, number>, tv: Record<string, number>}> => {
+    const [movieRes, tvRes] = await Promise.all([
+        apiFetch<{genres: {id: number, name: string}[]}>(apiKey, '/genre/movie/list'),
+        apiFetch<{genres: {id: number, name: string}[]}>(apiKey, '/genre/tv/list')
+    ]);
+    const genreMap = (res: {genres: {id: number, name: string}[]}) => 
+        res.genres.reduce((acc, genre) => {
+            acc[genre.name.toLowerCase()] = genre.id;
+            return acc;
+        }, {} as Record<string, number>);
+
+    return { movie: genreMap(movieRes), tv: genreMap(tvRes) };
 };
 
 // Normalization functions

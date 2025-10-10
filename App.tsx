@@ -4,7 +4,8 @@ import Header from './components/Header';
 import NetflixView from './components/NetflixView';
 import GameView, { Game } from './components/GameView';
 import MediaDetail from './components/MediaDetail';
-import AIAssistant from './components/AIAssistant';
+import AIAssistant, { AIStatus } from './components/AIAssistant';
+import AIGlow from './components/AIGlow';
 import Settings from './components/Settings';
 import { useTheme } from './hooks/useTheme';
 import { MediaItem } from './types';
@@ -19,6 +20,7 @@ const App: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
 
     const { theme } = useTheme();
 
@@ -46,7 +48,7 @@ const App: React.FC = () => {
             const detail = (event as CustomEvent<MediaItem>).detail;
             if (detail && detail.id && detail.media_type) {
                 setSelectedMedia(detail);
-                setView('home'); // Ensure view is home to show detail over it
+                setView('home'); 
             }
         };
 
@@ -98,6 +100,7 @@ const App: React.FC = () => {
 
     return (
         <div className={`theme-${theme}`}>
+            <AIGlow status={aiStatus} />
             <Header 
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
@@ -118,7 +121,10 @@ const App: React.FC = () => {
                 />
             )}
             
-            <AIAssistant tmdbApiKey={apiKey} />
+            <AIAssistant 
+                tmdbApiKey={apiKey} 
+                setAiStatus={setAiStatus}
+            />
 
             {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} />}
         </div>

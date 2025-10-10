@@ -1,6 +1,8 @@
+
 import React from 'react';
 import { useTheme, ThemeKey } from '../hooks/useTheme';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
+import { useVoicePreferences, VoiceKey, LanguageKey } from '../hooks/useVoicePreferences';
 import * as Icons from './Icons';
 
 const ThemeSelector: React.FC = () => {
@@ -51,6 +53,46 @@ const StreamingPreferences: React.FC = () => {
     );
 };
 
+const VoicePreferences: React.FC = () => {
+    const { voice, setVoicePreference, language, setLanguagePreference, availableVoices, availableLanguages } = useVoicePreferences();
+
+    return (
+        <div>
+            <h3 className="text-lg font-bold mb-3 text-slate-200">AI Voice Settings</h3>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-2">Language</label>
+                    <div className="flex gap-2">
+                        {availableLanguages.map(({ key, name }) => (
+                            <button
+                                key={key}
+                                onClick={() => setLanguagePreference(key as LanguageKey)}
+                                className={`flex-1 p-2 rounded-lg text-sm transition-all duration-300 ${language === key ? 'ring-1 ring-accent-500 bg-accent-500/30' : 'bg-white/5 hover:bg-white/10'}`}
+                            >
+                                {name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                 <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-2">Voice</label>
+                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {availableVoices.map(({ key, name }) => (
+                            <button
+                                key={key}
+                                onClick={() => setVoicePreference(key as VoiceKey)}
+                                className={`p-3 rounded-lg text-sm text-center transition-all duration-300 ${voice === key ? 'ring-1 ring-accent-500 bg-accent-500/30' : 'bg-white/5 hover:bg-white/10'}`}
+                            >
+                                {name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     return (
@@ -71,6 +113,7 @@ const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 
                 <div className="space-y-8">
                     <StreamingPreferences />
+                    <VoicePreferences />
                     <ThemeSelector />
                 </div>
             </div>

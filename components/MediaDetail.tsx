@@ -7,7 +7,7 @@ import VideoPlayer from './VideoPlayer';
 import Loader from './Loader';
 import { XIcon, ClockIcon, StarIcon, VolumeOffIcon, VolumeUpIcon } from './Icons';
 
-const IMAGE_BASE_URL = 'https://image.tds.org/t/p/';
+const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 
 interface MediaDetailProps {
     apiKey: string;
@@ -60,6 +60,23 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ apiKey, item, onClose, onInva
         fetchDetails();
     }, [apiKey, item, onInvalidApiKey]);
 
+    // Add event listener for voice commands
+    useEffect(() => {
+        const handleTrailerControl = (event: Event) => {
+            const detail = (event as CustomEvent<{ action: 'mute' | 'unmute' }>).detail;
+            if (detail.action === 'mute') {
+                setIsMuted(true);
+            } else if (detail.action === 'unmute') {
+                setIsMuted(false);
+            }
+        };
+
+        window.addEventListener('controlTrailerAudio', handleTrailerControl);
+        return () => {
+            window.removeEventListener('controlTrailerAudio', handleTrailerControl);
+        };
+    }, []);
+
     // Safely access title and release_date from MediaItem union type, providing fallbacks.
     const title = details ? ('title' in details ? details.title : details.name) : (item.media_type === 'movie' ? item.title : item.name);
     const releaseDate = details ? ('release_date' in details ? details.release_date : details.first_air_date) : (item.media_type === 'movie' ? item.release_date : item.first_air_date);
@@ -67,8 +84,7 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ apiKey, item, onClose, onInva
     const runtime = details ? ('runtime' in details ? details.runtime : (details.episode_run_time?.[0] || null)) : null;
 
     // --- Streaming Availability Logic ---
-    const userCountry = 'ZA'; 
-    const disneyPlusProviderId = 337;
+    const userCountry = 'US'; 
 
     let providers: WatchProvider[] = [];
     let providerLink: string | undefined = undefined;
@@ -77,17 +93,6 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ apiKey, item, onClose, onInva
         const countryData = details['watch/providers']?.results?.[userCountry];
         providerLink = countryData?.link;
         providers = countryData?.flatrate || [];
-
-        // Special regional rule for Disney+ ZA
-        if (userCountry === 'ZA') {
-            const hasDisneyPlusInZA = providers.some(p => p.provider_id === disneyPlusProviderId);
-            if (!hasDisneyPlusInZA) {
-                const ukDisneyPlus = details['watch/providers']?.results?.GB?.flatrate?.find(p => p.provider_id === disneyPlusProviderId);
-                if (ukDisneyPlus) {
-                    providers = [...providers, ukDisneyPlus];
-                }
-            }
-        }
     }
     
     const isUpcoming = releaseDate ? new Date(releaseDate) > new Date() : false;

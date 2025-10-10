@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -33,6 +34,13 @@
             --glow-max: #9b59b6;
             --glow-appletvplus: #ffffff;
             --glow-hulu: #3ce192;
+
+            /* AI Glow Colors */
+            --ai-glow-idle: #22D3EE;
+            --ai-glow-thinking-1: #3B82F6;
+            --ai-glow-thinking-2: #ffffff;
+            --ai-glow-responding-1: #C71585;
+            --ai-glow-responding-2: #FFD700;
         }
 
         /* Default Theme: Cyber Blue */
@@ -114,6 +122,36 @@
             to { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px var(--glow-color); }
         }
         .animate-glow { animation: glow 2s ease-in-out infinite alternate; }
+
+        /* AI Glow Animations */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 10px 3px var(--glow-color); opacity: 0.4; }
+            50% { box-shadow: 0 0 20px 6px var(--glow-color); opacity: 0.7; }
+        }
+        @keyframes ripple-glow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+        @keyframes gradient-shift {
+             0%, 100% { background-position: 0% 50%; }
+             50% { background-position: 100% 50%; }
+        }
+
+        /* Voice Mode Glow */
+        @keyframes voiceGlow {
+            0%   { box-shadow: 0 0 15px 4px rgba(19, 104, 120, 0.4), inset 0 0 15px 4px rgba(19, 104, 120, 0.4); }
+            50%  { box-shadow: 0 0 25px 8px rgba(19, 104, 120, 0.8), inset 0 0 25px 8px rgba(19, 104, 120, 0.8); }
+            100% { box-shadow: 0 0 15px 4px rgba(19, 104, 120, 0.4), inset 0 0 15px 4px rgba(19, 104, 120, 0.4); }
+        }
+        body.voice-mode-active::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 9998;
+            border: 4px solid transparent;
+            animation: voiceGlow 2s ease-in-out infinite;
+        }
 
         /* Custom Scrollbar */
         .scrollbar-thin::-webkit-scrollbar { width: 6px; }
