@@ -71,7 +71,7 @@ const GameView: React.FC<GameViewProps> = ({ apiKey, onInvalidApiKey, initialGam
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
+    <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[calc(100vh-5rem)]">
       {renderGame()}
     </div>
   );

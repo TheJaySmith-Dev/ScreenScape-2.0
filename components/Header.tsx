@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SearchIcon, GearIcon, MenuIcon, XIcon } from './Icons';
 import { ViewType } from '../App';
+import PatreonAuth from './PatreonAuth';
 
 interface HeaderProps {
     searchQuery: string;
@@ -32,42 +33,48 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
                     {/* Logo and Desktop Nav */}
                     <div className="flex items-center gap-8">
-                        <h1 className="text-2xl md:text-3xl font-bold text-white animate-glow tracking-wider">ScreenScape</h1>
+                        <button onClick={() => setView('home')} className="text-2xl md:text-3xl font-bold text-white animate-glow tracking-wider">SS</button>
                         <nav className="hidden md:flex items-center gap-6">
                             <NavButton viewName="home">Home</NavButton>
                             <NavButton viewName="watchlist">Watchlist</NavButton>
                             <NavButton viewName="game">Games</NavButton>
+                            <NavButton viewName="genscape">GenScape</NavButton>
                         </nav>
                     </div>
 
-                    {/* Desktop Search and Settings */}
-                    <div className="hidden md:flex items-center gap-4">
-                        <div className="relative">
+                    {/* Right-side controls */}
+                    <div className="flex items-center gap-2 sm:gap-4">
+                        {/* Desktop Search */}
+                        <div className="relative hidden md:block">
                             <input
                                 type="text"
                                 placeholder="Search..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="bg-glass border border-glass-edge rounded-full py-2 pl-10 pr-4 text-white placeholder-slate-400 focus:ring-2 focus:ring-accent-500 outline-none w-48 md:w-64 transition-all"
+                                className="bg-glass border border-glass-edge rounded-full py-2 pl-10 pr-4 text-white placeholder-slate-400 focus:ring-2 focus:ring-accent-500 outline-none w-48 transition-all"
                             />
                             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                         </div>
-                        <button onClick={onSettingsClick} className="text-slate-300 hover:text-white transition-colors">
-                            <GearIcon className="w-6 h-6" />
-                        </button>
-                    </div>
 
-                    {/* Mobile Icons */}
-                    <div className="md:hidden flex items-center gap-2">
-                        <button onClick={() => setIsMobileSearchOpen(true)} className="text-slate-300 hover:text-white p-2">
+                        {/* Mobile Search Icon */}
+                        <button onClick={() => setIsMobileSearchOpen(true)} className="text-slate-300 hover:text-white p-2 md:hidden">
                             <SearchIcon className="w-6 h-6" />
                         </button>
-                        <button onClick={onSettingsClick} className="text-slate-300 hover:text-white p-2">
+                        
+                        {/* Settings Icon (Desktop) */}
+                        <button onClick={onSettingsClick} className="text-slate-300 hover:text-white transition-colors p-2 rounded-full glass-button hidden md:block">
                             <GearIcon className="w-6 h-6" />
                         </button>
-                         <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-slate-300 hover:text-white p-2">
-                            {isMenuOpen ? <XIcon className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
-                        </button>
+                        
+                        {/* Patreon Auth Button */}
+                        <PatreonAuth />
+                        
+                        {/* Mobile Menu Icon */}
+                        <div className="md:hidden">
+                            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-slate-300 hover:text-white p-2">
+                                {isMenuOpen ? <XIcon className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -92,11 +99,18 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
             {/* Mobile Menu Dropdown */}
             {isMenuOpen && (
                 <div className="fixed top-20 left-0 right-0 bg-primary/95 backdrop-blur-lg z-30 p-4 border-b border-glass-edge animate-fade-in-down md:hidden">
-                    <nav className="flex flex-col gap-2">
+                    <nav className="flex flex-col gap-2 mb-4">
                         <NavButton viewName="home" isMobile>Home</NavButton>
                         <NavButton viewName="watchlist" isMobile>Watchlist</NavButton>
                         <NavButton viewName="game" isMobile>Games</NavButton>
+                        <NavButton viewName="genscape" isMobile>GenScape</NavButton>
                     </nav>
+                    <div className="border-t border-glass-edge pt-4 flex flex-col items-start gap-4">
+                        <button onClick={() => { onSettingsClick(); setIsMenuOpen(false); }} className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors text-lg">
+                            <GearIcon className="w-6 h-6" />
+                            Settings
+                        </button>
+                    </div>
                 </div>
             )}
             <style>{`

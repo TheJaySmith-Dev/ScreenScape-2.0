@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 // Common props for all icons
@@ -72,6 +73,13 @@ export const MicrophoneIcon: React.FC<IconProps> = (props) => (
   </svg>
 );
 
+export const KeyboardIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5.25h6M9 5.25v13.5m0-13.5h-3.375a1.125 1.125 0 00-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125H9.75M9 5.25v13.5m6-13.5h3.375a1.125 1.125 0 011.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125H14.25M9 5.25v13.5M15 12h.008v.008H15V12z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 5.25c0-.621.504-1.125 1.125-1.125h14.25c.621 0 1.125.504 1.125 1.125v13.5c0 .621-.504 1.125-1.125 1.125H4.875c-.621 0-1.125-.504-1.125-1.125V5.25z" />
+  </svg>
+);
+
 export const GearIcon: React.FC<IconProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <circle cx="12" cy="12" r="3"></circle>
@@ -109,4 +117,25 @@ export const ClockIcon: React.FC<IconProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
+);
+
+export const ImageIcon: React.FC<IconProps> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+    </svg>
+);
+
+export const DownloadIcon: React.FC<IconProps> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+    </svg>
+);
+
+export const PatreonIcon: React.FC<IconProps> = (props) => (
+    <svg viewBox="0 0 569 546" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <g>
+            <circle cx="362.589996" cy="204.589996" r="204.589996" fill="#f96854" />
+            <rect height="545.799988" width="100" x="0" y="0" fill="#052d49" />
+        </g>
+    </svg>
 );

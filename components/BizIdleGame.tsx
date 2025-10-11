@@ -140,7 +140,7 @@ const BizIdleGameComponent: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                   <span>Revenue: <span className="font-semibold text-green-400">${formatNumber(income)}/s</span></span>
                 </div>
               </div>
-              <div className="w-full md:w-48 flex-shrink-0">
+              <div className="w-full md:w-auto md:min-w-[12rem] flex-shrink-0">
                 <button onClick={() => handleBuyCompany(company.id)} disabled={!canAfford} className="w-full bg-cyan-600 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 enabled:hover:bg-cyan-500 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed">
                   <div>Acquire for</div>
                   <div className="text-lg">${formatNumber(cost)}</div>
@@ -182,16 +182,16 @@ const BizIdleGame: React.FC<BizIdleGameProps> = ({ onExit }) => {
   if (!hasStarted) {
     return (
       <div className="w-full max-w-5xl text-center animate-scale-up-center p-4">
-        <button onClick={onExit} className="absolute top-24 left-8 text-zinc-300 hover:text-white">&larr; Back to Games</button>
+        <button onClick={onExit} className="absolute top-24 left-4 sm:left-8 text-zinc-300 hover:text-white">&larr; Back to Games</button>
 
         <div className="mb-8">
-            <h1 className="text-5xl font-bold mb-2 animate-glow">BizIdle</h1>
-            <p className="text-lg text-cyan-400 font-semibold">The Ultimate Movie & TV Studio Tycoon Game</p>
+            <h1 className="text-4xl sm:text-5xl font-bold mb-2 animate-glow">BizIdle</h1>
+            <p className="text-base sm:text-lg text-cyan-400 font-semibold">The Ultimate Movie & TV Studio Tycoon Game</p>
         </div>
 
-        <div className="glass-panel text-left p-8 mb-8 !rounded-xl">
-            <h3 className="text-2xl font-bold mb-4">“From indie shorts to global blockbusters, build your media empire.”</h3>
-            <div className="text-zinc-300 space-y-4">
+        <div className="glass-panel text-left p-6 sm:p-8 mb-8 !rounded-xl">
+            <h3 className="text-xl sm:text-2xl font-bold mb-4">“From indie shorts to global blockbusters, build your media empire.”</h3>
+            <div className="text-zinc-300 space-y-4 text-sm sm:text-base">
                 <p><strong>BizIdle</strong> is a movie and TV studio simulation game where you call the shots. Start with a small indie studio and make strategic decisions to produce hit shows, release blockbuster films, build a streaming service, and dominate Hollywood.</p>
                 <p>Powered by dynamic AI agents, the industry changes constantly. Rival studios can poach your top talent, negotiate distribution deals, attempt hostile takeovers, or greenlight a competing blockbuster that challenges your release.</p>
                 <p>Whether you're chasing awards season glory, creating the next big streaming hit, or building a cinematic universe, <strong>no two playthroughs are ever the same.</strong></p>
@@ -199,21 +199,21 @@ const BizIdleGame: React.FC<BizIdleGameProps> = ({ onExit }) => {
         </div>
 
         <div className="mb-8">
-            <h2 className="text-3xl font-bold mb-6">Features</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-6">Features</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {features.map(feature => (
                     <div key={feature.title} className="glass-panel text-left p-4 !rounded-lg flex items-start gap-4 h-full">
-                        <span className="text-3xl mt-1">{feature.emoji}</span>
+                        <span className="text-2xl sm:text-3xl mt-1">{feature.emoji}</span>
                         <div>
-                            <h4 className="font-bold text-white">{feature.title}</h4>
-                            <p className="text-sm text-zinc-300">{feature.description}</p>
+                            <h4 className="font-bold text-white text-sm sm:text-base">{feature.title}</h4>
+                            <p className="text-xs sm:text-sm text-zinc-300">{feature.description}</p>
                         </div>
                     </div>
                 ))}
             </div>
         </div>
 
-        <button onClick={handlePlay} disabled={isLaunching} className="glass-button glass-button-primary px-12 py-4 rounded-full font-bold text-xl w-full max-w-sm">
+        <button onClick={handlePlay} disabled={isLaunching} className="glass-button glass-button-primary px-12 py-4 rounded-full font-bold text-lg sm:text-xl w-full max-w-sm">
             {isLaunching ? (
                 <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>

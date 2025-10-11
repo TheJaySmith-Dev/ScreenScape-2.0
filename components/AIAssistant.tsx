@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { SparklesIcon } from './Icons';
-import * as tmdbService from '../services/tmdbService';
-import { MediaItem } from '../types';
+import * as assistantEngine from '../services/assistantEngine';
 import { GoogleGenAI, LiveSession, LiveServerMessage, Modality, Blob, FunctionDeclaration, Type } from '@google/genai';
 import { useVoicePreferences } from '../hooks/useVoicePreferences';
 
@@ -76,10 +75,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
     const microphoneStreamRef = useRef<MediaStream | null>(null);
     const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
     const nextStartTimeRef = useRef(0);
-
-    const handleCardClick = (item: MediaItem) => {
-        window.dispatchEvent(new CustomEvent('selectMediaItem', { detail: item }));
-    };
     
     const stopVoiceMode = useCallback(() => {
         setIsVoiceModeActive(false);
@@ -106,6 +101,10 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
     }, [setAiStatus]);
     
     const startVoiceMode = useCallback(async () => {
+        if (!process.env.API_KEY) {
+            alert("Gemini API key is not configured. Voice Mode is unavailable.");
+            return;
+        }
         setIsVoiceModeActive(true);
         setAiStatus('listening');
 
@@ -113,7 +112,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             microphoneStreamRef.current = stream;
 
-            const ai = new GoogleGenAI({ apiKey: 'AIzaSyAwVYbiniK2rxvaPnVymSZN6bBND9NURjc' });
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
             const selectMediaItemDeclaration: FunctionDeclaration = {
                 name: 'selectMediaItem',
@@ -135,8 +134,24 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
                 },
             };
 
-            const tools = [{ functionDeclarations: [selectMediaItemDeclaration, getMediaOverviewDeclaration, controlTrailerAudioDeclaration] }];
-            const systemInstruction = `You are ScreenScape AI, a friendly and enthusiastic movie and TV show recommendation assistant. You can find movies, get plot summaries, open detail pages, and control trailer audio for users. Please respond in ${language}. Keep your spoken responses concise.`;
+            const getMediaFactDeclaration: FunctionDeclaration = {
+                name: 'getMediaFact',
+                description: "Gets a specific fact about a movie or TV show, such as its release date, director, cast, runtime, or box office revenue.",
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                        title: { type: Type.STRING, description: 'The title of the movie or TV show.' },
+                        fact_type: { 
+                            type: Type.STRING, 
+                            description: "The type of fact to retrieve. Supported values: 'release_date', 'director', 'cast', 'runtime', 'box_office'." 
+                        }
+                    },
+                    required: ['title', 'fact_type']
+                },
+            };
+
+            const tools = [{ functionDeclarations: [selectMediaItemDeclaration, getMediaOverviewDeclaration, controlTrailerAudioDeclaration, getMediaFactDeclaration] }];
+            const systemInstruction = `You are ScreenScape AI, a friendly and enthusiastic movie and TV show recommendation assistant. You can find movies, get plot summaries, open detail pages, and control trailer audio. You can also answer specific questions like 'Who directed Inception?' or 'When did Barbie come out?'. Please respond in ${language}. Keep your spoken responses concise.`;
 
             const sessionPromise = ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
@@ -161,26 +176,21 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
                     onmessage: async (message: LiveServerMessage) => {
                         if (message.toolCall) {
                             for (const fc of message.toolCall.functionCalls) {
-                                let result = "An unknown error occurred.";
+                                let result: { success: boolean; message: string; };
+
                                 if (fc.name === 'selectMediaItem' && fc.args.title) {
-                                    const res = await tmdbService.searchMulti(tmdbApiKey, fc.args.title);
-                                    const item = res.results.find((i): i is MediaItem => 'media_type' in i && (i.media_type === 'movie' || i.media_type === 'tv'));
-                                    if (item) {
-                                        handleCardClick(item);
-                                        result = `OK, navigating to ${'title' in item ? item.title : item.name}.`;
-                                    } else {
-                                        result = `Sorry, I couldn't find "${fc.args.title}".`;
-                                    }
+                                    result = await assistantEngine.findAndSelectMediaItem(fc.args.title, tmdbApiKey);
                                 } else if (fc.name === 'getMediaOverview' && fc.args.title) {
-                                     const res = await tmdbService.searchMulti(tmdbApiKey, fc.args.title);
-                                     const item = res.results.find((i): i is MediaItem => 'media_type' in i && (i.media_type === 'movie' || i.media_type === 'tv'));
-                                     result = item?.overview || `I couldn't find an overview for "${fc.args.title}".`;
+                                    result = await assistantEngine.findAndGetOverview(fc.args.title, tmdbApiKey);
                                 } else if (fc.name === 'controlTrailerAudio' && (fc.args.action === 'mute' || fc.args.action === 'unmute')) {
-                                    window.dispatchEvent(new CustomEvent('controlTrailerAudio', { detail: { action: fc.args.action } }));
-                                    result = `OK, trailer ${fc.args.action === 'mute' ? 'muted' : 'unmuted'}.`;
+                                    result = assistantEngine.controlTrailerAudio(fc.args.action as 'mute' | 'unmute');
+                                } else if (fc.name === 'getMediaFact' && fc.args.title && fc.args.fact_type) {
+                                     result = await assistantEngine.getFactAboutMedia(fc.args.title, fc.args.fact_type, tmdbApiKey);
+                                } else {
+                                     result = { success: false, message: "An unknown function was called." };
                                 }
                                 
-                                sessionPromise.then(session => session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result } } }));
+                                sessionPromise.then(session => session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result: result.message } } }));
                             }
                         }
 
@@ -191,7 +201,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
                         if (message.serverContent?.turnComplete) {
                             const userInput = currentTranscriptionRef.current.user.toLowerCase();
                             if (['goodbye', 'thanks', "that's all", 'stop listening', 'exit voice mode'].some(phrase => userInput.includes(phrase))) {
-                                setTimeout(() => stopVoiceMode(), 500); // Give AI time to say its closing remarks
+                                setTimeout(() => stopVoiceMode(), 500);
                             }
                             currentTranscriptionRef.current.user = '';
                         }
@@ -258,7 +268,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
     };
     
     useEffect(() => {
-        // Cleanup on component unmount
         return () => {
             stopVoiceMode();
         };
@@ -266,7 +275,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
 
     return (
         <button 
-            onClick={toggleVoiceMode} 
+            onClick={toggleVoiceMode}
+            title="Voice Mode"
             className={`fixed bottom-6 right-6 md:bottom-8 md:right-8 text-white p-4 rounded-full shadow-lg transition-transform hover:scale-110 z-50 animate-fade-in
                 ${isVoiceModeActive ? 'bg-red-600 hover:bg-red-500 animate-pulse' : 'bg-cyan-600 hover:bg-cyan-500'}`}
         >

@@ -9,6 +9,7 @@ export interface Movie {
   media_type: 'movie';
   genre_ids: number[];
   popularity: number;
+  revenue?: number; // Add revenue for box office feature
 }
 
 export interface TVShow {
@@ -22,7 +23,6 @@ export interface TVShow {
   media_type: 'tv';
   genre_ids: number[];
   popularity: number;
-  // Fix: Add optional properties for normalization to create a consistent MediaItem shape
   title?: string;
   release_date?: string;
 }
@@ -88,7 +88,6 @@ export interface CreditsResponse {
     crew: CrewMember[];
 }
 
-// Fix: Add PersonMovieCredit and PersonCreditsResponse for SixDegreesGame
 export interface PersonMovieCredit extends Movie {
     character: string;
 }
@@ -99,7 +98,6 @@ export interface PersonCreditsResponse {
     crew: CrewMember[];
 }
 
-// Fix: Add Image and ImagesResponse for GuessThePosterGame
 export interface Image {
     aspect_ratio: number;
     height: number;
@@ -145,6 +143,7 @@ export interface MovieDetails extends Movie {
     videos: { results: Video[] };
     credits: { cast: CastMember[]; crew: CrewMember[] };
     'watch/providers': WatchProviderResponse;
+    revenue: number; // Ensure revenue is here
 }
 
 export interface TVShowDetails extends TVShow {
@@ -156,4 +155,23 @@ export interface TVShowDetails extends TVShow {
     videos: { results: Video[] };
     credits: { cast: CastMember[]; crew: CrewMember[] };
     'watch/providers': WatchProviderResponse;
+}
+
+// Types for Release Dates endpoint
+export interface ReleaseDateInfo {
+    certification: string;
+    iso_639_1: string;
+    note: string;
+    release_date: string;
+    type: number;
+}
+
+export interface CountryReleaseDates {
+    iso_3166_1: string;
+    release_dates: ReleaseDateInfo[];
+}
+
+export interface ReleaseDatesResponse {
+    id: number;
+    results: CountryReleaseDates[];
 }

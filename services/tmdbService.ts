@@ -9,11 +9,11 @@ import {
   CreditsResponse,
   PersonCreditsResponse,
   ImagesResponse,
+  ReleaseDatesResponse,
 } from '../types';
 
 const API_BASE_URL = 'https://api.themoviedb.org/3';
 
-// FIX: Allow boolean values in params to support a wider range of API queries, like those from discoverMedia.
 const apiFetch = async <T>(apiKey: string, endpoint: string, params: Record<string, string | number | boolean> = {}): Promise<T> => {
   const url = new URL(`${API_BASE_URL}${endpoint}`);
   url.searchParams.append('api_key', apiKey);
@@ -55,10 +55,14 @@ export const getTVShowDetails = (apiKey: string, tvId: number): Promise<TVShowDe
   return apiFetch(apiKey, `/tv/${tvId}`, { append_to_response: 'videos,credits,watch/providers' });
 };
 
+export const getMovieReleaseDates = (apiKey: string, movieId: number): Promise<ReleaseDatesResponse> => {
+    return apiFetch(apiKey, `/movie/${movieId}/release_dates`);
+};
+
 export const getMoviesByProviders = (apiKey: string, providerIds: number[], page: number = 1): Promise<PaginatedResponse<Movie>> => {
     return apiFetch(apiKey, '/discover/movie', { 
         with_watch_providers: providerIds.join('|'),
-        watch_region: 'US', // Or make this dynamic
+        watch_region: 'US',
         page 
     });
 };
@@ -85,13 +89,11 @@ export const getGenres = async (apiKey: string): Promise<{movie: Record<string, 
     return { movie: genreMap(movieRes), tv: genreMap(tvRes) };
 };
 
-// Normalization functions
 export const normalizeMovie = (movie: Movie): MediaItem => ({
   ...movie,
   media_type: 'movie',
 });
 
-// Fix: Update normalizeTVShow to correctly add 'title' and 'release_date' and return a valid TVShow type.
 export const normalizeTVShow = (tvShow: TVShow): TVShow => ({
   ...tvShow,
   title: tvShow.name,
@@ -99,7 +101,6 @@ export const normalizeTVShow = (tvShow: TVShow): TVShow => ({
   media_type: 'tv',
 });
 
-// Fix: Add missing service functions for games
 export const searchPerson = (apiKey: string, query: string, page: number = 1): Promise<PaginatedResponse<Person>> => {
   return apiFetch(apiKey, '/search/person', { query, page });
 };

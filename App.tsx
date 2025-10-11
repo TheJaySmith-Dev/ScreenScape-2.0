@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import ApiKeySetup from './components/ApiKeySetup';
 import Header from './components/Header';
@@ -7,10 +8,14 @@ import MediaDetail from './components/MediaDetail';
 import AIAssistant, { AIStatus } from './components/AIAssistant';
 import AIGlow from './components/AIGlow';
 import Settings from './components/Settings';
+import TypeToAssist from './components/TypeToAssist';
+import GenScapeAccessGate from './components/GenScapeAccessGate';
+import GenScape from './components/GenScape';
+import AuthCallback from './components/AuthCallback';
 import { useTheme } from './hooks/useTheme';
 import { MediaItem } from './types';
 
-export type ViewType = 'home' | 'watchlist' | 'game';
+export type ViewType = 'home' | 'watchlist' | 'game' | 'genscape' | 'auth/callback';
 
 const App: React.FC = () => {
     const [apiKey, setApiKey] = useState<string | null>(null);
@@ -29,6 +34,14 @@ const App: React.FC = () => {
     }, [theme]);
     
     useEffect(() => {
+        // Simulate routing based on path
+        const path = window.location.pathname;
+        if (path === '/auth/callback') {
+            setView('auth/callback');
+        } else if (path === '/genscape') {
+            setView('genscape');
+        }
+
         const apiKeyToSet = '09b97a49759876f2fde9eadb163edc44';
         let storedKey = localStorage.getItem('tmdb_api_key');
 
@@ -64,6 +77,10 @@ const App: React.FC = () => {
     
     const handleSetView = (newView: ViewType) => {
         setView(newView);
+        // Update URL to reflect view change for better UX
+        const path = newView === 'home' ? '/' : `/${newView}`;
+        window.history.pushState({}, '', path);
+        
         setSelectedMedia(null);
         if (newView !== 'game') setActiveGame(null);
         if (newView === 'home' || newView === 'watchlist') setSearchQuery('');
@@ -75,6 +92,16 @@ const App: React.FC = () => {
     };
     
     const renderContent = () => {
+        if (view === 'auth/callback') {
+            return <AuthCallback />;
+        }
+        if (view === 'genscape') {
+            return (
+                <GenScapeAccessGate>
+                    <GenScape />
+                </GenScapeAccessGate>
+            );
+        }
         if (view === 'game') {
             return <GameView apiKey={apiKey!} onInvalidApiKey={handleInvalidApiKey} initialGame={activeGame} />;
         }
@@ -125,6 +152,8 @@ const App: React.FC = () => {
                 tmdbApiKey={apiKey} 
                 setAiStatus={setAiStatus}
             />
+            
+            <TypeToAssist tmdbApiKey={apiKey} />
 
             {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} />}
         </div>
