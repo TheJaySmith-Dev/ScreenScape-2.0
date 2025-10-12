@@ -1,11 +1,11 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 
 // --- IMPORTANT SECURITY NOTE ---
-// The user has explicitly requested to use these credentials in this environment.
-// In a standard production application, these should be handled securely on a backend server.
+// The client secret has been moved to the secure backend API route.
+// The client ID is public and safe to use here.
 const PATREON_CLIENT_ID = "bri-ZacRDVksfX5aawU5UOg5h0hGwQfF8BuxDy3K56qKN2GGtA2SLSkFkMgMxk3a";
-const PATREON_CLIENT_SECRET = "GTxbalCIYf2mvTmrBv8R2w5dyWNAZNDBemkzZDnl2qZf9h3U5oZ8BT10pnTJZBQF";
-const PATREON_REDIRECT_URI = window.location.origin + '/auth/callback';
+// This is the *backend* redirect URI that the user is sent to from Patreon.
+const PATREON_REDIRECT_URI = 'https://screenscape.space/api/auth/patreon/callback';
 
 interface PatreonUser {
     id: string;
@@ -19,7 +19,7 @@ interface PatreonSession {
     isLoading: boolean;
     login: () => void;
     logout: () => void;
-    handleCallback: (code: string) => Promise<void>;
+    processToken: (token: string) => Promise<void>;
 }
 
 const PatreonSessionContext = createContext<PatreonSession | undefined>(undefined);
@@ -43,10 +43,7 @@ export const PatreonProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const fetchIdentity = async (token: string) => {
         setIsLoading(true);
         try {
-            // NOTE: In a real production app, this fetch should be done on a secure backend server
-            // to protect your access token and handle API calls safely. This client-side approach
-            // is for demonstration purposes in this environment.
-            const response = await fetch(`https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=full_name,image_url`, {
+            const response = await fetch(`https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=full_name,image_url&fields%5Bmember%5D=patron_status`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -54,7 +51,7 @@ export const PatreonProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
             const { data, included } = await response.json();
             
-            setUser({ id: data.id, ...data.attributes });
+            setUser({ id: data.id, full_name: data.attributes.full_name, image_url: data.attributes.image_url });
 
             const membership = included?.find((item: any) => item.type === 'member');
             const patronStatus = membership?.attributes?.patron_status;
@@ -70,6 +67,7 @@ export const PatreonProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const login = () => {
         const scope = encodeURIComponent('identity identity.memberships');
+        // Redirect the user to Patreon. Patreon will then redirect them to our backend API route.
         const authUrl = `https://www.patreon.com/oauth2/authorize?response_type=code&client_id=${PATREON_CLIENT_ID}&redirect_uri=${encodeURIComponent(PATREON_REDIRECT_URI)}&scope=${scope}`;
         window.location.href = authUrl;
     };
@@ -79,43 +77,19 @@ export const PatreonProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setIsPatron(false);
         setAccessToken(null);
         localStorage.removeItem('patreon_access_token');
-        localStorage.removeItem('isAdminAccess'); // Also clear admin access on logout
+        localStorage.removeItem('isAdminAccess');
+        // Clear URL params on logout
+        window.history.replaceState({}, document.title, window.location.pathname);
     };
 
-    const handleCallback = async (code: string) => {
-        setIsLoading(true);
-        try {
-            // NOTE: This token exchange is highly insecure on the client-side.
-            // In a real app, the `code` must be sent to your backend, which then performs
-            // this POST request using your client secret, protecting it from exposure.
-            const response = await fetch(`https://cors-anywhere.herokuapp.com/https://www.patreon.com/api/oauth2/token`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    code: code,
-                    grant_type: 'authorization_code',
-                    client_id: PATREON_CLIENT_ID,
-                    client_secret: PATREON_CLIENT_SECRET,
-                    redirect_uri: PATREON_REDIRECT_URI,
-                }),
-            });
-             if (!response.ok) {
-                 const errorText = await response.text();
-                 throw new Error(`Token exchange failed: ${errorText}`);
-             }
-            const { access_token } = await response.json();
-            localStorage.setItem('patreon_access_token', access_token);
-            setAccessToken(access_token);
-            await fetchIdentity(access_token);
-
-        } catch (error) {
-            console.error("Patreon callback error:", error);
-            setIsLoading(false);
-        }
+    const processToken = async (token: string) => {
+        localStorage.setItem('patreon_access_token', token);
+        setAccessToken(token);
+        await fetchIdentity(token);
     };
 
 
-    const value = { user, isPatron, isLoading, login, logout, handleCallback };
+    const value = { user, isPatron, isLoading, login, logout, processToken };
 
     return (
         <PatreonSessionContext.Provider value={value}>

@@ -101,6 +101,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
     }, [setAiStatus]);
     
     const startVoiceMode = useCallback(async () => {
+        // FIX: Use environment variable for API key and check for its existence.
         if (!process.env.API_KEY) {
             alert("Gemini API key is not configured. Voice Mode is unavailable.");
             return;
@@ -112,6 +113,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             microphoneStreamRef.current = stream;
 
+            // FIX: Initialize with API key from environment variables.
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
             const selectMediaItemDeclaration: FunctionDeclaration = {
@@ -233,33 +235,40 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
                         }
                     },
                     onerror: (e: ErrorEvent) => {
-                        console.error('Gemini Live API Error:', e);
+                        console.error("AI Assistant Error:", e);
                         stopVoiceMode();
                     },
                     onclose: (e: CloseEvent) => {
-                       console.log('Gemini Live API connection closed.');
-                       stopVoiceMode();
+                        console.debug("AI Assistant connection closed.");
                     },
                 },
                 config: {
                     responseModalities: [Modality.AUDIO],
-                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
-                    systemInstruction,
+                    speechConfig: {
+                        voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+                    },
                     inputAudioTranscription: {},
-                    outputAudioTranscription: {},
+                    systemInstruction,
                     tools,
                 },
             });
-            sessionPromiseRef.current = sessionPromise;
 
+            sessionPromiseRef.current = sessionPromise;
+            
         } catch (error) {
-            console.error('Microphone access denied or audio setup failed:', error);
-            alert("Voice Mode requires microphone access. Please enable it in your browser settings.");
+            console.error("Failed to start voice mode:", error);
             stopVoiceMode();
         }
-    }, [tmdbApiKey, setAiStatus, stopVoiceMode, voice, language]);
+    }, [tmdbApiKey, voice, language, setAiStatus, stopVoiceMode]);
 
-    const toggleVoiceMode = () => {
+    useEffect(() => {
+        // Cleanup on component unmount
+        return () => {
+            stopVoiceMode();
+        };
+    }, [stopVoiceMode]);
+
+    const handleToggleVoiceMode = () => {
         if (isVoiceModeActive) {
             stopVoiceMode();
         } else {
@@ -267,20 +276,17 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
         }
     };
     
-    useEffect(() => {
-        return () => {
-            stopVoiceMode();
-        };
-    }, [stopVoiceMode]);
-
     return (
-        <button 
-            onClick={toggleVoiceMode}
-            title="Voice Mode"
-            className={`fixed bottom-6 right-6 md:bottom-8 md:right-8 text-white p-4 rounded-full shadow-lg transition-transform hover:scale-110 z-50 animate-fade-in
-                ${isVoiceModeActive ? 'bg-red-600 hover:bg-red-500 animate-pulse' : 'bg-cyan-600 hover:bg-cyan-500'}`}
+        <button
+            title="AI Voice Assistant"
+            onClick={handleToggleVoiceMode}
+            className={`fixed bottom-6 right-6 md:bottom-8 md:right-8 text-white p-4 rounded-full shadow-lg transition-all duration-300 hover:scale-110 z-50 animate-fade-in ${
+                isVoiceModeActive
+                    ? 'bg-red-600 hover:bg-red-500'
+                    : 'bg-accent-500 hover:bg-accent-400'
+            }`}
         >
-            <SparklesIcon className="w-6 h-6" />
+            <SparklesIcon className={`w-7 h-7 ${isVoiceModeActive ? 'animate-pulse' : ''}`} />
         </button>
     );
 };

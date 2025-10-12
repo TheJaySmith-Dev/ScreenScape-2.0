@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import ApiKeySetup from './components/ApiKeySetup';
 import Header from './components/Header';
@@ -11,11 +10,11 @@ import Settings from './components/Settings';
 import TypeToAssist from './components/TypeToAssist';
 import GenScapeAccessGate from './components/GenScapeAccessGate';
 import GenScape from './components/GenScape';
-import AuthCallback from './components/AuthCallback';
 import { useTheme } from './hooks/useTheme';
+import { usePatreon } from './contexts/PatreonSessionContext';
 import { MediaItem } from './types';
 
-export type ViewType = 'home' | 'watchlist' | 'game' | 'genscape' | 'auth/callback';
+export type ViewType = 'home' | 'watchlist' | 'game' | 'genscape';
 
 const App: React.FC = () => {
     const [apiKey, setApiKey] = useState<string | null>(null);
@@ -26,18 +25,29 @@ const App: React.FC = () => {
     const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
-
+    
     const { theme } = useTheme();
+    const { processToken } = usePatreon();
 
     useEffect(() => {
         document.documentElement.className = `theme-${theme} dark`;
     }, [theme]);
     
     useEffect(() => {
-        // Simulate routing based on path
         const path = window.location.pathname;
-        if (path === '/auth/callback') {
-            setView('auth/callback');
+        const params = new URLSearchParams(window.location.search);
+        const patreonToken = params.get('patreon_token');
+        const patreonError = params.get('patreon_error');
+
+        // This runs once on app load to handle the redirect from the secure backend.
+        if (patreonToken) {
+            processToken(patreonToken);
+            // Clean the URL to remove the token after processing
+            window.history.replaceState({}, document.title, '/genscape');
+            setView('genscape');
+        } else if (patreonError) {
+             // Let the GenScapeAccessGate handle showing the error message
+            setView('genscape');
         } else if (path === '/genscape') {
             setView('genscape');
         }
@@ -67,7 +77,7 @@ const App: React.FC = () => {
 
         window.addEventListener('selectMediaItem', handleSelectMedia);
         return () => window.removeEventListener('selectMediaItem', handleSelectMedia);
-    }, []);
+    }, [processToken]);
 
     const handleInvalidApiKey = useCallback(() => {
         localStorage.removeItem('tmdb_api_key');
@@ -77,7 +87,6 @@ const App: React.FC = () => {
     
     const handleSetView = (newView: ViewType) => {
         setView(newView);
-        // Update URL to reflect view change for better UX
         const path = newView === 'home' ? '/' : `/${newView}`;
         window.history.pushState({}, '', path);
         
@@ -92,9 +101,6 @@ const App: React.FC = () => {
     };
     
     const renderContent = () => {
-        if (view === 'auth/callback') {
-            return <AuthCallback />;
-        }
         if (view === 'genscape') {
             return (
                 <GenScapeAccessGate>

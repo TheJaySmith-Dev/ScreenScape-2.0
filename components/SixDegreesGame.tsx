@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 // Fix: Add missing imports for TMDb service functions and types
-import { searchMulti as searchPerson, getPersonMovieCredits, getMovieCredits } from '../services/tmdbService';
+// FIX: Use the specific `searchPerson` function instead of aliasing `searchMulti`.
+import { searchPerson, getPersonMovieCredits, getMovieCredits } from '../services/tmdbService';
 import { Person, PersonMovieCredit, CastMember } from '../types';
 import Loader from './Loader';
 
@@ -30,8 +31,8 @@ const ActorSearch: React.FC<{ onSelect: (actor: Person) => void, apiKey: string 
         }
         try {
             const response = await searchPerson(apiKey, searchQuery);
-            // Fix: Cast results to Person[] since searchMulti can return other types.
-            const persons = response.results.filter(p => 'known_for_department' in p && p.known_for_department === 'Acting' && p.profile_path) as Person[];
+            // FIX: Filter for actors with profile pictures and in the 'Acting' department for better results.
+            const persons = response.results.filter(p => p.known_for_department === 'Acting' && p.profile_path);
             setResults(persons);
             setIsOpen(true);
         } catch (error) {
