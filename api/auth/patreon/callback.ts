@@ -1,10 +1,9 @@
 // pages/api/auth/patreon/callback.ts
-import type { NextApiRequest, NextApiResponse } from 'next'
 
 // The base URL of the frontend application.
 const APP_BASE_URL = 'https://screenscape.space';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: any, res: any) {
   const code = req.query.code as string;
 
   // The frontend will be redirected to the /genscape view upon return.
