@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 // Common props for all icons
@@ -128,14 +127,5 @@ export const ImageIcon: React.FC<IconProps> = (props) => (
 export const DownloadIcon: React.FC<IconProps> = (props) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-    </svg>
-);
-
-export const PatreonIcon: React.FC<IconProps> = (props) => (
-    <svg viewBox="0 0 569 546" xmlns="http://www.w3.org/2000/svg" {...props}>
-        <g>
-            <circle cx="362.589996" cy="204.589996" r="204.589996" fill="#f96854" />
-            <rect height="545.799988" width="100" x="0" y="0" fill="#052d49" />
-        </g>
     </svg>
 );

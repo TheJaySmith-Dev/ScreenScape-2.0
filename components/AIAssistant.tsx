@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { SparklesIcon } from './Icons';
 import * as assistantEngine from '../services/assistantEngine';
-// FIX: The 'LiveSession' type is not exported from the '@google/genai' package. It has been removed.
 import { GoogleGenAI, LiveServerMessage, Modality, Blob, FunctionDeclaration, Type } from '@google/genai';
 import { useVoicePreferences } from '../hooks/useVoicePreferences';
 
@@ -70,7 +69,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
     const [isVoiceModeActive, setIsVoiceModeActive] = useState(false);
     const currentTranscriptionRef = useRef({ user: '' });
 
-    // FIX: The 'LiveSession' type is not exported. Using 'any' for the session promise type.
     const sessionPromiseRef = useRef<Promise<any> | null>(null);
     const inputAudioContextRef = useRef<AudioContext | null>(null);
     const outputAudioContextRef = useRef<AudioContext | null>(null);
@@ -103,7 +101,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
     }, [setAiStatus]);
     
     const startVoiceMode = useCallback(async () => {
-        // FIX: Use environment variable for API key and check for its existence.
         if (!process.env.API_KEY) {
             alert("Gemini API key is not configured. Voice Mode is unavailable.");
             return;
@@ -115,7 +112,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             microphoneStreamRef.current = stream;
 
-            // FIX: Initialize with API key from environment variables.
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
             const selectMediaItemDeclaration: FunctionDeclaration = {
@@ -183,15 +179,12 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
                                 let result: { success: boolean; message: string; };
 
                                 if (fc.name === 'selectMediaItem' && fc.args.title) {
-                                    // FIX: Cast function call argument to string to resolve type error.
                                     result = await assistantEngine.findAndSelectMediaItem(fc.args.title as string, tmdbApiKey);
                                 } else if (fc.name === 'getMediaOverview' && fc.args.title) {
-                                    // FIX: Cast function call argument to string to resolve type error.
                                     result = await assistantEngine.findAndGetOverview(fc.args.title as string, tmdbApiKey);
                                 } else if (fc.name === 'controlTrailerAudio' && (fc.args.action === 'mute' || fc.args.action === 'unmute')) {
                                     result = assistantEngine.controlTrailerAudio(fc.args.action as 'mute' | 'unmute');
                                 } else if (fc.name === 'getMediaFact' && fc.args.title && fc.args.fact_type) {
-                                     // FIX: Cast function call arguments to string to resolve type error.
                                      result = await assistantEngine.getFactAboutMedia(fc.args.title as string, fc.args.fact_type as string, tmdbApiKey);
                                 } else {
                                      result = { success: false, message: "An unknown function was called." };

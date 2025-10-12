@@ -11,8 +11,8 @@ import TypeToAssist from './components/TypeToAssist';
 import GenScapeAccessGate from './components/GenScapeAccessGate';
 import GenScape from './components/GenScape';
 import { useTheme } from './hooks/useTheme';
-import { usePatreon } from './contexts/PatreonSessionContext';
 import { MediaItem } from './types';
+import { validateKey } from './utils/genscapeKeys';
 
 export type ViewType = 'home' | 'watchlist' | 'game' | 'genscape';
 
@@ -27,68 +27,92 @@ const App: React.FC = () => {
     const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
     
     const { theme } = useTheme();
-    const { processToken } = usePatreon();
 
     useEffect(() => {
         document.documentElement.className = `theme-${theme} dark`;
     }, [theme]);
     
     useEffect(() => {
-        const path = window.location.pathname;
         const params = new URLSearchParams(window.location.search);
-        const patreonToken = params.get('patreon_token');
-        const patreonError = params.get('patreon_error');
+        const path = window.location.pathname;
 
-        // This runs once on app load to handle the redirect from the secure backend.
-        if (patreonToken) {
-            processToken(patreonToken);
-            // Clean the URL to remove the token after processing
-            window.history.replaceState({}, document.title, '/genscape');
-            setView('genscape');
-        } else if (patreonError) {
-             // Let the GenScapeAccessGate handle showing the error message
-            setView('genscape');
-        } else if (path === '/genscape') {
-            setView('genscape');
-        }
-
-        const apiKeyToSet = '09b97a49759876f2fde9eadb163edc44';
-        let storedKey = localStorage.getItem('tmdb_api_key');
-
-        if (!storedKey) {
-            localStorage.setItem('tmdb_api_key', apiKeyToSet);
-            storedKey = apiKeyToSet;
-        }
-
-        if (storedKey) {
-            setApiKey(storedKey);
-            setIsKeyInvalid(false);
+        // Handle GenScape Access Key from URL, e.g., /unlock?access=KEY
+        const accessKey = params.get('access');
+        if (path.includes('/unlock') && accessKey) {
+            if (validateKey(accessKey)) {
+                localStorage.setItem('genscape_verified', 'true');
+                params.delete('access');
+                params.set('view', 'genscape');
+                window.history.replaceState({view: 'genscape'}, document.title, `?${params.toString()}`);
+                setView('genscape');
+            } else {
+                params.delete('access');
+                params.set('view', 'genscape');
+                params.set('access_error', 'true');
+                window.history.replaceState({view: 'genscape'}, document.title, `?${params.toString()}`);
+                setView('genscape');
+            }
         } else {
-            setApiKey('');
+            // Set initial view from URL query parameter
+            const viewFromUrl = params.get('view');
+            if (viewFromUrl && ['home', 'watchlist', 'game', 'genscape'].includes(viewFromUrl)) {
+                setView(viewFromUrl as ViewType);
+            } else {
+                setView('home');
+            }
         }
+        
+        // Handle browser back/forward
+        const handlePopState = () => {
+            const popParams = new URLSearchParams(window.location.search);
+            const viewFromUrl = popParams.get('view');
+             if (viewFromUrl && ['home', 'watchlist', 'game', 'genscape'].includes(viewFromUrl)) {
+                setView(viewFromUrl as ViewType);
+            } else {
+                setView('home');
+            }
+        };
+        window.addEventListener('popstate', handlePopState);
 
+        // API Key setup - Hardcoded as per user request
+        const tmdbApiKey = '09b97a49759876f2fde9eadb163edc44';
+        localStorage.setItem('tmdb_api_key', tmdbApiKey);
+        setApiKey(tmdbApiKey);
+
+        // Custom event for selecting media items
         const handleSelectMedia = (event: Event) => {
             const detail = (event as CustomEvent<MediaItem>).detail;
             if (detail && detail.id && detail.media_type) {
                 setSelectedMedia(detail);
+                // When selecting media, go to home view and update URL
+                const newParams = new URLSearchParams(window.location.search);
+                newParams.set('view', 'home');
+                window.history.pushState({view: 'home'}, '', `?${newParams.toString()}`);
                 setView('home'); 
             }
         };
-
         window.addEventListener('selectMediaItem', handleSelectMedia);
-        return () => window.removeEventListener('selectMediaItem', handleSelectMedia);
-    }, [processToken]);
+
+        return () => {
+            window.removeEventListener('selectMediaItem', handleSelectMedia);
+            window.removeEventListener('popstate', handlePopState);
+        };
+    }, []);
 
     const handleInvalidApiKey = useCallback(() => {
-        localStorage.removeItem('tmdb_api_key');
-        setApiKey('');
+        // The hardcoded key is invalid. Don't clear it, as that would cause a reload loop.
+        // Instead, just set the invalid flag to show an error state.
+        console.error("The hardcoded TMDb API key is invalid or has been rejected by the service.");
         setIsKeyInvalid(true);
     }, []);
     
     const handleSetView = (newView: ViewType) => {
+        if (view === newView) return; // Avoid pushing same state
+        
         setView(newView);
-        const path = newView === 'home' ? '/' : `/${newView}`;
-        window.history.pushState({}, '', path);
+        const params = new URLSearchParams(window.location.search);
+        params.set('view', newView);
+        window.history.pushState({view: newView}, '', `?${params.toString()}`);
         
         setSelectedMedia(null);
         if (newView !== 'game') setActiveGame(null);
@@ -96,7 +120,7 @@ const App: React.FC = () => {
     };
 
     const handleSelectGame = (game: Game) => {
-        setView('game');
+        handleSetView('game');
         setActiveGame(game);
     };
     
@@ -127,8 +151,17 @@ const App: React.FC = () => {
         return <div className="h-screen w-screen bg-primary" />; // Loading state
     }
     
-    if (!apiKey) {
-        return <ApiKeySetup isKeyInvalid={isKeyInvalid} />;
+    if (isKeyInvalid) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-primary text-white p-4">
+              <div className="w-full max-w-md text-center bg-red-900/50 border border-red-500 rounded-2xl p-8 shadow-2xl">
+                <h1 className="text-3xl font-bold mb-3">API Key Error</h1>
+                <p className="text-zinc-300">
+                  Could not connect to TMDb. The application's API key is invalid or the service is unavailable.
+                </p>
+              </div>
+            </div>
+        );
     }
 
     return (

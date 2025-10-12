@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useGenScape } from '../hooks/useGenScape';
 import { ImageIcon, PaperAirplaneIcon, DownloadIcon } from './Icons';
@@ -93,6 +94,10 @@ const GenScape: React.FC = () => {
                     </button>
                 </form>
                 {error && <p className="text-red-400 mt-2 text-center">{error}</p>}
+
+                <p className="text-center text-xs text-slate-500 mt-4">
+                    Image generation powered by FreePik
+                </p>
             </div>
         </div>
     );

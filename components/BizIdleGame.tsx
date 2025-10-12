@@ -155,16 +155,12 @@ const BizIdleGameComponent: React.FC<{ onExit: () => void }> = ({ onExit }) => {
 };
 
 const features = [
-    { emoji: '🏙️', title: 'Start From Scratch', description: 'Grow your indie production house into a major media conglomerate.' },
-    { emoji: '🎬', title: 'Produce Hit Content', description: 'Greenlight everything from TV dramas to animated features and sci-fi epics.' },
-    { emoji: '🧠', title: 'Compete Against AI Rivals', description: 'Dynamic studios evolve, compete for talent, and fight for box office supremacy.' },
-    { emoji: '🏆', title: 'Win Industry Awards', description: 'Chase critical acclaim and unlock massive bonuses for your studio.' },
-    { emoji: '💰', title: 'Manage Budgets', description: 'Balance blockbuster risks with the steady income of television hits.' },
-    { emoji: '🤝', title: 'Acquire Studios', description: 'Buy out the competition through friendly mergers or hostile takeovers.' },
-    { emoji: '🌍', title: 'Build a Streaming Empire', description: 'Launch your own streaming service and compete for global subscribers.' },
-    { emoji: '🖼️', title: 'Chef’s Kiss UI', description: 'Built with a stunning, futuristic glass interface you’ll love.' },
-    { emoji: '🧑‍💼', title: 'Web-Only. No Account Needed.', description: 'Play instantly. No sign-ups. No friction. All Hollywood.' },
-    { emoji: '🔁', title: 'Endless Replay Value', description: 'Every session is unique, with unpredictable AI-driven market shifts.' }
+    { emoji: '🏙️', title: 'Build Your Empire', description: 'Grow your indie production house into a major media conglomerate from scratch.' },
+    { emoji: '💰', title: 'Manage Your Finances', description: 'Balance your income and expenses to strategically acquire new production assets.' },
+    { emoji: '🚀', title: 'Incremental Progression', description: 'Unlock and upgrade a variety of studios, from indie films to streaming giants.' },
+    { emoji: '📈', title: 'Idle Income', description: 'Your empire generates revenue automatically, growing your valuation over time.' },
+    { emoji: '🖼️', title: 'Futuristic UI', description: 'Built with a stunning, futuristic glass interface you’ll love.' },
+    { emoji: '🧑‍💼', title: 'No Account Needed', description: 'Play instantly in your browser. No sign-ups or friction required.' },
 ];
 
 // --- Wrapper Component with Start Screen ---
@@ -193,8 +189,7 @@ const BizIdleGame: React.FC<BizIdleGameProps> = ({ onExit }) => {
             <h3 className="text-xl sm:text-2xl font-bold mb-4">“From indie shorts to global blockbusters, build your media empire.”</h3>
             <div className="text-zinc-300 space-y-4 text-sm sm:text-base">
                 <p><strong>BizIdle</strong> is a movie and TV studio simulation game where you call the shots. Start with a small indie studio and make strategic decisions to produce hit shows, release blockbuster films, build a streaming service, and dominate Hollywood.</p>
-                <p>Powered by dynamic AI agents, the industry changes constantly. Rival studios can poach your top talent, negotiate distribution deals, attempt hostile takeovers, or greenlight a competing blockbuster that challenges your release.</p>
-                <p>Whether you're chasing awards season glory, creating the next big streaming hit, or building a cinematic universe, <strong>no two playthroughs are ever the same.</strong></p>
+                <p>This is an idle game focused on growth and acquisition. Manage your finances, reinvest your profits, and watch your media empire expand from a single small studio to a global powerhouse.</p>
             </div>
         </div>
 

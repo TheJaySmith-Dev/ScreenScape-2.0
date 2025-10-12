@@ -1,8 +1,6 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { PatreonProvider } from './contexts/PatreonSessionContext';
 import './services/youtubeService'; // This sets up the YouTube API ready callback.
 
 const rootElement = document.getElementById('root');
@@ -13,8 +11,6 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <PatreonProvider>
-      <App />
-    </PatreonProvider>
+    <App />
   </React.StrictMode>
 );

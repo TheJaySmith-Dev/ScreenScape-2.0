@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { SearchIcon, GearIcon, MenuIcon, XIcon } from './Icons';
 import { ViewType } from '../App';
-import PatreonAuth from './PatreonAuth';
 
 interface HeaderProps {
     searchQuery: string;
@@ -65,9 +64,6 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, view, setV
                         <button onClick={onSettingsClick} className="text-slate-300 hover:text-white transition-colors p-2 rounded-full glass-button hidden md:block">
                             <GearIcon className="w-6 h-6" />
                         </button>
-                        
-                        {/* Patreon Auth Button */}
-                        <PatreonAuth />
                         
                         {/* Mobile Menu Icon */}
                         <div className="md:hidden">
