@@ -1,4 +1,4 @@
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_URL = 'https://0ec90b57d6e95fcbda19832f.supabase.co';
 const API_URL = `${SUPABASE_URL}/functions/v1/generate-image`;
 
 /**
