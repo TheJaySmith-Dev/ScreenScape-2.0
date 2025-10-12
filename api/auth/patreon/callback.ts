@@ -19,12 +19,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Exchange authorization code for an access token
     const tokenResponse = await fetch('https://www.patreon.com/api/oauth2/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Content-Type': 'application/x-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        client_id: process.env.bri-ZacRDVksfX5aawU5UOg5h0hGwQfF8BuxDy3K56qKN2GGtA2SLSkFkMgMxk3a,
-        client_secret: process.env.GTxbalCIYf2mvTmrBv8R2w5dyWNAZNDBemkzZDnl2qZf9h3U5oZ8BT10pnTJZBQF,
+        client_id: process.env.PATREON_CLIENT_ID!,
+        client_secret: process.env.PATREON_CLIENT_SECRET!,
         redirect_uri: 'https://screenscape.space/api/auth/patreon/callback',
       }),
     });
