@@ -16,12 +16,18 @@ export const genImageFromFluxDev = async (prompt: string): Promise<string> => {
             body: JSON.stringify({ prompt }),
         });
 
-        const data = await response.json();
-
         if (!response.ok) {
-            // The backend now provides a structured error message
-            throw new Error(data.message || `API error: ${response.statusText}`);
+            let errorMessage = `API error: ${response.statusText}`;
+            try {
+                const data = await response.json();
+                errorMessage = data.message || errorMessage;
+            } catch {
+                // Response might not be JSON (e.g., 404 from Vite dev server)
+            }
+            throw new Error(errorMessage);
         }
+
+        const data = await response.json();
 
         if (!data.imageUrl) {
             throw new Error("Invalid response format from the server");
