@@ -8,6 +8,7 @@ type ServerResponse = {
   redirect: (url: string) => void;
   status: (code: number) => {
     json: (data: any) => void;
+    send: (message: string) => void;
   };
 };
 
@@ -19,65 +20,71 @@ type ServerRequest = {
 
 // This is the handler for the API route at /api/auth/patreon/callback
 export default async function handler(req: ServerRequest, res: ServerResponse) {
-  const { code } = req.query;
-
-  // Use environment variables for security
-  const PATREON_CLIENT_ID = process.env.PATREON_CLIENT_ID;
-  const PATREON_CLIENT_SECRET = process.env.PATREON_CLIENT_SECRET;
-  // This must exactly match the URL in your Patreon developer settings
-  const PATREON_REDIRECT_URI = 'https://screenscape.space/api/auth/patreon/callback'; 
-
+  const code = req.query.code as string;
+  // If code is missing, redirect to the frontend with an error.
   if (!code) {
-    return res.status(400).json({ error: 'Authorization code is missing.' });
+    const errorUrl = new URL('/genscape', 'https://screenscape.space');
+    errorUrl.searchParams.set('patreon_error', 'authentication_failed');
+    return res.redirect(errorUrl.toString());
   }
 
   try {
+    // Use environment variables for security
+    const PATREON_CLIENT_ID = process.env.PATREON_CLIENT_ID;
+    const PATREON_CLIENT_SECRET = process.env.PATREON_CLIENT_SECRET;
+    const PATREON_REDIRECT_URI = 'https://screenscape.space/api/auth/patreon/callback'; 
+
     // 1. Exchange the authorization code for an access token
     const tokenResponse = await fetch('https://www.patreon.com/api/oauth2/token', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        code: code as string,
         grant_type: 'authorization_code',
+        code,
         client_id: PATREON_CLIENT_ID!,
         client_secret: PATREON_CLIENT_SECRET!,
         redirect_uri: PATREON_REDIRECT_URI,
       }),
     });
 
-    if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.json();
-      throw new Error(`Patreon token exchange failed: ${errorData.error_description || 'Unknown error'}`);
+    const tokenData = await tokenResponse.json();
+
+    // If token exchange fails, redirect with an error.
+    if (!tokenData.access_token) {
+        console.error("Patreon token exchange failed:", tokenData);
+        const errorUrl = new URL('/genscape', 'https://screenscape.space');
+        errorUrl.searchParams.set('patreon_error', 'authentication_failed');
+        return res.redirect(errorUrl.toString());
     }
 
-    const { access_token } = await tokenResponse.json();
-
     // 2. Use the access token to get the user's identity and membership status
-    const identityResponse = await fetch('https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Bmember%5D=patron_status', {
-      headers: {
-        Authorization: `Bearer ${access_token}`,
-      },
-    });
+    const userResponse = await fetch(
+      'https://www.patreon.com/api/oauth2/v2/identity?include=memberships,memberships.currently_entitled_tiers',
+      {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+        },
+      }
+    );
 
-    if (!identityResponse.ok) {
+    if (!userResponse.ok) {
       throw new Error('Failed to fetch user identity from Patreon.');
     }
 
-    const { data, included } = await identityResponse.json();
-
-    const membership = included?.find((item: any) => item.type === 'member');
-    const patronStatus = membership?.attributes?.patron_status;
+    const userData = await userResponse.json();
+    
+    // The 'included' array contains membership info
+    const membership = userData?.included?.find((item: any) => item.type === 'member');
+    const isPatron = membership?.attributes?.patron_status === 'active_patron';
 
     // 3. Redirect the user based on their patron status
-    if (patronStatus === 'active_patron') {
+    if (isPatron) {
       // User is a valid patron. Redirect to GenScape with the access token.
       const successUrl = new URL('/genscape', 'https://screenscape.space');
-      successUrl.searchParams.set('patreon_token', access_token);
+      successUrl.searchParams.set('patreon_token', tokenData.access_token);
       res.redirect(successUrl.toString());
     } else {
-      // User is not an active patron. Redirect to a locked state.
+      // User is not an active patron. Redirect with an error message.
       const lockedUrl = new URL('/genscape', 'https://screenscape.space');
       lockedUrl.searchParams.set('patreon_error', 'not_an_active_patron');
       res.redirect(lockedUrl.toString());
