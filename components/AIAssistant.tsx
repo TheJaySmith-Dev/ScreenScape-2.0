@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { SparklesIcon } from './Icons';
 import * as assistantEngine from '../services/assistantEngine';
-import { GoogleGenAI, LiveSession, LiveServerMessage, Modality, Blob, FunctionDeclaration, Type } from '@google/genai';
+// FIX: The 'LiveSession' type is not exported from the '@google/genai' package. It has been removed.
+import { GoogleGenAI, LiveServerMessage, Modality, Blob, FunctionDeclaration, Type } from '@google/genai';
 import { useVoicePreferences } from '../hooks/useVoicePreferences';
 
 // --- Types ---
@@ -69,7 +70,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
     const [isVoiceModeActive, setIsVoiceModeActive] = useState(false);
     const currentTranscriptionRef = useRef({ user: '' });
 
-    const sessionPromiseRef = useRef<Promise<LiveSession> | null>(null);
+    // FIX: The 'LiveSession' type is not exported. Using 'any' for the session promise type.
+    const sessionPromiseRef = useRef<Promise<any> | null>(null);
     const inputAudioContextRef = useRef<AudioContext | null>(null);
     const outputAudioContextRef = useRef<AudioContext | null>(null);
     const microphoneStreamRef = useRef<MediaStream | null>(null);
@@ -181,13 +183,16 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
                                 let result: { success: boolean; message: string; };
 
                                 if (fc.name === 'selectMediaItem' && fc.args.title) {
-                                    result = await assistantEngine.findAndSelectMediaItem(fc.args.title, tmdbApiKey);
+                                    // FIX: Cast function call argument to string to resolve type error.
+                                    result = await assistantEngine.findAndSelectMediaItem(fc.args.title as string, tmdbApiKey);
                                 } else if (fc.name === 'getMediaOverview' && fc.args.title) {
-                                    result = await assistantEngine.findAndGetOverview(fc.args.title, tmdbApiKey);
+                                    // FIX: Cast function call argument to string to resolve type error.
+                                    result = await assistantEngine.findAndGetOverview(fc.args.title as string, tmdbApiKey);
                                 } else if (fc.name === 'controlTrailerAudio' && (fc.args.action === 'mute' || fc.args.action === 'unmute')) {
                                     result = assistantEngine.controlTrailerAudio(fc.args.action as 'mute' | 'unmute');
                                 } else if (fc.name === 'getMediaFact' && fc.args.title && fc.args.fact_type) {
-                                     result = await assistantEngine.getFactAboutMedia(fc.args.title, fc.args.fact_type, tmdbApiKey);
+                                     // FIX: Cast function call arguments to string to resolve type error.
+                                     result = await assistantEngine.getFactAboutMedia(fc.args.title as string, fc.args.fact_type as string, tmdbApiKey);
                                 } else {
                                      result = { success: false, message: "An unknown function was called." };
                                 }
