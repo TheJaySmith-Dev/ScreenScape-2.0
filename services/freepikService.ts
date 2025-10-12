@@ -1,33 +1,27 @@
-const FREEPIK_API_URL = 'https://api.freepik.com/v1/ai/images/generate';
-const FREEPIK_API_KEY = 'FPSX38b1f3f74cba72c920b4863726af0168';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const API_URL = `${SUPABASE_URL}/functions/v1/generate-image`;
 
 /**
- * Generates an image by calling FreePik's Flux Dev model directly.
+ * Generates an image by calling FreePik's Flux Dev model via Supabase Edge Function.
  *
  * @param prompt - The text prompt from the user.
  * @returns A promise that resolves to the URL of the generated image.
  */
 export const genImageFromFluxDev = async (prompt: string): Promise<string> => {
     try {
-        const response = await fetch(FREEPIK_API_URL, {
+        const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
-                'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'X-Freepik-API-Key': FREEPIK_API_KEY,
             },
-            body: JSON.stringify({
-                prompt: prompt,
-                model: 'flux-v1',
-                size: '1024x1024'
-            }),
+            body: JSON.stringify({ prompt }),
         });
 
         if (!response.ok) {
             let errorMessage = `API error: ${response.statusText}`;
             try {
                 const data = await response.json();
-                errorMessage = data.message || errorMessage;
+                errorMessage = data.error || data.message || errorMessage;
             } catch {
                 // Response might not be JSON
             }
@@ -36,15 +30,14 @@ export const genImageFromFluxDev = async (prompt: string): Promise<string> => {
 
         const data = await response.json();
 
-        const imageUrl = data.data?.url;
-        if (!imageUrl) {
-            throw new Error("Invalid response format from FreePik API");
+        if (!data.imageUrl) {
+            throw new Error("Invalid response format from server");
         }
 
-        return imageUrl;
+        return data.imageUrl;
 
     } catch (error) {
-        console.error("Error generating image via FreePik API:", error);
+        console.error("Error generating image:", error);
         // Fallback to a placeholder on error to avoid breaking the UI
         const encodedPrompt = encodeURIComponent(`Error: ${(error as Error).message}`);
         return `https://placehold.co/1024x1024/7f1d1d/ffffff/png?text=${encodedPrompt}&font=lato`;
