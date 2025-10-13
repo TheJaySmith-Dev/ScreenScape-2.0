@@ -60,16 +60,24 @@ const AuthCallback: React.FC = () => {
 
     if (authError) {
       setError(`Spotify authentication failed: ${authError}`);
+      localStorage.removeItem(CODE_VERIFIER_KEY);
       return;
     }
 
-    if (code && verifier) {
-      exchangeCodeForToken(code, verifier);
-    } else {
-      if(!code) setError("Authorization code missing from callback URL.");
-      else if(!verifier) setError("Code verifier missing from storage. Please try logging in again.");
-      else window.location.href = '/';
+    if (!code) {
+      // User may have navigated to /callback manually. Redirect home.
+      window.location.href = '/';
+      return;
     }
+
+    if (!verifier) {
+      setError("Code verifier not found. Your session may have expired or you might be in private browsing mode. Please try logging in again.");
+      return;
+    }
+
+    // If we have a code and verifier, proceed with token exchange
+    exchangeCodeForToken(code, verifier);
+    
   }, []);
 
   if (error) {

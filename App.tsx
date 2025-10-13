@@ -13,6 +13,7 @@ import AuthCallback from './components/AuthCallback';
 import MusicView from './components/MusicView';
 import { SpotifyProvider, useSpotify } from './contexts/SpotifyContext';
 import SpotifyMiniPlayer from './components/SpotifyMiniPlayer';
+import { useTheme } from './hooks/useTheme';
 
 
 export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game' | 'music';
@@ -20,6 +21,7 @@ export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game' | 'musi
 const TMDB_API_KEY = '09b97a49759876f2fde9eadb163edc44';
 
 const AppContent: React.FC = () => {
+    useTheme(); // Apply theme on app load
     const apiKey = TMDB_API_KEY;
     const [isKeyInvalid, setIsKeyInvalid] = useState(false);
     const [view, setView] = useState<ViewType>('screenSearch');
