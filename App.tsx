@@ -133,7 +133,13 @@ const AppContent: React.FC = () => {
 
 
 const App: React.FC = () => {
-  if (window.location.pathname === '/callback') {
+  const params = new URLSearchParams(window.location.search);
+  const isSpotifyCallback = params.has('code') || params.has('error');
+
+  // The Spotify callback now happens at the root URL (e.g., /?code=...)
+  // This avoids 404s on servers not configured for SPAs.
+  // We also check the old path for graceful migration.
+  if (window.location.pathname === '/callback' || isSpotifyCallback) {
     return <AuthCallback />;
   }
 

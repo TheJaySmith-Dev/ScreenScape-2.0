@@ -33,7 +33,7 @@ const generateCodeChallenge = async (verifier: string) => {
 
 
 const CLIENT_ID = 'fb4eb7f03647432fa68fe30883715906';
-const REDIRECT_URI = 'https://screenscape.space/callback';
+const REDIRECT_URI = 'https://screenscape.space/';
 const SCOPES = [
   'streaming',
   'user-read-email',
