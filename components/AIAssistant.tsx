@@ -3,6 +3,9 @@ import { SparklesIcon } from './Icons';
 import * as assistantEngine from '../services/assistantEngine';
 import { GoogleGenAI, LiveServerMessage, Modality, Blob, FunctionDeclaration, Type } from '@google/genai';
 import { useVoicePreferences } from '../hooks/useVoicePreferences';
+// FIX: Import useGeolocation to get the user's selected country for API calls.
+import { useGeolocation } from '../hooks/useGeolocation';
+import { useSpotify } from '../contexts/SpotifyContext';
 
 // --- Types ---
 export type AIStatus = 'idle' | 'listening';
@@ -65,6 +68,8 @@ function createBlob(data: Float32Array): Blob {
 
 const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) => {
     const { voice, language } = useVoicePreferences();
+    const { country } = useGeolocation();
+    const { isAuthenticated: isSpotifyAuthenticated } = useSpotify();
     
     const [isVoiceModeActive, setIsVoiceModeActive] = useState(false);
     const currentTranscriptionRef = useRef({ user: '' });
@@ -149,9 +154,34 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
                     required: ['title', 'fact_type']
                 },
             };
+            
+            const playSoundtrackDeclaration: FunctionDeclaration = {
+                name: 'playSoundtrack',
+                description: 'Searches for and plays the soundtrack for a given movie or TV show on Spotify.',
+                parameters: {
+                    type: Type.OBJECT, properties: { title: { type: Type.STRING, description: 'The title of the movie or TV show for which to play the soundtrack.' } }, required: ['title'],
+                },
+            };
 
-            const tools = [{ functionDeclarations: [selectMediaItemDeclaration, getMediaOverviewDeclaration, controlTrailerAudioDeclaration, getMediaFactDeclaration] }];
-            const systemInstruction = `You are ScreenScape AI, a friendly and enthusiastic movie and TV show recommendation assistant. You can find movies, get plot summaries, open detail pages, and control trailer audio. You can also answer specific questions like 'Who directed Inception?' or 'When did Barbie come out?'. Please respond in ${language}. Keep your spoken responses concise.`;
+            const controlMusicDeclaration: FunctionDeclaration = {
+                name: 'controlMusic',
+                description: 'Controls Spotify music playback. Actions can be to play (resume) or pause the music.',
+                parameters: {
+                    type: Type.OBJECT, properties: { action: { type: Type.STRING, description: "The action to perform: 'play' or 'pause'." } }, required: ['action'],
+                },
+            };
+
+            const openMusicPageDeclaration: FunctionDeclaration = {
+                name: 'openMusicPage',
+                description: 'Navigates the user to the dedicated music search page within the app.',
+                parameters: { type: Type.OBJECT, properties: {} },
+            };
+
+            const baseTools = [selectMediaItemDeclaration, getMediaOverviewDeclaration, controlTrailerAudioDeclaration, getMediaFactDeclaration];
+            const spotifyTools = [playSoundtrackDeclaration, controlMusicDeclaration, openMusicPageDeclaration];
+            const tools = [{ functionDeclarations: isSpotifyAuthenticated ? [...baseTools, ...spotifyTools] : baseTools }];
+
+            const systemInstruction = `You are ScreenScape AI, a friendly and enthusiastic movie and TV show recommendation assistant. You can find movies, get plot summaries, open detail pages, and control trailer audio. You can also answer specific questions like 'Who directed Inception?' or 'When did Barbie come out?'. ${isSpotifyAuthenticated ? 'You can also play movie soundtracks and control music on Spotify.' : ''} Please respond in ${language}. Keep your spoken responses concise.`;
 
             const sessionPromise = ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
@@ -185,8 +215,15 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
                                 } else if (fc.name === 'controlTrailerAudio' && (fc.args.action === 'mute' || fc.args.action === 'unmute')) {
                                     result = assistantEngine.controlTrailerAudio(fc.args.action as 'mute' | 'unmute');
                                 } else if (fc.name === 'getMediaFact' && fc.args.title && fc.args.fact_type) {
-                                     result = await assistantEngine.getFactAboutMedia(fc.args.title as string, fc.args.fact_type as string, tmdbApiKey);
-                                } else {
+                                     result = await assistantEngine.getFactAboutMedia(fc.args.title as string, fc.args.fact_type as string, tmdbApiKey, country.code);
+                                } else if (fc.name === 'playSoundtrack' && fc.args.title) {
+                                    result = assistantEngine.playSoundtrack(fc.args.title as string);
+                                } else if (fc.name === 'controlMusic' && (fc.args.action === 'play' || fc.args.action === 'pause')) {
+                                    result = assistantEngine.controlMusic(fc.args.action as 'play' | 'pause');
+                                } else if (fc.name === 'openMusicPage') {
+                                    result = assistantEngine.openMusicPage();
+                                }
+                                else {
                                      result = { success: false, message: "An unknown function was called." };
                                 }
                                 
@@ -257,7 +294,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
             console.error("Failed to start voice mode:", error);
             stopVoiceMode();
         }
-    }, [tmdbApiKey, voice, language, setAiStatus, stopVoiceMode]);
+    }, [tmdbApiKey, voice, language, setAiStatus, stopVoiceMode, country.code, isSpotifyAuthenticated]);
 
     useEffect(() => {
         // Cleanup on component unmount

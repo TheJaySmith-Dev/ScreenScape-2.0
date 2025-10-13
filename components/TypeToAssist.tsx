@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as assistantEngine from '../services/assistantEngine';
+// FIX: Import useGeolocation to get the user's selected country for API calls.
+import { useGeolocation } from '../hooks/useGeolocation';
 import { KeyboardIcon, PaperAirplaneIcon, XIcon, SparklesIcon } from './Icons';
 
 interface TypeToAssistProps {
@@ -12,6 +14,8 @@ const TypeToAssist: React.FC<TypeToAssistProps> = ({ tmdbApiKey }) => {
     const [response, setResponse] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    // FIX: Get the country code from the useGeolocation hook.
+    const { country } = useGeolocation();
 
     const handleCommand = useCallback(async (command: string) => {
         if (!command.trim()) return;
@@ -19,7 +23,8 @@ const TypeToAssist: React.FC<TypeToAssistProps> = ({ tmdbApiKey }) => {
         setIsLoading(true);
         setResponse(null);
 
-        const result = await assistantEngine.processAssistantCommand(command, tmdbApiKey);
+        // FIX: Pass the country code as the region for the API call.
+        const result = await assistantEngine.processAssistantCommand(command, tmdbApiKey, country.code);
         
         setResponse(result.message);
         if (result.action === 'close') {
@@ -27,7 +32,7 @@ const TypeToAssist: React.FC<TypeToAssistProps> = ({ tmdbApiKey }) => {
             setTimeout(() => setIsOpen(false), 1500);
         }
         setIsLoading(false);
-    }, [tmdbApiKey]);
+    }, [tmdbApiKey, country.code]);
 
     const handleSubmit = (e?: React.FormEvent) => {
         e?.preventDefault();

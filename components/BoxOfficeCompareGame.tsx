@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { boxOfficeData, BoxOfficeMovie } from '../services/boxOfficeData';
 import { getMovieDetails } from '../services/tmdbService';
+import { useGeolocation } from '../hooks/useGeolocation';
 import Loader from './Loader';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
@@ -48,6 +49,7 @@ const BoxOfficeCompareGame: React.FC<BoxOfficeCompareGameProps> = ({ apiKey, onE
     const [highScore, setHighScore] = useState(0);
     const [showResult, setShowResult] = useState(false);
     const [isCorrect, setIsCorrect] = useState(false);
+    const { country } = useGeolocation();
 
     useEffect(() => {
         const storedHighScore = localStorage.getItem(HIGH_SCORE_KEY);
@@ -59,7 +61,7 @@ const BoxOfficeCompareGame: React.FC<BoxOfficeCompareGameProps> = ({ apiKey, onE
     const fetchMoviePosters = useCallback(async () => {
         setGameState('loading');
         try {
-            const posterPromises = boxOfficeData.map(movie => getMovieDetails(apiKey, movie.tmdbId));
+            const posterPromises = boxOfficeData.map(movie => getMovieDetails(apiKey, movie.tmdbId, country.code));
             const movieDetails = await Promise.all(posterPromises);
             
             const enrichedData = boxOfficeData.map((movie, index) => ({
@@ -80,7 +82,7 @@ const BoxOfficeCompareGame: React.FC<BoxOfficeCompareGameProps> = ({ apiKey, onE
             }
             setGameState('idle');
         }
-    }, [apiKey, onInvalidApiKey]);
+    }, [apiKey, onInvalidApiKey, country.code]);
 
     const handleGuess = (guess: 'higher' | 'lower') => {
         if (!currentMovie || !nextMovie) return;

@@ -26,7 +26,7 @@ const apiFetch = async <T>(apiKey: string, endpoint: string, params: Record<stri
     if (response.status === 401) {
         throw new Error("Invalid API Key");
     }
-    throw new Error(`TMDb API error: ${response.statusText}`);
+    throw new Error(`TMDb API error: ${response.status} ${response.statusText}`);
   }
   return response.json();
 };
@@ -39,40 +39,51 @@ export const searchMulti = (apiKey: string, query: string, page: number = 1): Pr
   return apiFetch(apiKey, '/search/multi', { query, page });
 };
 
-export const getPopularMovies = (apiKey: string, page: number = 1): Promise<PaginatedResponse<Movie>> => {
-  return apiFetch(apiKey, '/movie/popular', { page });
+export const getPopularMovies = async (apiKey: string, page: number = 1): Promise<PaginatedResponse<Movie>> => {
+  const response = await apiFetch<PaginatedResponse<Movie>>(apiKey, '/movie/popular', { page });
+  response.results = response.results.map(movie => ({ ...movie, media_type: 'movie' }));
+  return response;
 };
 
-export const getPopularTVShows = (apiKey: string, page: number = 1): Promise<PaginatedResponse<TVShow>> => {
-  return apiFetch(apiKey, '/tv/popular', { page });
+export const getPopularTVShows = async (apiKey: string, page: number = 1): Promise<PaginatedResponse<TVShow>> => {
+  const response = await apiFetch<PaginatedResponse<TVShow>>(apiKey, '/tv/popular', { page });
+  response.results = response.results.map(show => ({ ...show, media_type: 'tv' }));
+  return response;
 };
 
-export const getMovieDetails = (apiKey: string, movieId: number): Promise<MovieDetails> => {
-  return apiFetch(apiKey, `/movie/${movieId}`, { append_to_response: 'videos,credits,watch/providers' });
+export const getMovieDetails = (apiKey: string, movieId: number, region: string): Promise<MovieDetails> => {
+  return apiFetch(apiKey, `/movie/${movieId}`, { append_to_response: 'videos,credits,watch/providers', region });
 };
 
-export const getTVShowDetails = (apiKey: string, tvId: number): Promise<TVShowDetails> => {
-  return apiFetch(apiKey, `/tv/${tvId}`, { append_to_response: 'videos,credits,watch/providers' });
+export const getTVShowDetails = (apiKey: string, tvId: number, region: string): Promise<TVShowDetails> => {
+  return apiFetch(apiKey, `/tv/${tvId}`, { append_to_response: 'videos,credits,watch/providers', region });
 };
 
 export const getMovieReleaseDates = (apiKey: string, movieId: number): Promise<ReleaseDatesResponse> => {
     return apiFetch(apiKey, `/movie/${movieId}/release_dates`);
 };
 
-export const getMoviesByProviders = (apiKey: string, providerIds: number[], page: number = 1): Promise<PaginatedResponse<Movie>> => {
-    return apiFetch(apiKey, '/discover/movie', { 
+export const getMoviesByProviders = async (apiKey: string, providerIds: number[], region: string, page: number = 1): Promise<PaginatedResponse<Movie>> => {
+    const response = await apiFetch<PaginatedResponse<Movie>>(apiKey, '/discover/movie', { 
         with_watch_providers: providerIds.join('|'),
-        watch_region: 'US',
+        watch_region: region,
         page 
     });
+    response.results = response.results.map(movie => ({ ...movie, media_type: 'movie' }));
+    return response;
 };
 
-export const discoverMedia = (apiKey: string, type: 'movie' | 'tv', params: Record<string, string | number | boolean>): Promise<PaginatedResponse<MediaItem>> => {
-    return apiFetch(apiKey, `/discover/${type}`, params);
+export const discoverMedia = async (apiKey: string, type: 'movie' | 'tv', params: Record<string, string | number | boolean>): Promise<PaginatedResponse<MediaItem>> => {
+    const response = await apiFetch<PaginatedResponse<MediaItem>>(apiKey, `/discover/${type}`, params);
+    // FIX: The `media_type` property was being assigned a type of `'movie' | 'tv'`, which is too broad for the `MediaItem` union. Casting the created object to `MediaItem` resolves the type error.
+    response.results = response.results.map(item => ({ ...item, media_type: type } as MediaItem));
+    return response;
 };
 
-export const getMovieRecommendations = (apiKey: string, movieId: number): Promise<PaginatedResponse<Movie>> => {
-    return apiFetch(apiKey, `/movie/${movieId}/recommendations`);
+export const getMovieRecommendations = async (apiKey: string, movieId: number): Promise<PaginatedResponse<Movie>> => {
+    const response = await apiFetch<PaginatedResponse<Movie>>(apiKey, `/movie/${movieId}/recommendations`);
+    response.results = response.results.map(movie => ({ ...movie, media_type: 'movie' }));
+    return response;
 };
 
 export const getGenres = async (apiKey: string): Promise<{movie: Record<string, number>, tv: Record<string, number>}> => {

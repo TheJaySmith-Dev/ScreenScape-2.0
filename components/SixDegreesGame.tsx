@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-// Fix: Add missing imports for TMDb service functions and types
 // FIX: Use the specific `searchPerson` function instead of aliasing `searchMulti`.
 import { searchPerson, getPersonMovieCredits, getMovieCredits } from '../services/tmdbService';
 import { Person, PersonMovieCredit, CastMember } from '../types';

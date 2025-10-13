@@ -6,13 +6,14 @@ import HeroCarousel from './HeroCarousel';
 import MediaRow from './MediaRow';
 import { getPopularMovies, getPopularTVShows, getMoviesByProviders, searchMulti, normalizeMovie, normalizeTVShow } from '../services/tmdbService';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
+import { useGeolocation } from '../hooks/useGeolocation';
 import StreamingHubs from './StreamingHubs';
 import Loader from './Loader';
 import { StarIcon } from './Icons';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 
-interface NetflixViewProps {
+interface ExploreViewProps {
     apiKey: string;
     searchQuery: string;
     onInvalidApiKey: () => void;
@@ -51,11 +52,12 @@ const SearchResultCard: React.FC<{ item: MediaItem, onClick: (item: MediaItem) =
 };
 
 
-const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onSelectItem, onInvalidApiKey }) => {
+const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelectItem, onInvalidApiKey }) => {
     const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
     const [popularShows, setPopularShows] = useState<TVShow[]>([]);
     const [forYou, setForYou] = useState<Movie[]>([]);
     const { providerIds } = useStreamingPreferences();
+    const { country } = useGeolocation();
     const [activeProviderHub, setActiveProviderHub] = useState<number | null>(null);
     
     // State for search
@@ -64,14 +66,17 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onSelect
     const debounceTimer = useRef<number | null>(null);
 
     useEffect(() => {
+        let isMounted = true;
         const fetchHomeData = async () => {
             try {
                 const [moviesRes, showsRes] = await Promise.all([
                     getPopularMovies(apiKey),
                     getPopularTVShows(apiKey)
                 ]);
-                setPopularMovies(moviesRes.results);
-                setPopularShows(showsRes.results);
+                if (isMounted) {
+                    setPopularMovies(moviesRes.results);
+                    setPopularShows(showsRes.results);
+                }
             } catch (error) {
                 console.error(error);
                 if (error instanceof Error && error.message.includes("Invalid API Key")) {
@@ -80,27 +85,35 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onSelect
             }
         };
         fetchHomeData();
+        return () => { isMounted = false; };
     }, [apiKey, onInvalidApiKey]);
 
     useEffect(() => {
+        let isMounted = true;
         const fetchForYou = async () => {
             const providersToFetch = activeProviderHub ? [activeProviderHub] : Array.from(providerIds);
             if (providersToFetch.length > 0) {
                 try {
-                    const forYouRes = await getMoviesByProviders(apiKey, providersToFetch);
-                    setForYou(forYouRes.results);
+                    const forYouRes = await getMoviesByProviders(apiKey, providersToFetch, country.code);
+                    if (isMounted) {
+                        setForYou(forYouRes.results);
+                    }
                 } catch (error) {
                      console.error("Failed to fetch 'For You' recommendations:", error);
                 }
             } else {
-                setForYou([]);
+                if (isMounted) {
+                    setForYou([]);
+                }
             }
         };
         fetchForYou();
-    }, [apiKey, providerIds, activeProviderHub]);
+        return () => { isMounted = false; };
+    }, [apiKey, providerIds, activeProviderHub, country.code]);
     
      // Effect for handling search
     useEffect(() => {
+        let isMounted = true;
         if (debounceTimer.current) {
             clearTimeout(debounceTimer.current);
         }
@@ -121,19 +134,24 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onSelect
                         item.poster_path != null
                     )
                     .map(item => item.media_type === 'movie' ? normalizeMovie(item) : normalizeTVShow(item));
-
-                setSearchResults(validResults);
+                
+                if (isMounted) {
+                    setSearchResults(validResults);
+                }
             } catch (error) {
                 console.error("Search failed:", error);
                 if (error instanceof Error && error.message.includes("Invalid API Key")) {
                     onInvalidApiKey();
                 }
             } finally {
-                setIsSearching(false);
+                if (isMounted) {
+                    setIsSearching(false);
+                }
             }
         }, 300); // 300ms debounce
 
         return () => {
+            isMounted = false;
             if (debounceTimer.current) {
                 clearTimeout(debounceTimer.current);
             }
@@ -185,4 +203,4 @@ const NetflixView: React.FC<NetflixViewProps> = ({ apiKey, searchQuery, onSelect
     );
 };
 
-export default NetflixView;
+export default ExploreView;

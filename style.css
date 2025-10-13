@@ -1,0 +1,133 @@
+/* THEMES */
+.theme-cyber-blue {
+  --color-primary: #020b1e;
+  --color-accent-500: #00d9ff;
+  --color-accent-400: #57e7ff;
+  --color-glow: 0 0 8px #00d9ff, 0 0 16px #00d9ff, 0 0 24px #00d9ff;
+  --glass-bg: rgba(2, 43, 72, 0.3);
+  --color-glass-edge: rgba(0, 217, 255, 0.2);
+}
+
+.theme-synthwave-sunset {
+  --color-primary: #1a0a2e;
+  --color-accent-500: #ff4a8d;
+  --color-accent-400: #ff7ab5;
+  --color-glow: 0 0 8px #ff4a8d, 0 0 16px #ff4a8d, 0 0 24px #ff4a8d;
+  --glass-bg: rgba(74, 28, 99, 0.3);
+  --color-glass-edge: rgba(255, 74, 141, 0.2);
+}
+
+.theme-emerald-matrix {
+  --color-primary: #03120c;
+  --color-accent-500: #00ff87;
+  --color-accent-400: #66ffb8;
+  --color-glow: 0 0 8px #00ff87, 0 0 16px #00ff87, 0 0 24px #00ff87;
+  --glass-bg: rgba(0, 56, 31, 0.3);
+  --color-glass-edge: rgba(0, 255, 135, 0.2);
+}
+
+.theme-cosmic-ruby {
+  --color-primary: #1e020e;
+  --color-accent-500: #ff0055;
+  --color-accent-400: #ff4d8c;
+  --color-glow: 0 0 8px #ff0055, 0 0 16px #ff0055, 0 0 24px #ff0055;
+  --glass-bg: rgba(72, 2, 31, 0.3);
+  --color-glass-edge: rgba(255, 0, 85, 0.2);
+}
+
+/* BASE STYLES */
+body {
+    background-color: var(--color-primary);
+    font-family: 'Inter', sans-serif;
+    color: white;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* CUSTOM UTILITIES & COMPONENT STYLES */
+.bg-glass, .glass-panel {
+    background-color: var(--glass-bg);
+    border: 1px solid var(--color-glass-edge);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-button {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(5px);
+}
+.glass-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.glass-button-primary {
+  background-color: rgba(from var(--color-accent-500) r g b / 0.2);
+  border-color: rgba(from var(--color-accent-500) r g b / 0.4);
+}
+.glass-button-primary:hover {
+  background-color: rgba(from var(--color-accent-500) r g b / 0.3);
+  border-color: rgba(from var(--color-accent-500) r g b / 0.6);
+}
+.glass-button-secondary {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* SCROLLBAR */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-glass-edge) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--color-glass-edge);
+  border-radius: 20px;
+}
+.scrollbar-thumb-zinc-700::-webkit-scrollbar-thumb { background-color: #3f3f46; }
+
+.group-hover\/row:hover .scrollbar-thumb-accent\/50::-webkit-scrollbar-thumb,
+.group\/row:hover .scrollbar-thumb-accent\/50::-webkit-scrollbar-thumb,
+.group\/strip:hover .scrollbar-thumb-accent\/50::-webkit-scrollbar-thumb {
+    background-color: rgba(from var(--color-accent-500) r g b / 0.5);
+}
+
+/* PERSPECTIVE for 3D transforms */
+.perspective { perspective: 1000px; }
+.preserve-3d { transform-style: preserve-3d; }
+
+/* VOICE MODE GLOW */
+body.voice-mode-active::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1; /* Position it behind most content but over the body background */
+  pointer-events: none;
+  background: radial-gradient(circle at bottom right, rgba(from var(--color-accent-500) r g b / 0.3), transparent 40%);
+  animation: voice-glow-pulse 4s infinite ease-in-out;
+}
+@keyframes voice-glow-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+/* BRAND GLOWS */
+.brand-glow-netflix:hover { box-shadow: 0 0 12px #e50914; }
+.brand-glow-disneyplus:hover { box-shadow: 0 0 12px #0063e5; }
+.brand-glow-primevideo:hover { box-shadow: 0 0 12px #00a8e1; }
+.brand-glow-max:hover { box-shadow: 0 0 12px #a450ff; }
+.brand-glow-appletvplus:hover { box-shadow: 0 0 12px #ffffff; }
+.brand-glow-hulu:hover { box-shadow: 0 0 12px #1ce783; }
+
+/* SPOTIFY STYLES */
+.spotify-glow-pulse {
+  border: 1px solid rgba(29, 185, 84, 0.3);
+  animation: spotify-pulse-animation 2s infinite;
+}
+
+@keyframes spotify-pulse-animation {
+  0% { box-shadow: 0 0 0 0 rgba(29, 185, 84, 0.4); }
+  70% { box-shadow: 0 0 10px 10px rgba(29, 185, 84, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(29, 185, 84, 0); }
+}

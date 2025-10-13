@@ -175,3 +175,49 @@ export interface ReleaseDatesResponse {
     id: number;
     results: CountryReleaseDates[];
 }
+
+// --- Spotify Types ---
+export interface SpotifyImage {
+  url: string;
+  height: number | null;
+  width: number | null;
+}
+
+export interface SpotifyArtist {
+  name: string;
+  id: string;
+}
+
+export interface SpotifyAlbum {
+  id: string;
+  name: string;
+  artists: SpotifyArtist[];
+  images: SpotifyImage[];
+  uri: string;
+  tracks: {
+    items: SpotifyTrack[];
+    total: number;
+  };
+}
+
+export interface SpotifyTrack {
+  id: string;
+  name: string;
+  artists: SpotifyArtist[];
+  uri: string;
+  duration_ms: number;
+  album: SpotifyAlbum;
+}
+
+export interface SpotifyUser {
+  display_name: string;
+  id: string;
+  images: SpotifyImage[];
+}
+
+export interface SpotifyPlayerState {
+  track: SpotifyTrack | null;
+  album: SpotifyAlbum | null;
+  isPlaying: boolean;
+  position: number;
+}

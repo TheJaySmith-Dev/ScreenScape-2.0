@@ -3,6 +3,7 @@ import React from 'react';
 import { useTheme, ThemeKey } from '../hooks/useTheme';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import { useVoicePreferences, VoiceKey, LanguageKey } from '../hooks/useVoicePreferences';
+import { useGeolocation } from '../hooks/useGeolocation';
 import * as Icons from './Icons';
 
 const ThemeSelector: React.FC = () => {
@@ -93,6 +94,33 @@ const VoicePreferences: React.FC = () => {
     );
 };
 
+const RegionSettings: React.FC = () => {
+    const { country, setCountryPreference, availableCountries } = useGeolocation();
+
+    return (
+        <div>
+            <h3 className="text-lg font-bold mb-3 text-slate-200">Region</h3>
+            <p className="text-sm text-slate-400 mb-4">Streaming provider availability will be based on your selected region.</p>
+            <div className="relative">
+                 <select
+                    value={country.code}
+                    onChange={(e) => setCountryPreference(e.target.value)}
+                    className="w-full bg-white/5 hover:bg-white/10 p-4 rounded-lg appearance-none focus:ring-2 focus:ring-accent-500 focus:outline-none"
+                >
+                    {availableCountries.map(c => (
+                        <option key={c.code} value={c.code} className="bg-primary text-white">
+                            {c.name}
+                        </option>
+                    ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                     <Icons.ChevronDownIcon className="w-5 h-5" />
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     return (
@@ -112,6 +140,7 @@ const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 </div>
                 
                 <div className="space-y-8">
+                    <RegionSettings />
                     <StreamingPreferences />
                     <VoicePreferences />
                     <ThemeSelector />

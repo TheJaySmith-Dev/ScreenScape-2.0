@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MediaItem, Video, TVShow } from '../types';
 import { getTrending, getMovieDetails, getTVShowDetails } from '../services/tmdbService';
+// FIX: Import useGeolocation to get the user's selected country for API calls.
+import { useGeolocation } from '../hooks/useGeolocation';
 import VideoPlayer from './VideoPlayer';
 import { PlayIcon, VolumeOffIcon, VolumeUpIcon } from './Icons';
 
@@ -18,9 +20,13 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isMuted, setIsMuted] = useState(true);
     const [isHovered, setIsHovered] = useState(false);
+    const [isTrailerLoading, setIsTrailerLoading] = useState(true);
     const intervalRef = useRef<number | null>(null);
+    // FIX: Get the country code from the useGeolocation hook.
+    const { country } = useGeolocation();
 
     useEffect(() => {
+        let isMounted = true;
         const fetchTrending = async () => {
             try {
                 const trending = await getTrending(apiKey, 'week');
@@ -28,39 +34,60 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                     .filter(item => item.backdrop_path && (item.media_type === 'movie' || item.media_type === 'tv'))
                     .sort((a, b) => b.popularity - a.popularity)
                     .slice(0, 7);
-                setItems(filteredItems);
+                if (isMounted) {
+                    setItems(filteredItems);
+                }
             } catch (error) {
                 console.error(error);
-                onInvalidApiKey();
+                if (error instanceof Error && error.message.includes("Invalid API Key")) {
+                    onInvalidApiKey();
+                }
             }
         };
         fetchTrending();
+        return () => { isMounted = false; };
     }, [apiKey, onInvalidApiKey]);
 
     useEffect(() => {
-        if (items.length > 0) {
-            const currentItem = items[currentIndex];
-            if (!trailers[currentItem.id]) {
-                const fetchTrailer = async () => {
-                    try {
-                        const details = currentItem.media_type === 'movie'
-                            ? await getMovieDetails(apiKey, currentItem.id)
-                            : await getTVShowDetails(apiKey, currentItem.id);
-                        
-                        const officialTrailer = details.videos?.results.find((v: Video) => v.type === 'Trailer' && v.official && v.site === 'YouTube');
-                        const anyTrailer = details.videos?.results.find((v: Video) => v.type === 'Trailer' && v.site === 'YouTube');
-                        const trailerKey = officialTrailer?.key || anyTrailer?.key || null;
+        if (items.length === 0) return;
 
+        let isMounted = true;
+        const currentItem = items[currentIndex];
+        // If we haven't checked for this trailer yet
+        if (trailers[currentItem.id] === undefined) {
+            setIsTrailerLoading(true);
+            const fetchTrailer = async () => {
+                try {
+                    // FIX: Pass the country code as the required third argument.
+                    const details = currentItem.media_type === 'movie'
+                        ? await getMovieDetails(apiKey, currentItem.id, country.code)
+                        : await getTVShowDetails(apiKey, currentItem.id, country.code);
+                    
+                    const officialTrailer = details.videos?.results.find((v: Video) => v.type === 'Trailer' && v.official && v.site === 'YouTube');
+                    const anyTrailer = details.videos?.results.find((v: Video) => v.type === 'Trailer' && v.site === 'YouTube');
+                    const trailerKey = officialTrailer?.key || anyTrailer?.key || null;
+
+                    if (isMounted) {
                         setTrailers(prev => ({ ...prev, [currentItem.id]: trailerKey }));
-                    } catch (error) {
-                        console.error("Failed to fetch trailer:", error);
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch trailer:", error);
+                    if (isMounted) {
                         setTrailers(prev => ({ ...prev, [currentItem.id]: null })); // Mark as failed
                     }
-                };
-                fetchTrailer();
-            }
+                } finally {
+                    if (isMounted) {
+                        setIsTrailerLoading(false);
+                    }
+                }
+            };
+            fetchTrailer();
+        } else {
+            // Trailer status is already known, just update loading state
+            setIsTrailerLoading(false);
         }
-    }, [currentIndex, items, apiKey, trailers]);
+        return () => { isMounted = false; };
+    }, [currentIndex, items, apiKey, trailers, country.code]);
 
     const goToNext = useCallback(() => {
         setCurrentIndex(prevIndex => (prevIndex + 1) % (items.length || 1));
@@ -77,6 +104,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
 
     const activeItem = items[currentIndex];
     const activeTrailerKey = activeItem ? trailers[activeItem.id] : null;
+    const showVideo = !!activeTrailerKey && !isTrailerLoading;
 
     return (
         <div 
@@ -89,11 +117,12 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                     key={item.id}
                     className={`absolute inset-0 transition-opacity duration-1000 ${index === currentIndex ? 'opacity-100' : 'opacity-0'}`}
                 >
-                    {activeTrailerKey && index === currentIndex ? (
+                    {showVideo && index === currentIndex ? (
                          <div className="absolute inset-0 scale-125">
-                            <VideoPlayer videoKey={activeTrailerKey} isMuted={isMuted} onEnd={goToNext} />
+                            <VideoPlayer videoKey={activeTrailerKey!} isMuted={isMuted} onEnd={goToNext} />
                         </div>
                     ) : (
+                        item.backdrop_path &&
                         <img
                             src={`${IMAGE_BASE_URL}${item.backdrop_path}`}
                             alt={item.media_type === 'movie' ? item.title : (item as TVShow).name}
@@ -119,12 +148,14 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                                 <PlayIcon className="w-6 h-6" />
                                 More Info
                             </button>
-                            <button 
-                                onClick={() => setIsMuted(!isMuted)}
-                                className="glass-button rounded-full w-12 h-12 flex items-center justify-center"
-                            >
-                                {isMuted ? <VolumeOffIcon className="w-6 h-6" /> : <VolumeUpIcon className="w-6 h-6" />}
-                            </button>
+                            {showVideo && (
+                                <button 
+                                    onClick={() => setIsMuted(!isMuted)}
+                                    className="glass-button rounded-full w-12 h-12 flex items-center justify-center"
+                                >
+                                    {isMuted ? <VolumeOffIcon className="w-6 h-6" /> : <VolumeUpIcon className="w-6 h-6" />}
+                                </button>
+                            )}
                         </div>
                     </div>
                 )}
@@ -134,9 +165,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2">
                 {items.map((_, index) => (
                     <button key={index} onClick={() => setCurrentIndex(index)} className="w-12 h-1 bg-white/20 rounded-full overflow-hidden">
-                        <div className={`h-full bg-white ${index === currentIndex ? 'animate-progress' : ''} ${index > currentIndex ? 'w-0' : 'w-full'}`}
-                            style={{ animation: index === currentIndex ? 'progress 7s linear forwards' : 'none' }}
-                        />
+                        <div className={`h-full bg-white ${index === currentIndex ? 'animate-progress' : ''} ${index > currentIndex ? 'w-0' : 'w-full'}`} />
                     </button>
                 ))}
             </div>

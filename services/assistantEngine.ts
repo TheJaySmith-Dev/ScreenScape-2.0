@@ -5,7 +5,8 @@ type CommandResult = { success: boolean; message: string; action?: 'close' };
 
 // --- Helper Functions ---
 
-async function searchAndGetDetails(title: string, tmdbApiKey: string): Promise<{ details: MovieDetails | TVShowDetails, media_type: 'movie' | 'tv' } | null> {
+// FIX: Add region parameter to pass to getMovieDetails and getTVShowDetails.
+async function searchAndGetDetails(title: string, tmdbApiKey: string, region: string): Promise<{ details: MovieDetails | TVShowDetails, media_type: 'movie' | 'tv' } | null> {
     try {
         const searchRes = await tmdbService.searchMulti(tmdbApiKey, title);
         const item = searchRes.results.find((i): i is MediaItem => 
@@ -15,8 +16,10 @@ async function searchAndGetDetails(title: string, tmdbApiKey: string): Promise<{
         if (!item) return null;
 
         const details = item.media_type === 'movie'
-            ? await tmdbService.getMovieDetails(tmdbApiKey, item.id)
-            : await tmdbService.getTVShowDetails(tmdbApiKey, item.id);
+            // FIX: Pass the region parameter to getMovieDetails.
+            ? await tmdbService.getMovieDetails(tmdbApiKey, item.id, region)
+            // FIX: Pass the region parameter to getTVShowDetails.
+            : await tmdbService.getTVShowDetails(tmdbApiKey, item.id, region);
         
         return { details, media_type: item.media_type };
     } catch (error) {
@@ -37,8 +40,9 @@ function formatRevenue(revenue: number): string {
 
 // --- Fact-finding Logic ---
 
-export async function getFactAboutMedia(title: string, factType: string, tmdbApiKey: string): Promise<CommandResult> {
-    const result = await searchAndGetDetails(title, tmdbApiKey);
+// FIX: Add region parameter to pass down to searchAndGetDetails.
+export async function getFactAboutMedia(title: string, factType: string, tmdbApiKey: string, region: string): Promise<CommandResult> {
+    const result = await searchAndGetDetails(title, tmdbApiKey, region);
     if (!result) {
         return { success: false, message: `Sorry, I couldn't find anything called "${title}".` };
     }
@@ -105,7 +109,8 @@ export async function getFactAboutMedia(title: string, factType: string, tmdbApi
 
 // --- Command Processors ---
 
-export async function processAssistantCommand(command: string, tmdbApiKey: string): Promise<CommandResult> {
+// FIX: Add region parameter to pass down to getFactAboutMedia.
+export async function processAssistantCommand(command: string, tmdbApiKey: string, region: string): Promise<CommandResult> {
     const lowerCaseCommand = command.toLowerCase().trim();
 
     const patterns: { regex: RegExp, factType: string }[] = [
@@ -120,13 +125,14 @@ export async function processAssistantCommand(command: string, tmdbApiKey: strin
         const match = lowerCaseCommand.match(pattern.regex);
         if (match?.[1]) {
             const title = match[1].trim().replace(/[?.!]$/, '').trim();
-            return getFactAboutMedia(title, pattern.factType, tmdbApiKey);
+            return getFactAboutMedia(title, pattern.factType, tmdbApiKey, region);
         }
     }
 
     const takeToMatch = lowerCaseCommand.match(/^(?:take me to|show me|open|go to)\s+(.+)/);
     if (takeToMatch?.[1]) {
         const title = takeToMatch[1].trim().replace(/[?.!]$/, '').trim();
+        if (title.toLowerCase().includes('music page')) return openMusicPage();
         return findAndSelectMediaItem(title, tmdbApiKey);
     }
 
@@ -135,6 +141,15 @@ export async function processAssistantCommand(command: string, tmdbApiKey: strin
         const title = aboutMatch[1].trim().replace(/[?.!]$/, '').trim();
         return findAndGetOverview(title, tmdbApiKey);
     }
+    
+    const playSoundtrackMatch = lowerCaseCommand.match(/^(?:play the soundtrack for|play music from|play)\s+(.+)/);
+    if (playSoundtrackMatch?.[1]) {
+        const title = playSoundtrackMatch[1].trim().replace(/[?.!]$/, '').trim();
+        return playSoundtrack(title);
+    }
+    if (['pause music', 'stop music', 'pause the music', 'stop the music'].some(c => lowerCaseCommand.includes(c))) return controlMusic('pause');
+    if (['resume music', 'play music', 'resume the music', 'play the music'].some(c => lowerCaseCommand.includes(c))) return controlMusic('play');
+
 
     if (lowerCaseCommand.includes('mute')) return controlTrailerAudio('mute');
     if (lowerCaseCommand.includes('unmute')) return controlTrailerAudio('unmute');
@@ -179,4 +194,19 @@ export async function findAndGetOverview(title: string, tmdbApiKey: string): Pro
 export function controlTrailerAudio(action: 'mute' | 'unmute'): CommandResult {
     window.dispatchEvent(new CustomEvent('controlTrailerAudio', { detail: { action } }));
     return { success: true, message: `OK, the trailer has been ${action === 'mute' ? 'muted' : 'unmuted'}.` };
+}
+
+// --- Spotify Voice Commands ---
+export function playSoundtrack(mediaTitle: string): CommandResult {
+    window.dispatchEvent(new CustomEvent('spotify:playByTitle', { detail: { mediaTitle } }));
+    return { success: true, message: `Okay, playing the soundtrack for ${mediaTitle}.` };
+}
+export function controlMusic(action: 'play' | 'pause'): CommandResult {
+    window.dispatchEvent(new CustomEvent('spotify:togglePlay', { detail: { forceState: action }}));
+    return { success: true, message: `Music ${action === 'play' ? 'resumed' : 'paused'}.` };
+}
+
+export function openMusicPage(): CommandResult {
+    window.dispatchEvent(new CustomEvent('setView', { detail: { view: 'music' } }));
+    return { success: true, message: 'Opening the music page.' };
 }
