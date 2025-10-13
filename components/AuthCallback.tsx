@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Loader from './Loader';
 
 const CLIENT_ID = 'fb4eb7f03647432fa68fe30883715906';
-const REDIRECT_URI = 'https://screenscape.space/';
+const REDIRECT_URI = 'https://screenscape.space/callback';
 const CODE_VERIFIER_KEY = 'spotify_code_verifier';
 const AUTH_TOKEN_KEY = 'spotify_auth_token';
 const AUTH_EXPIRES_AT_KEY = 'spotify_auth_expires_at';
