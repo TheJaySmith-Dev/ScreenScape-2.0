@@ -2,6 +2,36 @@ import { useState, useEffect, useCallback } from 'react';
 import { SpotifyUser } from '../types';
 import { getMyProfile } from '../services/spotifyService';
 
+// --- PKCE Helpers ---
+const generateRandomString = (length: number) => {
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let text = '';
+  for (let i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+};
+
+const sha256 = async (plain: string) => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  return window.crypto.subtle.digest('SHA-256', data);
+};
+
+const base64urlencode = (a: ArrayBuffer) => {
+  // @ts-ignore
+  return btoa(String.fromCharCode.apply(null, new Uint8Array(a)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+};
+
+const generateCodeChallenge = async (verifier: string) => {
+  const hashed = await sha256(verifier);
+  return base64urlencode(hashed);
+};
+
+
 const CLIENT_ID = 'fb4eb7f03647432fa68fe30883715906';
 const REDIRECT_URI = 'https://screenscape.space/callback';
 const SCOPES = [
@@ -15,6 +45,7 @@ const SCOPES = [
 
 const AUTH_TOKEN_KEY = 'spotify_auth_token';
 const AUTH_EXPIRES_AT_KEY = 'spotify_auth_expires_at';
+const CODE_VERIFIER_KEY = 'spotify_code_verifier';
 
 export const useSpotifyAuth = () => {
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -49,12 +80,20 @@ export const useSpotifyAuth = () => {
     fetchUser();
   }, [accessToken, user]);
 
-  const login = useCallback(() => {
+  const login = useCallback(async () => {
+    const codeVerifier = generateRandomString(128);
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+    localStorage.setItem(CODE_VERIFIER_KEY, codeVerifier);
+    
     const authUrl = new URL('https://accounts.spotify.com/authorize');
-    authUrl.searchParams.append('response_type', 'token');
+    authUrl.searchParams.append('response_type', 'code');
     authUrl.searchParams.append('client_id', CLIENT_ID);
     authUrl.searchParams.append('scope', SCOPES);
     authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
+    authUrl.searchParams.append('code_challenge_method', 'S256');
+    authUrl.searchParams.append('code_challenge', codeChallenge);
+
     window.location.href = authUrl.toString();
   }, []);
 
