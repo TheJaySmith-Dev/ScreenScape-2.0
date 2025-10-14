@@ -10,6 +10,7 @@ import {
   PersonCreditsResponse,
   ImagesResponse,
   ReleaseDatesResponse,
+  Collection,
 } from '../types';
 
 const API_BASE_URL = 'https://api.themoviedb.org/3';
@@ -86,6 +87,10 @@ export const getMovieRecommendations = async (apiKey: string, movieId: number): 
     return response;
 };
 
+export const getCollectionDetails = (apiKey: string, collectionId: number): Promise<Collection> => {
+    return apiFetch(apiKey, `/collection/${collectionId}`);
+};
+
 export const getGenres = async (apiKey: string): Promise<{movie: Record<string, number>, tv: Record<string, number>}> => {
     const [movieRes, tvRes] = await Promise.all([
         apiFetch<{genres: {id: number, name: string}[]}>(apiKey, '/genre/movie/list'),
@@ -112,8 +117,11 @@ export const normalizeTVShow = (tvShow: TVShow): TVShow => ({
   media_type: 'tv',
 });
 
-export const searchPerson = (apiKey: string, query: string, page: number = 1): Promise<PaginatedResponse<Person>> => {
-  return apiFetch(apiKey, '/search/person', { query, page });
+// FIX: Update searchPerson to add media_type for consistency with the updated Person type.
+export const searchPerson = async (apiKey: string, query: string, page: number = 1): Promise<PaginatedResponse<Person>> => {
+  const response = await apiFetch<PaginatedResponse<any>>(apiKey, '/search/person', { query, page });
+  response.results = response.results.map((p: any) => ({ ...p, media_type: 'person' }));
+  return response;
 };
 
 export const getPersonMovieCredits = (apiKey: string, personId: number): Promise<PersonCreditsResponse> => {

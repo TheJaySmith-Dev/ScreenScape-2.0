@@ -21,9 +21,22 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
     const [isMuted, setIsMuted] = useState(true);
     const [isHovered, setIsHovered] = useState(false);
     const [isTrailerLoading, setIsTrailerLoading] = useState(true);
+    const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
     const intervalRef = useRef<number | null>(null);
     // FIX: Get the country code from the useGeolocation hook.
     const { country } = useGeolocation();
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        setPrefersReducedMotion(mediaQuery.matches);
+
+        const handleChange = (event: MediaQueryListEvent) => {
+            setPrefersReducedMotion(event.matches);
+        };
+
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+    }, []);
 
     useEffect(() => {
         let isMounted = true;
@@ -119,7 +132,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                 >
                     {showVideo && index === currentIndex ? (
                          <div className="absolute inset-0 scale-125">
-                            <VideoPlayer videoKey={activeTrailerKey!} isMuted={isMuted} onEnd={goToNext} />
+                            <VideoPlayer videoKey={activeTrailerKey!} isMuted={isMuted} onEnd={goToNext} loop={!prefersReducedMotion} />
                         </div>
                     ) : (
                         item.backdrop_path &&

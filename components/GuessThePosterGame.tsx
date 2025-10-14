@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 // FIX: Add missing import for getMovieImages
 import { getPopularMovies, getMovieImages } from '../services/tmdbService';

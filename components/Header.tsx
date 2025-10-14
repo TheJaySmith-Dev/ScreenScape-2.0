@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { GearIcon, MenuIcon, XIcon } from './Icons';
 import { ViewType } from '../App';
-import SpotifyConnect from './SpotifyConnect';
-import { useSpotify } from '../contexts/SpotifyContext';
 
 interface HeaderProps {
     view: ViewType;
@@ -12,7 +10,6 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const { isAuthenticated } = useSpotify();
 
     const NavButton: React.FC<{ viewName: ViewType, children: React.ReactNode, isMobile?: boolean }> = ({ viewName, children, isMobile = false }) => (
         <button 
@@ -25,7 +22,7 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
             {children}
         </button>
     );
-
+    
     return (
         <>
             <header className="fixed top-0 left-0 right-0 bg-primary/80 backdrop-blur-xl z-40 h-20 flex items-center border-b border-glass-edge">
@@ -36,7 +33,6 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                         <nav className="hidden md:flex items-center gap-6">
                             <NavButton viewName="screenSearch">Home</NavButton>
                             <NavButton viewName="explore">Explore</NavButton>
-                            {isAuthenticated && <NavButton viewName="music">Music</NavButton>}
                             <NavButton viewName="watchlist">Watchlist</NavButton>
                             <NavButton viewName="game">Games</NavButton>
                         </nav>
@@ -44,14 +40,13 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
 
                     {/* Right-side controls */}
                     <div className="flex items-center gap-2 sm:gap-4">
-                        <SpotifyConnect />
-                        {/* Settings Icon */}
+                        {/* Settings Icon (Desktop) */}
                         <button onClick={onSettingsClick} className="text-slate-300 hover:text-white transition-colors p-2 rounded-full glass-button hidden md:block">
                             <GearIcon className="w-6 h-6" />
                         </button>
                         
                         {/* Mobile Menu Icon */}
-                        <div className="md:hidden">
+                        <div className="md:hidden flex items-center">
                             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-slate-300 hover:text-white p-2">
                                 {isMenuOpen ? <XIcon className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
                             </button>
@@ -66,7 +61,6 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                     <nav className="flex flex-col gap-2 mb-4">
                         <NavButton viewName="screenSearch" isMobile>Home</NavButton>
                         <NavButton viewName="explore" isMobile>Explore</NavButton>
-                        {isAuthenticated && <NavButton viewName="music" isMobile>Music</NavButton>}
                         <NavButton viewName="watchlist" isMobile>Watchlist</NavButton>
                         <NavButton viewName="game" isMobile>Games</NavButton>
                     </nav>

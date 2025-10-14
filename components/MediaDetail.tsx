@@ -1,240 +1,327 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { MediaItem, MovieDetails, TVShowDetails, Video, CastMember, WatchProvider, Movie } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { MediaItem, MovieDetails, TVShowDetails, Movie, WatchProviderCountry } from '../types';
 import { getMovieDetails, getTVShowDetails, getMovieRecommendations } from '../services/tmdbService';
-import { XIcon, StarIcon, ClockIcon, VolumeOffIcon, VolumeUpIcon } from './Icons';
+import { generateStoryScapeSummary } from './storyscape.js';
 import { useGeolocation } from '../hooks/useGeolocation';
-import MediaRow from './MediaRow';
-import Loader from './Loader';
+import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import VideoPlayer from './VideoPlayer';
-import { useSpotify } from '../contexts/SpotifyContext';
-import SpotifySoundtrack from './SpotifySoundtrack';
+import Loader from './Loader';
+import * as Icons from './Icons';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 
+// --- Prop Types ---
 interface MediaDetailProps {
     item: MediaItem;
     apiKey: string;
     onClose: () => void;
     onSelectItem: (item: MediaItem) => void;
+    onInvalidApiKey: () => void;
 }
 
-const ProviderList: React.FC<{title: string, providers?: WatchProvider[]}> = ({title, providers}) => {
-    if (!providers || providers.length === 0) return null;
+const WhereToWatch: React.FC<{ providers: WatchProviderCountry | undefined }> = ({ providers }) => {
+    const { providerIds } = useStreamingPreferences();
+    if (!providers) return null;
+
+    const { flatrate, rent, buy, link } = providers;
+
+    const sortAndFilter = (providerList: any[] | undefined) => {
+        if (!providerList) return [];
+        return providerList.sort((a, b) => {
+            const aIsPreferred = providerIds.has(a.provider_id);
+            const bIsPreferred = providerIds.has(b.provider_id);
+            if (aIsPreferred && !bIsPreferred) return -1;
+            if (!aIsPreferred && bIsPreferred) return 1;
+            return a.display_priority - b.display_priority;
+        });
+    };
+
+    const stream = sortAndFilter(flatrate);
+    const rental = sortAndFilter(rent);
+    const purchase = sortAndFilter(buy);
+
+    if (!stream.length && !rental.length && !purchase.length) {
+        return null;
+    }
+
     return (
-        <div>
-            <h4 className="text-slate-400 font-semibold text-sm">{title}</h4>
-            <div className="flex flex-wrap gap-2 mt-1">
-                {providers.map(p => (
-                    <img key={p.provider_id} src={`${IMAGE_BASE_URL}w92${p.logo_path}`} alt={p.provider_name} className="w-10 h-10 rounded-md" title={p.provider_name}/>
-                ))}
+        <section className="my-12">
+            <h2 className="text-2xl font-bold mb-4">Where to Watch</h2>
+            <div className="glass-panel p-6 rounded-xl">
+                {stream.length > 0 && (
+                    <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-slate-400 mb-2">STREAM</h3>
+                        <div className="flex flex-wrap gap-3">
+                            {stream.map(p => (
+                                <a key={p.provider_id} href={link} target="_blank" rel="noopener noreferrer" className="transform hover:-translate-y-1 transition-transform">
+                                    <img src={`${IMAGE_BASE_URL}w92${p.logo_path}`} alt={p.provider_name} className="w-12 h-12 rounded-lg" />
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                 {rental.length > 0 && (
+                    <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-slate-400 mb-2">RENT</h3>
+                        <div className="flex flex-wrap gap-3">
+                            {rental.map(p => (
+                                <a key={p.provider_id} href={link} target="_blank" rel="noopener noreferrer" className="transform hover:-translate-y-1 transition-transform">
+                                    <img src={`${IMAGE_BASE_URL}w92${p.logo_path}`} alt={p.provider_name} className="w-12 h-12 rounded-lg" />
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                 {purchase.length > 0 && (
+                    <div>
+                        <h3 className="text-sm font-semibold text-slate-400 mb-2">BUY</h3>
+                        <div className="flex flex-wrap gap-3">
+                            {purchase.map(p => (
+                                <a key={p.provider_id} href={link} target="_blank" rel="noopener noreferrer" className="transform hover:-translate-y-1 transition-transform">
+                                    <img src={`${IMAGE_BASE_URL}w92${p.logo_path}`} alt={p.provider_name} className="w-12 h-12 rounded-lg" />
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
-        </div>
+        </section>
     );
 };
 
 
-const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSelectItem }) => {
+// --- Main Component ---
+const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSelectItem, onInvalidApiKey }) => {
     const [details, setDetails] = useState<MovieDetails | TVShowDetails | null>(null);
-    const [trailerKey, setTrailerKey] = useState<string | null>(null);
-    const [isMuted, setIsMuted] = useState(() => sessionStorage.getItem('trailerMuted') !== 'false');
-    const [recommendations, setRecommendations] = useState<Movie[]>([]);
+    const [storyScape, setStoryScape] = useState<{ summary: string, tone: string, style: string } | null>(null);
+    const [recommendations, setRecommendations] = useState<MediaItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const { country } = useGeolocation();
-    const { isAuthenticated } = useSpotify();
-
-    const handleKeyUp = useCallback((e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-            onClose();
-        }
-    }, [onClose]);
-
-    const handleVideoEnd = useCallback(() => {
-        // This can be used to replay the video or perform another action when the trailer finishes.
-        // The key is that this function is stable and doesn't cause the VideoPlayer to re-render.
-    }, []);
+    const [error, setError] = useState<string | null>(null);
+    const [isMuted, setIsMuted] = useState(true);
+    const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
     
-    const toggleMute = useCallback(() => {
-        setIsMuted(prevMuted => {
-            const newMutedState = !prevMuted;
-            sessionStorage.setItem('trailerMuted', String(newMutedState));
-            return newMutedState;
-        });
-    }, []);
+    const [isStoryScapeLoading, setIsStoryScapeLoading] = useState(false);
+    const [storyScapeError, setStoryScapeError] = useState<string | null>(null);
+
+    const { country } = useGeolocation();
 
     useEffect(() => {
-        window.addEventListener('keyup', handleKeyUp);
-        document.body.style.overflow = 'hidden';
-        return () => {
-            window.removeEventListener('keyup', handleKeyUp);
-            document.body.style.overflow = 'auto';
-        };
-    }, [handleKeyUp]);
+        const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        setPrefersReducedMotion(mediaQuery.matches);
+        const handleChange = (event: MediaQueryListEvent) => setPrefersReducedMotion(event.matches);
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+    }, []);
 
     useEffect(() => {
         let isMounted = true;
         const fetchDetails = async () => {
+            if (!isMounted) return;
             setIsLoading(true);
-            setTrailerKey(null); // Reset trailer key on item change
+            setError(null);
+            setStoryScape(null);
+            setRecommendations([]);
             try {
                 const fetchedDetails = item.media_type === 'movie'
                     ? await getMovieDetails(apiKey, item.id, country.code)
                     : await getTVShowDetails(apiKey, item.id, country.code);
                 
-                const officialTrailer = fetchedDetails.videos?.results.find((v: Video) => v.type === 'Trailer' && v.official && v.site === 'YouTube');
-                const anyTrailer = fetchedDetails.videos?.results.find((v: Video) => v.type === 'Trailer' && v.site === 'YouTube');
-                const newTrailerKey = officialTrailer?.key || anyTrailer?.key || null;
+                if (!isMounted) return;
+                setDetails(fetchedDetails);
 
-                let recs: Movie[] = [];
                 if (item.media_type === 'movie') {
-                    const recsResponse = await getMovieRecommendations(apiKey, item.id);
-                    recs = recsResponse.results;
-                }
-                
-                if (isMounted) {
-                    setDetails(fetchedDetails);
-                    setTrailerKey(newTrailerKey);
-                    setRecommendations(recs);
+                    const recs = await getMovieRecommendations(apiKey, item.id);
+                    if (isMounted) setRecommendations(recs.results.map(r => ({...r, media_type: 'movie'})));
                 }
 
-            } catch (error) {
-                console.error("Failed to fetch media details:", error);
-            } finally {
-                if (isMounted) {
-                    setIsLoading(false);
+            } catch (err) {
+                if (err instanceof Error) {
+                    console.error("Failed to fetch media details:", err);
+                    if (isMounted) {
+                        if (err.message.includes("Invalid API Key")) {
+                            onInvalidApiKey();
+                        } else {
+                            setError("Could not load details for this item.");
+                        }
+                    }
                 }
+            } finally {
+                if (isMounted) setIsLoading(false);
             }
         };
 
         fetchDetails();
-        document.querySelector('.media-detail-scroller')?.scrollTo(0,0);
-        
-        return () => {
-            isMounted = false;
-        };
-    }, [item, apiKey, country.code]);
+        return () => { isMounted = false; };
+    }, [item.id, item.media_type, apiKey, onInvalidApiKey, country.code]);
     
-    const title = details ? ('title' in details ? details.title : details.name) : ('title' in item ? item.title : item.name);
-    const releaseYear = details ? new Date('release_date' in details && details.release_date ? details.release_date : ('first_air_date' in details ? details.first_air_date : '')).getFullYear() : '';
+    const handleGenerateStoryScape = async () => {
+        if (!details) return;
+        setIsStoryScapeLoading(true);
+        setStoryScapeError(null);
+        setStoryScape(null);
+        try {
+            const summary = await generateStoryScapeSummary(
+                'title' in details ? details.title : details.name,
+                details.overview
+            );
+            if(summary) {
+                setStoryScape(summary);
+            } else {
+                setStoryScapeError("StoryScape is still processing this title. Try again in a moment.");
+            }
+        } catch (err) {
+            setStoryScapeError("StoryScape is still processing this title. Try again in a moment.");
+        } finally {
+            setIsStoryScapeLoading(false);
+        }
+    };
     
-    const regionalProviders = details && 'watch/providers' in details ? details['watch/providers']?.results?.[country.code] : null;
+    const mainTrailerKey = useMemo(() => {
+        if (!details?.videos?.results) return null;
+        const officialTrailer = details.videos.results.find(v => v.type === 'Trailer' && v.official && v.site === 'YouTube');
+        return officialTrailer?.key || details.videos.results.find(v => v.site === 'YouTube' && v.type === 'Trailer')?.key || null;
+    }, [details]);
+
+
+    if (isLoading) {
+        return (
+            <div className="fixed inset-0 bg-primary z-50 flex items-center justify-center">
+                <Loader />
+            </div>
+        );
+    }
+
+    if (error || !details) {
+        return (
+            <div className="fixed inset-0 bg-primary z-50 flex flex-col items-center justify-center p-4">
+                <p className="text-xl text-red-400 mb-4">{error || "Something went wrong."}</p>
+                <button onClick={onClose} className="glass-button px-4 py-2 rounded-lg">Go Back</button>
+            </div>
+        );
+    }
+    
+    const title = 'title' in details ? details.title : details.name;
+    const releaseDate = 'release_date' in details ? details.release_date : details.first_air_date;
+    const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
+    const runtimeInfo = 'runtime' in details && details.runtime ? `${details.runtime}m` : ('number_of_seasons' in details ? `${details.number_of_seasons} Season${details.number_of_seasons > 1 ? 's' : ''}` : '');
 
     return (
-        <div className="fixed inset-0 bg-primary/80 backdrop-blur-2xl z-50 overflow-y-auto animate-fade-in media-detail-scroller">
-            <button onClick={onClose} className="fixed top-6 right-6 z-[60] text-white/70 hover:text-white transition-colors bg-black/30 rounded-full p-2">
-                <XIcon className="w-6 h-6" />
+        <div className="fixed inset-0 bg-primary z-50 overflow-y-auto animate-fade-in scrollbar-thin scrollbar-thumb-zinc-700">
+            <button onClick={onClose} className="fixed top-6 right-6 z-50 p-2 bg-black/50 rounded-full text-white hover:bg-white/20 transition-colors">
+                <Icons.XIcon className="w-6 h-6" />
             </button>
+            
+            <div className="trailer-container">
+                {mainTrailerKey ? (
+                    <VideoPlayer videoKey={mainTrailerKey} isMuted={isMuted} onEnd={() => {}} loop={!prefersReducedMotion} />
+                ) : (
+                    details.backdrop_path && (
+                        <img src={`${IMAGE_BASE_URL}original${details.backdrop_path}`} alt={`${title} backdrop`} className="w-full h-full object-cover"/>
+                    )
+                )}
+            </div>
 
-            {isLoading ? (
-                <div className="flex justify-center items-center h-screen"><Loader /></div>
-            ) : details && (
-                <div>
-                    <div className="relative h-[50vh] md:h-[60vh] bg-primary">
-                        <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/80 to-transparent z-10" />
-                        
-                        {trailerKey ? (
-                            <div className="absolute inset-0 scale-125 opacity-80">
-                                <VideoPlayer videoKey={trailerKey} isMuted={isMuted} onEnd={handleVideoEnd} />
-                            </div>
-                        ) : details.backdrop_path && (
-                             <img 
-                                src={`${IMAGE_BASE_URL}original${details.backdrop_path}`} 
-                                alt={`${title} backdrop`}
-                                className="w-full h-full object-cover opacity-80"
-                            />
-                        )}
+             {mainTrailerKey && (
+                <button onClick={() => setIsMuted(prev => !prev)} className="mute-toggle">
+                    {isMuted ? <Icons.VolumeOffIcon className="w-6 h-6" /> : <Icons.VolumeUpIcon className="w-6 h-6" />}
+                </button>
+            )}
 
-                        <div className="absolute bottom-0 left-0 w-full container mx-auto px-4 sm:px-6 lg:px-8 flex items-end justify-between pb-8 z-20">
-                             <div className="flex items-end">
-                                <div className="w-36 md:w-48 h-54 md:h-72 flex-shrink-0 mr-4 md:mr-8 rounded-xl overflow-hidden shadow-2xl hidden sm:block bg-glass">
-                                    {details.poster_path && <img src={`${IMAGE_BASE_URL}w500${details.poster_path}`} alt={`${title} poster`} className="w-full h-full object-cover"/>}
-                                </div>
-                                <div>
-                                    <h1 className="text-3xl md:text-5xl font-bold">{title}</h1>
-                                    <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-2 text-slate-300">
-                                        <span>{releaseYear || 'N/A'}</span>
-                                        <div className="flex items-center gap-1.5">
-                                            <StarIcon className="w-5 h-5 text-yellow-400" isActive />
-                                            <span className="font-semibold">{details.vote_average.toFixed(1)}</span>
-                                        </div>
-                                        { 'runtime' in details && details.runtime ? (
-                                            <div className="flex items-center gap-1.5">
-                                                <ClockIcon className="w-5 h-5" />
-                                                <span>{Math.floor(details.runtime / 60)}h {details.runtime % 60}m</span>
-                                            </div>
-                                        ) : 'episode_run_time' in details && details.episode_run_time?.[0] ? (
-                                            <div className="flex items-center gap-1.5">
-                                                <ClockIcon className="w-5 h-5" />
-                                                <span>{details.episode_run_time[0]}m / ep</span>
-                                            </div>
-                                        ) : null }
-                                    </div>
-                                </div>
-                            </div>
-                            {trailerKey && (
-                                <button
-                                    onClick={toggleMute}
-                                    className="glass-button rounded-full w-12 h-12 flex items-center justify-center flex-shrink-0"
-                                >
-                                    {isMuted ? <VolumeOffIcon className="w-6 h-6" /> : <VolumeUpIcon className="w-6 h-6" />}
-                                </button>
-                            )}
+            <div className="trailer-gradient" />
+
+            <div className="title-glass-panel">
+                <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
+                    <img
+                        src={details.poster_path ? `${IMAGE_BASE_URL}w500${details.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'}
+                        alt={title}
+                        className="title-poster"
+                    />
+                    <div className="w-full text-center md:text-left">
+                        <h1 className="text-4xl md:text-5xl font-bold text-white">{title}</h1>
+                        <div className="flex flex-wrap justify-center md:justify-start items-center gap-x-4 gap-y-2 text-slate-300 mt-2">
+                            <span>{year}</span>
+                            <span className="w-1 h-1 bg-slate-400 rounded-full hidden sm:block" />
+                            <span>{details.genres?.map(g => g?.name).filter(Boolean).join(', ')}</span>
+                            {runtimeInfo && <span className="w-1 h-1 bg-slate-400 rounded-full hidden sm:block" />}
+                            {runtimeInfo && <span>{runtimeInfo}</span>}
+                        </div>
+                        <div className="flex items-center justify-center md:justify-start gap-2 mt-4">
+                            <Icons.StarIcon className="w-5 h-5 text-yellow-400" isActive />
+                            <span className="text-xl font-bold">{details.vote_average.toFixed(1)}</span>
+                            <span className="text-sm text-slate-400">/ 10</span>
                         </div>
                     </div>
-                    
-                    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12">
-                        <div className="lg:col-span-2">
-                             <h2 className="text-2xl font-bold mb-3">Overview</h2>
-                            <p className="text-slate-300 leading-relaxed">{details.overview}</p>
+                </div>
 
-                            <h2 className="text-2xl font-bold mt-8 mb-4">Top Billed Cast</h2>
-                            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-                                {details.credits.cast.slice(0, 10).map((member: CastMember) => (
-                                    <div key={member.id} className="text-center w-28 flex-shrink-0">
-                                        <div className="w-24 h-32 mx-auto rounded-lg overflow-hidden bg-glass">
-                                            {member.profile_path ? <img src={`${IMAGE_BASE_URL}w185${member.profile_path}`} alt={member.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-400"><XIcon className="w-8 h-8"/></div>}
-                                        </div>
-                                        <p className="text-sm font-semibold mt-2 leading-tight">{member.name}</p>
-                                        <p className="text-xs text-slate-400">{member.character}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        
-                        <div className="space-y-6">
-                            {(regionalProviders?.flatrate || regionalProviders?.buy || regionalProviders?.rent) ? (
-                                <div>
-                                    <h3 className="text-xl font-bold mb-3">Where to Watch ({country.code})</h3>
-                                    <div className="space-y-3">
-                                        <ProviderList title="Stream" providers={regionalProviders?.flatrate} />
-                                        <ProviderList title="Buy" providers={regionalProviders?.buy} />
-                                        <ProviderList title="Rent" providers={regionalProviders?.rent} />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div>
-                                    <h3 className="text-xl font-bold mb-3">Where to Watch</h3>
-                                    <p className="text-slate-400 text-sm">Not available for streaming in your selected region.</p>
-                                </div>
-                            )}
-                            {isAuthenticated && <SpotifySoundtrack mediaTitle={title} />}
-                             {details.genres.length > 0 && (
-                                <div>
-                                    <h3 className="text-xl font-bold mb-3">Genres</h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        {details.genres.map(genre => <span key={genre.id} className="bg-glass px-3 py-1 rounded-full text-sm">{genre.name}</span>)}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                <p className="mt-6 text-slate-200 leading-relaxed max-w-3xl mx-auto">{details.overview}</p>
 
-                    {recommendations.length > 0 && (
-                        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 border-t border-glass-edge">
-                            <MediaRow title="More Like This" items={recommendations} onSelectItem={onSelectItem} />
+                <div className="text-center mt-8">
+                    {!storyScape && !isStoryScapeLoading && !storyScapeError && (
+                        <button onClick={handleGenerateStoryScape} className="storyscape-generate-button">
+                            <Icons.SparklesIcon className="w-5 h-5" /> Generate StoryScape
+                        </button>
+                    )}
+                    {isStoryScapeLoading && (
+                        <div className="storyscape-loading">
+                            <div className="shimmer" />
                         </div>
                     )}
+                    {storyScapeError && <p className="storyscape-error">{storyScapeError}</p>}
                 </div>
-            )}
+
+                {storyScape && (
+                     <section className="my-12 glass-panel p-6 rounded-xl animate-fade-in">
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-accent-400"><Icons.SparklesIcon className="w-6 h-6"/> StoryScape AI</h2>
+                        <p className="text-slate-200 italic mb-4">"{storyScape.summary}"</p>
+                        <div className="flex flex-col sm:flex-row gap-4 text-sm border-t border-glass-edge pt-4">
+                            <div className="flex-1">
+                                <h4 className="font-semibold text-slate-400 mb-1">EMOTIONAL TONE</h4>
+                                <p>{storyScape.tone}</p>
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="font-semibold text-slate-400 mb-1">CINEMATIC STYLE</h4>
+                                <p>{storyScape.style}</p>
+                            </div>
+                        </div>
+                    </section>
+                )}
+
+                <WhereToWatch providers={details['watch/providers']?.results[country.code]} />
+
+                {details.credits?.cast && details.credits.cast.length > 0 && (
+                    <section className="my-12">
+                        <h2 className="text-2xl font-bold mb-4">Top Billed Cast</h2>
+                        <div className="flex overflow-x-auto gap-4 pb-4 scrollbar-thin scrollbar-thumb-zinc-700">
+                            {details.credits?.cast?.slice(0, 10).map(member => member && (
+                                <div key={member.id} className="flex-shrink-0 w-32 text-center">
+                                    <img
+                                        src={member.profile_path ? `${IMAGE_BASE_URL}w185${member.profile_path}` : 'https://via.placeholder.com/185x278?text=N/A'}
+                                        alt={member.name}
+                                        className="w-full aspect-[2/3] object-cover rounded-lg bg-glass mb-2"
+                                    />
+                                    <p className="font-semibold text-sm">{member.name}</p>
+                                    <p className="text-xs text-slate-400 line-clamp-2">{member.character}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {recommendations && recommendations.length > 0 && (
+                    <section className="my-12">
+                        <h2 className="text-2xl font-bold mb-4">More Like This</h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            {recommendations.slice(0, 10).map(rec => (
+                               <div key={rec.id} onClick={() => onSelectItem(rec)} className="group cursor-pointer">
+                                   <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-glass transition-transform duration-300 group-hover:scale-105">
+                                      <img src={rec.poster_path ? `${IMAGE_BASE_URL}w500${rec.poster_path}` : 'https://via.placeholder.com/500x750?text=N/A'} alt={'title' in rec ? rec.title : rec.name} className="w-full h-full object-cover"/>
+                                   </div>
+                               </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+            </div>
         </div>
     );
 };

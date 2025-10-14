@@ -10,6 +10,12 @@ export interface Movie {
   genre_ids: number[];
   popularity: number;
   revenue?: number; // Add revenue for box office feature
+  belongs_to_collection?: {
+    id: number;
+    name: string;
+    poster_path: string | null;
+    backdrop_path: string | null;
+  } | null;
 }
 
 export interface TVShow {
@@ -32,6 +38,8 @@ export interface Person {
     name: string;
     profile_path: string | null;
     known_for_department: string;
+    // FIX: Add media_type to Person to align with multi-search results and resolve type errors.
+    media_type: 'person';
 }
 
 export type MediaItem = Movie | TVShow;
@@ -92,10 +100,11 @@ export interface PersonMovieCredit extends Movie {
     character: string;
 }
 
+// FIX: Update PersonCreditsResponse.crew to be an array of movies with a job property. The previous `CrewMember[]` type was incorrect for this API response, as it returns movie objects, not people, which caused type errors in WatchPath.tsx.
 export interface PersonCreditsResponse {
     id: number;
     cast: PersonMovieCredit[];
-    crew: CrewMember[];
+    crew: (Movie & { job: string })[];
 }
 
 export interface Image {
@@ -176,48 +185,16 @@ export interface ReleaseDatesResponse {
     results: CountryReleaseDates[];
 }
 
-// --- Spotify Types ---
-export interface SpotifyImage {
-  url: string;
-  height: number | null;
-  width: number | null;
+// --- Watch Path Types ---
+export interface CollectionPart extends Movie {
+    media_type: 'movie';
 }
 
-export interface SpotifyArtist {
-  name: string;
-  id: string;
-}
-
-export interface SpotifyAlbum {
-  id: string;
-  name: string;
-  artists: SpotifyArtist[];
-  images: SpotifyImage[];
-  uri: string;
-  tracks: {
-    items: SpotifyTrack[];
-    total: number;
-  };
-}
-
-export interface SpotifyTrack {
-  id: string;
-  name: string;
-  artists: SpotifyArtist[];
-  uri: string;
-  duration_ms: number;
-  album: SpotifyAlbum;
-}
-
-export interface SpotifyUser {
-  display_name: string;
-  id: string;
-  images: SpotifyImage[];
-}
-
-export interface SpotifyPlayerState {
-  track: SpotifyTrack | null;
-  album: SpotifyAlbum | null;
-  isPlaying: boolean;
-  position: number;
+export interface Collection {
+    id: number;
+    name: string;
+    overview: string;
+    poster_path: string | null;
+    backdrop_path: string | null;
+    parts: CollectionPart[];
 }

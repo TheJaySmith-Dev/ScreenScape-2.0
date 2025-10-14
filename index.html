@@ -61,6 +61,13 @@
 </head>
 <body>
     <div id="root"></div>
+    <script>
+      // One-time script to set the TMDb API key if it's not already present.
+      // This ensures the app is immediately usable for the user.
+      if (!localStorage.getItem('tmdb_api_key')) {
+        localStorage.setItem('tmdb_api_key', '09b97a49759876f2fde9eadb163edc44');
+      }
+    </script>
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>

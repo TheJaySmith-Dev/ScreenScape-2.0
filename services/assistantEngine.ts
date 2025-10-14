@@ -1,11 +1,11 @@
 import * as tmdbService from './tmdbService';
 import { MediaItem, MovieDetails, TVShowDetails } from '../types';
+import { queryOpenRouter } from '../components/openrouter.js';
 
 type CommandResult = { success: boolean; message: string; action?: 'close' };
 
 // --- Helper Functions ---
 
-// FIX: Add region parameter to pass to getMovieDetails and getTVShowDetails.
 async function searchAndGetDetails(title: string, tmdbApiKey: string, region: string): Promise<{ details: MovieDetails | TVShowDetails, media_type: 'movie' | 'tv' } | null> {
     try {
         const searchRes = await tmdbService.searchMulti(tmdbApiKey, title);
@@ -16,9 +16,7 @@ async function searchAndGetDetails(title: string, tmdbApiKey: string, region: st
         if (!item) return null;
 
         const details = item.media_type === 'movie'
-            // FIX: Pass the region parameter to getMovieDetails.
             ? await tmdbService.getMovieDetails(tmdbApiKey, item.id, region)
-            // FIX: Pass the region parameter to getTVShowDetails.
             : await tmdbService.getTVShowDetails(tmdbApiKey, item.id, region);
         
         return { details, media_type: item.media_type };
@@ -40,7 +38,6 @@ function formatRevenue(revenue: number): string {
 
 // --- Fact-finding Logic ---
 
-// FIX: Add region parameter to pass down to searchAndGetDetails.
 export async function getFactAboutMedia(title: string, factType: string, tmdbApiKey: string, region: string): Promise<CommandResult> {
     const result = await searchAndGetDetails(title, tmdbApiKey, region);
     if (!result) {
@@ -54,18 +51,32 @@ export async function getFactAboutMedia(title: string, factType: string, tmdbApi
         case 'release_date':
             if (details.media_type === 'movie') {
                 const releaseDates = await tmdbService.getMovieReleaseDates(tmdbApiKey, details.id);
-                const usRelease = releaseDates.results.find(r => r.iso_3166_1 === 'US');
-                const theatricalRelease = usRelease?.release_dates.find(rd => rd.type === 3); // Type 3 is Theatrical
-                if (theatricalRelease) {
-                    const date = new Date(theatricalRelease.release_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                    return { success: true, message: `${mediaTitle} was released on ${date} in the United States.` };
+                const countryRelease = releaseDates.results.find(r => r.iso_3166_1 === region);
+                
+                if (countryRelease && countryRelease.release_dates.length > 0) {
+                    // Find the best release date type: 3 (Theatrical) > 2 (Theatrical limited) > 1 (Premiere)
+                    const bestRelease = countryRelease.release_dates.find(rd => rd.type === 3) ||
+                                      countryRelease.release_dates.find(rd => rd.type === 2) ||
+                                      countryRelease.release_dates.find(rd => rd.type === 1) ||
+                                      countryRelease.release_dates[0]; // Fallback to the first one
+
+                    if (bestRelease) {
+                        const date = new Date(bestRelease.release_date).toLocaleDateString('en-US', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' });
+                        return { success: true, message: `${mediaTitle} was released on ${date} in ${region}.` };
+                    }
                 }
             }
-            // Fallback for TV or movies without specific US theatrical release
+            // Fallback for TV or movies without a specific regional release
             const releaseDate = 'release_date' in details ? details.release_date : details.first_air_date;
             if (releaseDate) {
-                 const date = new Date(releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                 return { success: true, message: `${mediaTitle} was first released on ${date}.` };
+                 // Manually parse YYYY-MM-DD to avoid timezone issues.
+                 const parts = releaseDate.split('-');
+                 const year = parseInt(parts[0], 10);
+                 const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+                 const day = parseInt(parts[2], 10);
+                 const date = new Date(Date.UTC(year, month, day));
+                 const formattedDate = date.toLocaleDateString('en-US', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' });
+                 return { success: true, message: `${mediaTitle}'s initial release was on ${formattedDate}.` };
             }
             break;
 
@@ -109,7 +120,6 @@ export async function getFactAboutMedia(title: string, factType: string, tmdbApi
 
 // --- Command Processors ---
 
-// FIX: Add region parameter to pass down to getFactAboutMedia.
 export async function processAssistantCommand(command: string, tmdbApiKey: string, region: string): Promise<CommandResult> {
     const lowerCaseCommand = command.toLowerCase().trim();
 
@@ -132,7 +142,6 @@ export async function processAssistantCommand(command: string, tmdbApiKey: strin
     const takeToMatch = lowerCaseCommand.match(/^(?:take me to|show me|open|go to)\s+(.+)/);
     if (takeToMatch?.[1]) {
         const title = takeToMatch[1].trim().replace(/[?.!]$/, '').trim();
-        if (title.toLowerCase().includes('music page')) return openMusicPage();
         return findAndSelectMediaItem(title, tmdbApiKey);
     }
 
@@ -142,19 +151,12 @@ export async function processAssistantCommand(command: string, tmdbApiKey: strin
         return findAndGetOverview(title, tmdbApiKey);
     }
     
-    const playSoundtrackMatch = lowerCaseCommand.match(/^(?:play the soundtrack for|play music from|play)\s+(.+)/);
-    if (playSoundtrackMatch?.[1]) {
-        const title = playSoundtrackMatch[1].trim().replace(/[?.!]$/, '').trim();
-        return playSoundtrack(title);
-    }
-    if (['pause music', 'stop music', 'pause the music', 'stop the music'].some(c => lowerCaseCommand.includes(c))) return controlMusic('pause');
-    if (['resume music', 'play music', 'resume the music', 'play the music'].some(c => lowerCaseCommand.includes(c))) return controlMusic('play');
-
-
     if (lowerCaseCommand.includes('mute')) return controlTrailerAudio('mute');
     if (lowerCaseCommand.includes('unmute')) return controlTrailerAudio('unmute');
     
-    return { success: false, message: "Sorry, I don't understand that command. Try 'Show me Inception' or 'Who directed Dune?'" };
+    // Fallback to conversational AI if no structured command is matched
+    const conversationalResponse = await queryOpenRouter(command);
+    return { success: true, message: conversationalResponse };
 }
 
 export async function findAndSelectMediaItem(title: string, tmdbApiKey: string): Promise<CommandResult> {
@@ -194,19 +196,4 @@ export async function findAndGetOverview(title: string, tmdbApiKey: string): Pro
 export function controlTrailerAudio(action: 'mute' | 'unmute'): CommandResult {
     window.dispatchEvent(new CustomEvent('controlTrailerAudio', { detail: { action } }));
     return { success: true, message: `OK, the trailer has been ${action === 'mute' ? 'muted' : 'unmuted'}.` };
-}
-
-// --- Spotify Voice Commands ---
-export function playSoundtrack(mediaTitle: string): CommandResult {
-    window.dispatchEvent(new CustomEvent('spotify:playByTitle', { detail: { mediaTitle } }));
-    return { success: true, message: `Okay, playing the soundtrack for ${mediaTitle}.` };
-}
-export function controlMusic(action: 'play' | 'pause'): CommandResult {
-    window.dispatchEvent(new CustomEvent('spotify:togglePlay', { detail: { forceState: action }}));
-    return { success: true, message: `Music ${action === 'play' ? 'resumed' : 'paused'}.` };
-}
-
-export function openMusicPage(): CommandResult {
-    window.dispatchEvent(new CustomEvent('setView', { detail: { view: 'music' } }));
-    return { success: true, message: 'Opening the music page.' };
 }

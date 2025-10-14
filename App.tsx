@@ -1,148 +1,119 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import Header from './components/Header';
-import ExploreView from './components/NetflixView';
-import MediaDetail from './components/MediaDetail';
-import Settings from './components/Settings';
-import GameView, { Game } from './components/GameView';
-import AIAssistant, { AIStatus } from './components/AIAssistant';
-import AIGlow from './components/AIGlow';
 import { MediaItem } from './types';
+import Header from './components/Header';
 import ScreenSearch from './components/ScreenSearch';
+import NetflixView from './components/NetflixView';
+import GameView, { Game } from './components/GameView';
+import MediaDetail from './components/MediaDetail';
+import ApiKeySetup from './components/ApiKeySetup';
+import Settings from './components/Settings';
+import AIAssistant, { AIStatus } from './components/AIAssistant';
 import TypeToAssist from './components/TypeToAssist';
-import AuthCallback from './components/AuthCallback';
-import MusicView from './components/MusicView';
-import { SpotifyProvider, useSpotify } from './contexts/SpotifyContext';
-import SpotifyMiniPlayer from './components/SpotifyMiniPlayer';
-import { useTheme } from './hooks/useTheme';
+import AIGlow from './components/AIGlow';
+import QuickJump from './components/QuickJump';
 
+export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game';
 
-export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game' | 'music';
-
-const TMDB_API_KEY = '09b97a49759876f2fde9eadb163edc44';
-
-const AppContent: React.FC = () => {
-    useTheme(); // Apply theme on app load
-    const apiKey = TMDB_API_KEY;
+const App: React.FC = () => {
+    const [apiKey, setApiKey] = useState<string | null>(null);
     const [isKeyInvalid, setIsKeyInvalid] = useState(false);
     const [view, setView] = useState<ViewType>('screenSearch');
     const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
+    const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [initialGame, setInitialGame] = useState<Game | null>(null);
     const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
-    const { isAuthenticated } = useSpotify();
-
 
     useEffect(() => {
-        const handleSelectMediaItem = (event: Event) => {
-            const customEvent = event as CustomEvent<MediaItem>;
-            setSelectedItem(customEvent.detail);
-        };
-        
-        const handleControlTrailerAudio = (event: Event) => {
-             // This can be implemented if MediaDetail has a video player with controls
-             console.log('Control trailer audio event:', (event as CustomEvent).detail);
-        };
-
-        const handleSetView = (event: Event) => {
-            const customEvent = event as CustomEvent<{ view: ViewType }>;
-            setView(customEvent.detail.view);
-        };
-
-        window.addEventListener('selectMediaItem', handleSelectMediaItem);
-        window.addEventListener('controlTrailerAudio', handleControlTrailerAudio);
-        window.addEventListener('setView', handleSetView);
-
-
-        return () => {
-            window.removeEventListener('selectMediaItem', handleSelectMediaItem);
-            window.removeEventListener('controlTrailerAudio', handleControlTrailerAudio);
-            window.removeEventListener('setView', handleSetView);
-        };
+        const storedKey = localStorage.getItem('tmdb_api_key');
+        if (storedKey) {
+            setApiKey(storedKey);
+            setIsKeyInvalid(false);
+        } else {
+            // No key found, prompt user
+            setIsKeyInvalid(true); 
+        }
     }, []);
-    
+
     const handleInvalidApiKey = useCallback(() => {
-        // The hardcoded key is invalid. Display an error state.
+        localStorage.removeItem('tmdb_api_key');
+        setApiKey(null);
         setIsKeyInvalid(true);
     }, []);
 
-    const handleSelectItem = (item: MediaItem) => {
+    const handleSelectItem = useCallback((item: MediaItem) => {
         setSelectedItem(item);
-    };
-    
-    const handleSelectGame = (game: Game) => {
+    }, []);
+
+    const handleSelectGame = useCallback((game: Game) => {
         setView('game');
-        setInitialGame(game);
-    };
-
-    const handleCloseDetail = () => {
-        setSelectedItem(null);
-    };
+        setSelectedGame(game);
+    }, []);
     
-    if (isKeyInvalid) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-primary text-white p-4">
-                <div className="w-full max-w-md text-center bg-glass border border-red-500/50 rounded-2xl p-8 shadow-2xl">
-                    <h1 className="text-3xl font-bold mb-3 text-red-400">Configuration Error</h1>
-                    <p className="text-zinc-300">
-                        The embedded TMDb API key is invalid. The application cannot function.
-                    </p>
-                </div>
-            </div>
-        );
-    }
+    const handleCloseDetail = useCallback(() => {
+        setSelectedItem(null);
+    }, []);
 
+    useEffect(() => {
+        const selectMediaItemHandler = (event: Event) => {
+            const customEvent = event as CustomEvent<MediaItem>;
+            handleSelectItem(customEvent.detail);
+        };
+        
+        const setSearchViewHandler = (event: Event) => {
+            const customEvent = event as CustomEvent<{ query: string }>;
+            setView('explore');
+            setSearchQuery(customEvent.detail.query);
+        }
+
+        window.addEventListener('selectMediaItem', selectMediaItemHandler);
+        window.addEventListener('setSearchView', setSearchViewHandler);
+
+        return () => {
+            window.removeEventListener('selectMediaItem', selectMediaItemHandler);
+            window.removeEventListener('setSearchView', setSearchViewHandler);
+        };
+    }, [handleSelectItem]);
+    
     const renderView = () => {
+        if (selectedItem) {
+            return <MediaDetail key={selectedItem.id} item={selectedItem} apiKey={apiKey!} onClose={handleCloseDetail} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
+        }
+
         switch (view) {
             case 'screenSearch':
-                return <ScreenSearch apiKey={apiKey} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
+                return <ScreenSearch apiKey={apiKey!} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
             case 'explore':
-                return <ExploreView apiKey={apiKey} searchQuery="" onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} onSelectGame={handleSelectGame} view={view} />;
-            case 'watchlist':
-                return <div className="container mx-auto px-4 py-8 text-center pt-24"><h1 className="text-3xl font-bold">Watchlist</h1><p className="text-slate-400 mt-4">This feature is coming soon!</p></div>;
+                return <NetflixView apiKey={apiKey!} searchQuery={searchQuery} onSelectItem={handleSelectItem} onSelectGame={handleSelectGame} onInvalidApiKey={handleInvalidApiKey} view={view} />;
             case 'game':
-                return <GameView apiKey={apiKey} onInvalidApiKey={handleInvalidApiKey} initialGame={initialGame} />;
-            case 'music':
-                return <MusicView />;
+                return <GameView apiKey={apiKey!} onInvalidApiKey={handleInvalidApiKey} initialGame={selectedGame} />;
+            case 'watchlist':
+                 return <div className="container mx-auto px-4 py-8 text-center"><h1 className="text-3xl font-bold">Watchlist</h1><p className="text-slate-400 mt-4">This feature is coming soon!</p></div>;
             default:
-                return <ScreenSearch apiKey={apiKey} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
+                return <ScreenSearch apiKey={apiKey!} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
         }
     };
 
+    if (!apiKey) {
+        return <ApiKeySetup isKeyInvalid={isKeyInvalid} />;
+    }
+
     return (
-        <div className={`bg-primary text-white min-h-screen font-sans ${aiStatus !== 'idle' ? 'ai-active' : ''}`}>
+        <div className="bg-primary text-white min-h-screen font-sans">
             <AIGlow status={aiStatus} />
             <Header view={view} setView={setView} onSettingsClick={() => setIsSettingsOpen(true)} />
+            
             <main className="pt-20">
                 {renderView()}
             </main>
-            {selectedItem && (
-                <MediaDetail
-                    item={selectedItem}
-                    apiKey={apiKey}
-                    onClose={handleCloseDetail}
-                    onSelectItem={handleSelectItem}
-                />
-            )}
+
             {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} />}
+
             <AIAssistant tmdbApiKey={apiKey} setAiStatus={setAiStatus} />
             <TypeToAssist tmdbApiKey={apiKey} />
-            {isAuthenticated && <SpotifyMiniPlayer />}
+            <QuickJump apiKey={apiKey} />
         </div>
     );
-};
-
-
-const App: React.FC = () => {
-  // Route to the AuthCallback component if the path is /callback.
-  if (window.location.pathname === '/callback') {
-    return <AuthCallback />;
-  }
-
-  return (
-    <SpotifyProvider>
-      <AppContent />
-    </SpotifyProvider>
-  );
 };
 
 export default App;

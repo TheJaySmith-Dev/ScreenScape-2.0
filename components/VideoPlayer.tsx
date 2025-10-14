@@ -55,9 +55,10 @@ interface VideoPlayerProps {
     videoKey: string;
     isMuted: boolean;
     onEnd: () => void;
+    loop?: boolean;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loop = false }) => {
     const playerRef = useRef<YT.Player | null>(null);
     const playerContainerRef = useRef<HTMLDivElement>(null);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
@@ -77,18 +78,24 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd }) =
         const createPlayer = () => {
             if (!isMountedRef.current || !playerContainerRef.current) return;
             
+            const playerVars: YT.PlayerOptions['playerVars'] = {
+                autoplay: 1,
+                controls: 0,
+                showinfo: 0,
+                rel: 0,
+                modestbranding: 1,
+                loop: loop ? 1 : 0,
+                fs: 0,
+                iv_load_policy: 3,
+                mute: 1,
+            };
+
+            if (loop) {
+                playerVars.playlist = videoKey;
+            }
+
             playerRef.current = new window.YT.Player(playerContainerRef.current, {
-                playerVars: {
-                    autoplay: 1,
-                    controls: 0,
-                    showinfo: 0,
-                    rel: 0,
-                    modestbranding: 1,
-                    loop: 0,
-                    fs: 0,
-                    iv_load_policy: 3,
-                    mute: 1,
-                },
+                playerVars: playerVars,
                 events: {
                     onReady: () => {
                         if (isMountedRef.current) {

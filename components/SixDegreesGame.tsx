@@ -147,7 +147,8 @@ const SixDegreesGame: React.FC<SixDegreesGameProps> = ({ apiKey, onExit }) => {
     
     const handleSelectActor = (actor: CastMember) => {
         // FIX: Explicitly type the new path item to prevent type widening of 'type' property.
-        const newItem: PathItem = { type: 'actor', data: { id: actor.id, name: actor.name, profile_path: actor.profile_path, known_for_department: 'Acting' } };
+        // FIX: Add `media_type: 'person'` to satisfy the `Person` type, which is required by `PathItem` for items of type 'actor'.
+        const newItem: PathItem = { type: 'actor', data: { id: actor.id, name: actor.name, profile_path: actor.profile_path, known_for_department: 'Acting', media_type: 'person' } };
         const newPath = [...path, newItem];
         if (newPath.length > 12) {
              setGameState('lost');
