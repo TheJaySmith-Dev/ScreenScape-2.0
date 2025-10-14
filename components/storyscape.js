@@ -1,6 +1,92 @@
 // /components/storyscape.js
 import { queryOpenRouter } from "./openrouter.js";
 
+const DEFAULT_TONE = "Reflective and character-driven";
+const DEFAULT_STYLE = "Grounded cinematic storytelling";
+
+function extractJsonCandidate(raw) {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  // Remove leading explanatory text that may precede the JSON block.
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    return null;
+  }
+
+  return trimmed.slice(firstBrace, lastBrace + 1);
+}
+
+function sanitizeResponse(rawResponse) {
+  if (typeof rawResponse !== "string") {
+    return "";
+  }
+
+  return rawResponse
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+}
+
+function buildFallbackSummary(title, overview) {
+  if (!overview || typeof overview !== "string") {
+    return null;
+  }
+
+  const cleanedOverview = overview.replace(/\s+/g, " ").trim();
+  if (!cleanedOverview) {
+    return null;
+  }
+
+  const maxLength = 280;
+  let summary = cleanedOverview;
+  if (cleanedOverview.length > maxLength) {
+    const truncated = cleanedOverview.slice(0, maxLength);
+    const lastSpace = truncated.lastIndexOf(" ");
+    summary = `${truncated.slice(0, lastSpace > 200 ? lastSpace : maxLength)}…`;
+  }
+
+  return {
+    summary,
+    tone: DEFAULT_TONE,
+    style: DEFAULT_STYLE,
+    origin: "fallback",
+    note: `StoryScape's live service is unavailable, so this synopsis was adapted from the official overview for "${title}".`,
+  };
+}
+
+function parseStoryScapeResponse(rawResponse) {
+  const cleanedResponse = sanitizeResponse(rawResponse);
+  const candidate = extractJsonCandidate(cleanedResponse);
+  if (!candidate) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(candidate);
+    if (parsed && typeof parsed === "object") {
+      const summary = typeof parsed.summary === "string" ? parsed.summary.trim() : "";
+      const tone = typeof parsed.tone === "string" ? parsed.tone.trim() : "";
+      const style = typeof parsed.style === "string" ? parsed.style.trim() : "";
+
+      if (summary) {
+        return {
+          summary,
+          tone: tone || DEFAULT_TONE,
+          style: style || DEFAULT_STYLE,
+          origin: "ai",
+        };
+      }
+    }
+  } catch (err) {
+    console.error("StoryScape JSON parse error:", err);
+  }
+
+  return null;
+}
+
 /**
  * Generates a cinematic, spoiler-free summary for a movie or TV show using the OpenRouter AI.
  * @param {string} title The title of the media.
@@ -30,18 +116,27 @@ export async function generateStoryScapeSummary(title, overview) {
 
   try {
     const rawResponse = await queryOpenRouter(prompt);
-    // The AI might sometimes wrap the JSON in markdown, so we clean it.
-    const cleanedResponse = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanedResponse);
-    
-    if (parsed.summary && parsed.tone && parsed.style) {
+    const parsed = parseStoryScapeResponse(rawResponse);
+    if (parsed) {
       return parsed;
-    } else {
-      // The JSON was valid but missing keys.
-      return { summary: rawResponse, tone: "N/A", style: "N/A" };
     }
+
+    const normalizedResponse = typeof rawResponse === "string" ? rawResponse.toLowerCase() : "";
+    if (normalizedResponse.includes("unavailable") || normalizedResponse.includes("rate limit")) {
+      throw new Error("StoryScape is temporarily unavailable. Please try again later.");
+    }
+
+    const fallback = buildFallbackSummary(title, overview);
+    if (fallback) {
+      return fallback;
+    }
+
+    throw new Error("StoryScape could not understand the response it received.");
   } catch (err) {
     console.error("StoryScape parsing error:", err);
-    return null; // Return null to indicate failure
+    if (err instanceof Error) {
+      throw err;
+    }
+    throw new Error("StoryScape is still processing this title. Try again in a moment.");
   }
 }
