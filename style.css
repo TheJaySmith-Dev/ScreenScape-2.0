@@ -26,6 +26,7 @@
 body {
     background-color: var(--color-primary);
     font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
 }
 
 body.voice-mode-active {
@@ -382,13 +383,42 @@ body.voice-mode-active {
     }
 }
 
+@media (max-width: 640px) {
+    .trailer-container {
+        aspect-ratio: 9 / 16;
+        min-height: 320px;
+    }
+    .trailer-gradient {
+        height: 60px;
+        margin-top: -60px;
+    }
+    .title-glass-panel {
+        margin: 1rem;
+        padding: 1rem;
+        border-radius: 0.875rem;
+    }
+    .title-poster {
+        max-width: 160px;
+        margin-top: -3rem;
+    }
+    .mute-toggle {
+        top: 0.75rem;
+        right: 0.75rem;
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+    .storyscape-generate-button {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
 /* Mute Toggle Button */
 .mute-toggle {
-    position: relative;
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
     z-index: 10;
-    margin-top: -4rem; /* Pull it up over the trailer */
-    margin-right: 1.5rem;
-    margin-left: auto;
     background: rgba(20, 20, 30, 0.5);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -449,6 +479,15 @@ body.voice-mode-active {
     background: rgba(255, 45, 85, 0.1);
     border: 1px solid rgba(255, 45, 85, 0.3);
     color: #ff5e78;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    text-align: center;
+}
+.storyscape-notice {
+    background: rgba(148, 163, 184, 0.12);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    color: #e2e8f0;
     padding: 0.5rem 1rem;
     border-radius: 0.5rem;
     font-size: 0.875rem;
