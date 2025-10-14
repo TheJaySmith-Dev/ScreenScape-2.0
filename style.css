@@ -454,3 +454,12 @@ body.voice-mode-active {
     font-size: 0.875rem;
     text-align: center;
 }
+.storyscape-notice {
+    background: rgba(148, 163, 184, 0.12);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    color: #e2e8f0;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    text-align: center;
+}

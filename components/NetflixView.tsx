@@ -4,7 +4,14 @@ import { ViewType } from '../App';
 import { Game } from './GameView';
 import HeroCarousel from './HeroCarousel';
 import MediaRow from './MediaRow';
-import { getPopularMovies, getPopularTVShows, getMoviesByProviders, searchMulti, normalizeMovie, normalizeTVShow } from '../services/tmdbService';
+import {
+    getPopularMovies,
+    getPopularTVShows,
+    getMoviesByProviders,
+    searchMulti,
+    normalizeMovie,
+    normalizeTVShow,
+} from '../services/tmdbService';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import { useGeolocation } from '../hooks/useGeolocation';
 import StreamingHubs from './StreamingHubs';
@@ -22,7 +29,7 @@ interface ExploreViewProps {
     onSelectGame: (game: Game) => void;
 }
 
-const SearchResultCard: React.FC<{ item: MediaItem, onClick: (item: MediaItem) => void }> = ({ item, onClick }) => {
+const SearchResultCard: React.FC<{ item: MediaItem; onClick: (item: MediaItem) => void }> = ({ item, onClick }) => {
     const title = 'title' in item ? item.title : item.name;
     const year = 'release_date' in item ? item.release_date?.substring(0, 4) : item.first_air_date?.substring(0, 4);
 
@@ -51,7 +58,6 @@ const SearchResultCard: React.FC<{ item: MediaItem, onClick: (item: MediaItem) =
     );
 };
 
-
 const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelectItem, onInvalidApiKey }) => {
     const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
     const [popularShows, setPopularShows] = useState<TVShow[]>([]);
@@ -59,8 +65,7 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
     const { providerIds } = useStreamingPreferences();
     const { country } = useGeolocation();
     const [activeProviderHub, setActiveProviderHub] = useState<number | null>(null);
-    
-    // State for search
+
     const [searchResults, setSearchResults] = useState<MediaItem[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const debounceTimer = useRef<number | null>(null);
@@ -71,49 +76,57 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
             try {
                 const [moviesRes, showsRes] = await Promise.all([
                     getPopularMovies(apiKey),
-                    getPopularTVShows(apiKey)
+                    getPopularTVShows(apiKey),
                 ]);
+
                 if (isMounted) {
                     setPopularMovies(moviesRes.results);
                     setPopularShows(showsRes.results);
                 }
             } catch (error) {
                 console.error(error);
-                if (error instanceof Error && error.message.includes("Invalid API Key")) {
+                if (error instanceof Error && error.message.includes('Invalid API Key')) {
                     onInvalidApiKey();
                 }
             }
         };
+
         fetchHomeData();
-        return () => { isMounted = false; };
+        return () => {
+            isMounted = false;
+        };
     }, [apiKey, onInvalidApiKey]);
 
     useEffect(() => {
         let isMounted = true;
         const fetchForYou = async () => {
             const providersToFetch = activeProviderHub ? [activeProviderHub] : Array.from(providerIds);
-            if (providersToFetch.length > 0) {
-                try {
-                    const forYouRes = await getMoviesByProviders(apiKey, providersToFetch, country.code);
-                    if (isMounted) {
-                        setForYou(forYouRes.results);
-                    }
-                } catch (error) {
-                     console.error("Failed to fetch 'For You' recommendations:", error);
-                }
-            } else {
+            if (providersToFetch.length === 0) {
                 if (isMounted) {
                     setForYou([]);
                 }
+                return;
+            }
+
+            try {
+                const forYouRes = await getMoviesByProviders(apiKey, providersToFetch, country.code);
+                if (isMounted) {
+                    setForYou(forYouRes.results ?? []);
+                }
+            } catch (error) {
+                console.error("Failed to fetch 'For You' recommendations:", error);
             }
         };
+
         fetchForYou();
-        return () => { isMounted = false; };
+        return () => {
+            isMounted = false;
+        };
     }, [apiKey, providerIds, activeProviderHub, country.code]);
-    
-     // Effect for handling search
+
     useEffect(() => {
         let isMounted = true;
+
         if (debounceTimer.current) {
             clearTimeout(debounceTimer.current);
         }
@@ -121,7 +134,9 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
         if (searchQuery.trim() === '') {
             setSearchResults([]);
             setIsSearching(false);
-            return;
+            return () => {
+                isMounted = false;
+            };
         }
 
         setIsSearching(true);
@@ -129,18 +144,19 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
             try {
                 const response = await searchMulti(apiKey, searchQuery);
                 const validResults = response.results
-                    .filter((item): item is Movie | TVShow => 
-                        ('media_type' in item && (item.media_type === 'movie' || item.media_type === 'tv')) &&
-                        item.poster_path != null
+                    .filter((item): item is Movie | TVShow =>
+                        'media_type' in item &&
+                        (item.media_type === 'movie' || item.media_type === 'tv') &&
+                        item.poster_path != null,
                     )
-                    .map(item => item.media_type === 'movie' ? normalizeMovie(item) : normalizeTVShow(item));
-                
+                    .map(item => (item.media_type === 'movie' ? normalizeMovie(item) : normalizeTVShow(item)));
+
                 if (isMounted) {
                     setSearchResults(validResults);
                 }
             } catch (error) {
-                console.error("Search failed:", error);
-                if (error instanceof Error && error.message.includes("Invalid API Key")) {
+                console.error('Search failed:', error);
+                if (error instanceof Error && error.message.includes('Invalid API Key')) {
                     onInvalidApiKey();
                 }
             } finally {
@@ -148,7 +164,7 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
                     setIsSearching(false);
                 }
             }
-        }, 300); // 300ms debounce
+        }, 300);
 
         return () => {
             isMounted = false;
@@ -158,10 +174,13 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
         };
     }, [searchQuery, apiKey, onInvalidApiKey]);
 
-    const rows = useMemo(() => [
-        { title: "Popular Movies", items: popularMovies },
-        { title: "Popular TV Shows", items: popularShows }
-    ], [popularMovies, popularShows]);
+    const rows = useMemo(
+        () => [
+            { title: 'Popular Movies', items: popularMovies },
+            { title: 'Popular TV Shows', items: popularShows },
+        ],
+        [popularMovies, popularShows],
+    );
 
     if (searchQuery.trim() !== '') {
         return (
@@ -186,17 +205,14 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
         <div className="flex flex-col space-y-4 md:space-y-8">
             <HeroCarousel apiKey={apiKey} onSelectItem={onSelectItem} onInvalidApiKey={onInvalidApiKey} />
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col space-y-8 -mt-24 md:-mt-32 relative z-10 pb-16">
-                 {providerIds.size > 0 && (
+                {providerIds.size > 0 && (
                     <div>
-                        <StreamingHubs 
-                            activeHub={activeProviderHub}
-                            setActiveHub={setActiveProviderHub}
-                        />
+                        <StreamingHubs activeHub={activeProviderHub} setActiveHub={setActiveProviderHub} />
                         <MediaRow title="For You" items={forYou} onSelectItem={onSelectItem} />
                     </div>
                 )}
-                 {rows.map((row, index) => (
-                    <MediaRow key={index} title={row.title} items={row.items} onSelectItem={onSelectItem} />
+                {rows.map((row, index) => (
+                    <MediaRow key={`${row.title}-${index}`} title={row.title} items={row.items} onSelectItem={onSelectItem} />
                 ))}
             </div>
         </div>
