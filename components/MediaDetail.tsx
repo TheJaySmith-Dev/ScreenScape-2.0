@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { MediaItem, MovieDetails, TVShowDetails, Movie, WatchProviderCountry } from '../types';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { MediaItem, MovieDetails, TVShowDetails, WatchProvider, WatchProviderCountry } from '../types';
 import { getMovieDetails, getTVShowDetails, getMovieRecommendations } from '../services/tmdbService';
 import { generateStoryScapeSummary } from './storyscape.js';
 import { useGeolocation } from '../hooks/useGeolocation';
@@ -7,6 +7,11 @@ import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import VideoPlayer from './VideoPlayer';
 import Loader from './Loader';
 import * as Icons from './Icons';
+import {
+    getAvailabilityBuckets,
+    buildAvailabilityDescriptors,
+    hasAvailability,
+} from '../utils/streamingAvailability';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 
@@ -19,68 +24,103 @@ interface MediaDetailProps {
     onInvalidApiKey: () => void;
 }
 
-const WhereToWatch: React.FC<{ providers: WatchProviderCountry | undefined }> = ({ providers }) => {
-    const { providerIds } = useStreamingPreferences();
-    if (!providers) return null;
+interface WhereToWatchProps {
+    providers: WatchProviderCountry | undefined;
+    providerIds: Set<number>;
+}
 
-    const { flatrate, rent, buy, link } = providers;
+const WhereToWatch: React.FC<WhereToWatchProps> = ({ providers, providerIds }) => {
+    const { stream, rent, buy, link } = useMemo<{
+        stream: WatchProvider[];
+        rent: WatchProvider[];
+        buy: WatchProvider[];
+        link: string | undefined;
+    }>(() => {
+        if (!providers) {
+            return { stream: [], rent: [], buy: [], link: undefined };
+        }
 
-    const sortAndFilter = (providerList: any[] | undefined) => {
-        if (!providerList) return [];
-        return providerList.sort((a, b) => {
-            const aIsPreferred = providerIds.has(a.provider_id);
-            const bIsPreferred = providerIds.has(b.provider_id);
-            if (aIsPreferred && !bIsPreferred) return -1;
-            if (!aIsPreferred && bIsPreferred) return 1;
-            return a.display_priority - b.display_priority;
-        });
-    };
+        const buckets = getAvailabilityBuckets(providers, providerIds);
+        const normalizedLink = providers.link?.trim();
 
-    const stream = sortAndFilter(flatrate);
-    const rental = sortAndFilter(rent);
-    const purchase = sortAndFilter(buy);
+        return {
+            stream: buckets.stream.filter(provider => provider?.logo_path),
+            rent: buckets.rent.filter(provider => provider?.logo_path),
+            buy: buckets.buy.filter(provider => provider?.logo_path),
+            link: normalizedLink ? providers.link : undefined,
+        };
+    }, [providers, providerIds]);
 
-    if (!stream.length && !rental.length && !purchase.length) {
+    const hasStream = stream.length > 0;
+    const hasRent = rent.length > 0;
+    const hasBuy = buy.length > 0;
+
+    if (!hasStream && !hasRent && !hasBuy) {
         return null;
     }
+
+    const renderProviderLogo = (provider: WatchProvider) => {
+        if (!provider.logo_path) {
+            return null;
+        }
+
+        const logo = (
+            <img
+                src={`${IMAGE_BASE_URL}w92${provider.logo_path}`}
+                alt={provider.provider_name}
+                className="w-12 h-12 rounded-lg"
+            />
+        );
+
+        if (!link) {
+            return (
+                <div
+                    key={provider.provider_id}
+                    className="transform hover:-translate-y-1 transition-transform"
+                >
+                    {logo}
+                </div>
+            );
+        }
+
+        return (
+            <a
+                key={provider.provider_id}
+                href={link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transform hover:-translate-y-1 transition-transform"
+            >
+                {logo}
+            </a>
+        );
+    };
 
     return (
         <section className="my-12">
             <h2 className="text-2xl font-bold mb-4">Where to Watch</h2>
             <div className="glass-panel p-6 rounded-xl">
-                {stream.length > 0 && (
+                {hasStream && (
                     <div className="mb-4">
                         <h3 className="text-sm font-semibold text-slate-400 mb-2">STREAM</h3>
                         <div className="flex flex-wrap gap-3">
-                            {stream.map(p => (
-                                <a key={p.provider_id} href={link} target="_blank" rel="noopener noreferrer" className="transform hover:-translate-y-1 transition-transform">
-                                    <img src={`${IMAGE_BASE_URL}w92${p.logo_path}`} alt={p.provider_name} className="w-12 h-12 rounded-lg" />
-                                </a>
-                            ))}
+                            {stream.map(renderProviderLogo)}
                         </div>
                     </div>
                 )}
-                 {rental.length > 0 && (
+                {hasRent && (
                     <div className="mb-4">
                         <h3 className="text-sm font-semibold text-slate-400 mb-2">RENT</h3>
                         <div className="flex flex-wrap gap-3">
-                            {rental.map(p => (
-                                <a key={p.provider_id} href={link} target="_blank" rel="noopener noreferrer" className="transform hover:-translate-y-1 transition-transform">
-                                    <img src={`${IMAGE_BASE_URL}w92${p.logo_path}`} alt={p.provider_name} className="w-12 h-12 rounded-lg" />
-                                </a>
-                            ))}
+                            {rent.map(renderProviderLogo)}
                         </div>
                     </div>
                 )}
-                 {purchase.length > 0 && (
+                {hasBuy && (
                     <div>
                         <h3 className="text-sm font-semibold text-slate-400 mb-2">BUY</h3>
                         <div className="flex flex-wrap gap-3">
-                            {purchase.map(p => (
-                                <a key={p.provider_id} href={link} target="_blank" rel="noopener noreferrer" className="transform hover:-translate-y-1 transition-transform">
-                                    <img src={`${IMAGE_BASE_URL}w92${p.logo_path}`} alt={p.provider_name} className="w-12 h-12 rounded-lg" />
-                                </a>
-                            ))}
+                            {buy.map(renderProviderLogo)}
                         </div>
                     </div>
                 )}
@@ -99,11 +139,12 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     const [error, setError] = useState<string | null>(null);
     const [isMuted, setIsMuted] = useState(true);
     const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-    
+
     const [isStoryScapeLoading, setIsStoryScapeLoading] = useState(false);
     const [storyScapeError, setStoryScapeError] = useState<string | null>(null);
 
     const { country } = useGeolocation();
+    const { providerIds } = useStreamingPreferences();
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -112,6 +153,19 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         mediaQuery.addEventListener('change', handleChange);
         return () => mediaQuery.removeEventListener('change', handleChange);
     }, []);
+
+    const handleControlTrailerAudio = useCallback((event: Event) => {
+        const customEvent = event as CustomEvent<{ action: 'mute' | 'unmute' }>;
+        if (!customEvent.detail) return;
+        setIsMuted(customEvent.detail.action === 'mute');
+    }, []);
+
+    useEffect(() => {
+        window.addEventListener('controlTrailerAudio', handleControlTrailerAudio);
+        return () => {
+            window.removeEventListener('controlTrailerAudio', handleControlTrailerAudio);
+        };
+    }, [handleControlTrailerAudio]);
 
     useEffect(() => {
         let isMounted = true;
@@ -182,6 +236,26 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         return officialTrailer?.key || details.videos.results.find(v => v.site === 'YouTube' && v.type === 'Trailer')?.key || null;
     }, [details]);
 
+    const providersForCountry = useMemo(
+        () => details?.['watch/providers']?.results?.[country.code],
+        [details, country.code]
+    );
+
+    const availabilityBuckets = useMemo(
+        () => getAvailabilityBuckets(providersForCountry, providerIds),
+        [providersForCountry, providerIds]
+    );
+
+    const availabilityDescriptors = useMemo(
+        () => buildAvailabilityDescriptors(availabilityBuckets, 4),
+        [availabilityBuckets]
+    );
+
+    const hasStreamingAvailability = useMemo(
+        () => hasAvailability(availabilityBuckets),
+        [availabilityBuckets]
+    );
+
 
     if (isLoading) {
         return (
@@ -250,6 +324,19 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                             <span className="text-xl font-bold">{details.vote_average.toFixed(1)}</span>
                             <span className="text-sm text-slate-400">/ 10</span>
                         </div>
+                        {hasStreamingAvailability && (
+                            <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-4 text-xs md:text-sm text-slate-200">
+                                {availabilityDescriptors.map(descriptor => (
+                                    <span
+                                        key={descriptor.type}
+                                        className="bg-white/10 border border-white/20 px-3 py-1 rounded-full backdrop-blur-sm"
+                                    >
+                                        <span className="font-semibold text-white mr-1">{descriptor.type}:</span>
+                                        {descriptor.text}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -286,7 +373,7 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                     </section>
                 )}
 
-                <WhereToWatch providers={details['watch/providers']?.results[country.code]} />
+                <WhereToWatch providers={providersForCountry} providerIds={providerIds} />
 
                 {details.credits?.cast && details.credits.cast.length > 0 && (
                     <section className="my-12">

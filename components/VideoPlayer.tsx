@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ensureYouTubeApiIsReady } from '../services/youtubeService';
 
-// Add TypeScript declarations for the YouTube IFrame Player API to resolve compilation errors.
 declare global {
   interface Window {
     YT: typeof YT;
@@ -63,6 +62,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
     const playerContainerRef = useRef<HTMLDivElement>(null);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const isMountedRef = useRef(false);
+    const initialMuteRef = useRef(isMuted);
+    const lastVideoKeyRef = useRef<string | null>(null);
+    const onEndRef = useRef(onEnd);
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -71,13 +73,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
         };
     }, []);
 
-    // Effect to create and destroy the player ONCE.
+    useEffect(() => {
+        initialMuteRef.current = isMuted;
+    }, [isMuted]);
+
+    useEffect(() => {
+        onEndRef.current = onEnd;
+    }, [onEnd]);
+
     useEffect(() => {
         if (!playerContainerRef.current) return;
 
+        let isCancelled = false;
+
         const createPlayer = () => {
-            if (!isMountedRef.current || !playerContainerRef.current) return;
-            
+            if (!isMountedRef.current || !playerContainerRef.current || isCancelled) return;
+            if (!window.YT || typeof window.YT.Player !== 'function') return;
+
             const playerVars: YT.PlayerOptions['playerVars'] = {
                 autoplay: 1,
                 controls: 0,
@@ -87,7 +99,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
                 loop: loop ? 1 : 0,
                 fs: 0,
                 iv_load_policy: 3,
-                mute: 1,
+                mute: initialMuteRef.current ? 1 : 0,
             };
 
             if (loop) {
@@ -97,14 +109,21 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
             playerRef.current = new window.YT.Player(playerContainerRef.current, {
                 playerVars: playerVars,
                 events: {
-                    onReady: () => {
-                        if (isMountedRef.current) {
-                            setIsPlayerReady(true);
+                    onReady: (event) => {
+                        if (!isMountedRef.current || isCancelled) {
+                            return;
                         }
+
+                        if (!initialMuteRef.current && typeof event.target.unMute === 'function') {
+                            event.target.unMute();
+                        }
+
+                        lastVideoKeyRef.current = null;
+                        setIsPlayerReady(true);
                     },
                     onStateChange: (event) => {
-                        if (isMountedRef.current && event.data === window.YT.PlayerState.ENDED) {
-                            onEnd();
+                        if (isMountedRef.current && !isCancelled && event.data === window.YT.PlayerState.ENDED) {
+                            onEndRef.current();
                         }
                     },
                 },
@@ -114,25 +133,51 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
         ensureYouTubeApiIsReady().then(createPlayer);
 
         return () => {
+            isCancelled = true;
             playerRef.current?.destroy();
+            playerRef.current = null;
+            if (isMountedRef.current) {
+                setIsPlayerReady(false);
+            }
+            lastVideoKeyRef.current = null;
         };
-    }, [onEnd]);
+    }, [loop, videoKey]);
 
-    // Effect to load a new video when the key changes or player becomes ready.
     useEffect(() => {
-        if (isPlayerReady && playerRef.current && videoKey) {
+        if (!isPlayerReady || !playerRef.current || !videoKey) {
+            return;
+        }
+
+        if (lastVideoKeyRef.current === videoKey) {
+            return;
+        }
+
+        try {
             playerRef.current.loadVideoById(videoKey);
+            lastVideoKeyRef.current = videoKey;
+        } catch (error) {
+            console.error('Failed to load YouTube video', error);
         }
     }, [isPlayerReady, videoKey]);
 
-    // Effect to handle mute/unmute toggles.
     useEffect(() => {
-        if (isPlayerReady && playerRef.current && typeof playerRef.current.mute === 'function') {
-            if (isMuted) {
-                playerRef.current.mute();
-            } else {
-                playerRef.current.unMute();
+        if (!isPlayerReady || !playerRef.current) return;
+
+        const player = playerRef.current;
+
+        if (isMuted) {
+            if (typeof player.mute === 'function') {
+                player.mute();
             }
+            return;
+        }
+
+        if (typeof player.unMute === 'function') {
+            player.unMute();
+        }
+
+        if (typeof player.playVideo === 'function') {
+            player.playVideo();
         }
     }, [isPlayerReady, isMuted]);
 
