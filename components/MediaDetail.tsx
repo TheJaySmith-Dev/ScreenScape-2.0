@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { MediaItem, MovieDetails, TVShowDetails, WatchProvider, WatchProviderCountry } from '../types';
+import { MediaItem, Movie, MovieDetails, TVShowDetails, WatchProvider, WatchProviderCountry } from '../types';
 import { getMovieDetails, getTVShowDetails, getMovieRecommendations } from '../services/tmdbService';
 import { generateStoryScapeSummary } from './storyscape.js';
 import { useGeolocation } from '../hooks/useGeolocation';
