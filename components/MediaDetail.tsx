@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { MediaItem, MovieDetails, TVShowDetails, Movie, WatchProviderCountry } from '../types';
 import { getMovieDetails, getTVShowDetails, getMovieRecommendations } from '../services/tmdbService';
 import { generateStoryScapeSummary } from './storyscape.js';
@@ -7,6 +7,11 @@ import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import VideoPlayer from './VideoPlayer';
 import Loader from './Loader';
 import * as Icons from './Icons';
+import {
+    getAvailabilityBuckets,
+    buildAvailabilityDescriptors,
+    hasAvailability,
+} from '../utils/streamingAvailability';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 
@@ -19,26 +24,23 @@ interface MediaDetailProps {
     onInvalidApiKey: () => void;
 }
 
-const WhereToWatch: React.FC<{ providers: WatchProviderCountry | undefined }> = ({ providers }) => {
-    const { providerIds } = useStreamingPreferences();
+interface WhereToWatchProps {
+    providers: WatchProviderCountry | undefined;
+    providerIds: Set<number>;
+}
+
+const WhereToWatch: React.FC<WhereToWatchProps> = ({ providers, providerIds }) => {
     if (!providers) return null;
 
-    const { flatrate, rent, buy, link } = providers;
-
-    const sortAndFilter = (providerList: any[] | undefined) => {
-        if (!providerList) return [];
-        return providerList.sort((a, b) => {
-            const aIsPreferred = providerIds.has(a.provider_id);
-            const bIsPreferred = providerIds.has(b.provider_id);
-            if (aIsPreferred && !bIsPreferred) return -1;
-            if (!aIsPreferred && bIsPreferred) return 1;
-            return a.display_priority - b.display_priority;
-        });
-    };
-
-    const stream = sortAndFilter(flatrate);
-    const rental = sortAndFilter(rent);
-    const purchase = sortAndFilter(buy);
+    const { stream, rent, buy, link } = useMemo(() => {
+        const buckets = getAvailabilityBuckets(providers, providerIds);
+        return {
+            stream: buckets.stream,
+            rent: buckets.rent,
+            buy: buckets.buy,
+            link: providers.link,
+        };
+    }, [providers, providerIds]);
 
     if (!stream.length && !rental.length && !purchase.length) {
         return null;
@@ -60,7 +62,7 @@ const WhereToWatch: React.FC<{ providers: WatchProviderCountry | undefined }> = 
                         </div>
                     </div>
                 )}
-                 {rental.length > 0 && (
+                {rental.length > 0 && (
                     <div className="mb-4">
                         <h3 className="text-sm font-semibold text-slate-400 mb-2">RENT</h3>
                         <div className="flex flex-wrap gap-3">
@@ -72,7 +74,7 @@ const WhereToWatch: React.FC<{ providers: WatchProviderCountry | undefined }> = 
                         </div>
                     </div>
                 )}
-                 {purchase.length > 0 && (
+                {purchase.length > 0 && (
                     <div>
                         <h3 className="text-sm font-semibold text-slate-400 mb-2">BUY</h3>
                         <div className="flex flex-wrap gap-3">
@@ -99,11 +101,12 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     const [error, setError] = useState<string | null>(null);
     const [isMuted, setIsMuted] = useState(true);
     const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-    
+
     const [isStoryScapeLoading, setIsStoryScapeLoading] = useState(false);
     const [storyScapeError, setStoryScapeError] = useState<string | null>(null);
 
     const { country } = useGeolocation();
+    const { providerIds } = useStreamingPreferences();
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -112,6 +115,19 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         mediaQuery.addEventListener('change', handleChange);
         return () => mediaQuery.removeEventListener('change', handleChange);
     }, []);
+
+    const handleControlTrailerAudio = useCallback((event: Event) => {
+        const customEvent = event as CustomEvent<{ action: 'mute' | 'unmute' }>;
+        if (!customEvent.detail) return;
+        setIsMuted(customEvent.detail.action === 'mute');
+    }, []);
+
+    useEffect(() => {
+        window.addEventListener('controlTrailerAudio', handleControlTrailerAudio);
+        return () => {
+            window.removeEventListener('controlTrailerAudio', handleControlTrailerAudio);
+        };
+    }, [handleControlTrailerAudio]);
 
     useEffect(() => {
         let isMounted = true;
@@ -182,6 +198,26 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         return officialTrailer?.key || details.videos.results.find(v => v.site === 'YouTube' && v.type === 'Trailer')?.key || null;
     }, [details]);
 
+    const providersForCountry = useMemo(
+        () => details?.['watch/providers']?.results?.[country.code],
+        [details, country.code]
+    );
+
+    const availabilityBuckets = useMemo(
+        () => getAvailabilityBuckets(providersForCountry, providerIds),
+        [providersForCountry, providerIds]
+    );
+
+    const availabilityDescriptors = useMemo(
+        () => buildAvailabilityDescriptors(availabilityBuckets, 4),
+        [availabilityBuckets]
+    );
+
+    const hasStreamingAvailability = useMemo(
+        () => hasAvailability(availabilityBuckets),
+        [availabilityBuckets]
+    );
+
 
     if (isLoading) {
         return (
@@ -250,6 +286,19 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                             <span className="text-xl font-bold">{details.vote_average.toFixed(1)}</span>
                             <span className="text-sm text-slate-400">/ 10</span>
                         </div>
+                        {hasStreamingAvailability && (
+                            <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-4 text-xs md:text-sm text-slate-200">
+                                {availabilityDescriptors.map(descriptor => (
+                                    <span
+                                        key={descriptor.type}
+                                        className="bg-white/10 border border-white/20 px-3 py-1 rounded-full backdrop-blur-sm"
+                                    >
+                                        <span className="font-semibold text-white mr-1">{descriptor.type}:</span>
+                                        {descriptor.text}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -286,7 +335,7 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                     </section>
                 )}
 
-                <WhereToWatch providers={details['watch/providers']?.results[country.code]} />
+                <WhereToWatch providers={providersForCountry} providerIds={providerIds} />
 
                 {details.credits?.cast && details.credits.cast.length > 0 && (
                     <section className="my-12">
