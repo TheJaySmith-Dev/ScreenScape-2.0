@@ -1,10 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MediaItem, Video, TVShow } from '../types';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { MediaItem, Video, TVShow, WatchProviderCountry } from '../types';
 import { getTrending, getMovieDetails, getTVShowDetails } from '../services/tmdbService';
-// FIX: Import useGeolocation to get the user's selected country for API calls.
 import { useGeolocation } from '../hooks/useGeolocation';
+import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import VideoPlayer from './VideoPlayer';
 import { PlayIcon, VolumeOffIcon, VolumeUpIcon } from './Icons';
+import {
+    getAvailabilityBuckets,
+    buildAvailabilityDescriptors,
+    hasAvailability,
+} from '../utils/streamingAvailability';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
 
@@ -22,9 +27,23 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
     const [isHovered, setIsHovered] = useState(false);
     const [isTrailerLoading, setIsTrailerLoading] = useState(true);
     const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+    const [availabilityMap, setAvailabilityMap] = useState<Record<number, WatchProviderCountry | null>>({});
     const intervalRef = useRef<number | null>(null);
-    // FIX: Get the country code from the useGeolocation hook.
     const { country } = useGeolocation();
+    const { providerIds } = useStreamingPreferences();
+
+    const handleControlTrailerAudio = useCallback((event: Event) => {
+        const customEvent = event as CustomEvent<{ action: 'mute' | 'unmute' }>;
+        if (!customEvent.detail) return;
+        setIsMuted(customEvent.detail.action === 'mute');
+    }, []);
+
+    useEffect(() => {
+        window.addEventListener('controlTrailerAudio', handleControlTrailerAudio);
+        return () => {
+            window.removeEventListener('controlTrailerAudio', handleControlTrailerAudio);
+        };
+    }, [handleControlTrailerAudio]);
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -49,6 +68,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                     .slice(0, 7);
                 if (isMounted) {
                     setItems(filteredItems);
+                    setTrailers({});
+                    setAvailabilityMap({});
                 }
             } catch (error) {
                 console.error(error);
@@ -71,22 +92,24 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
             setIsTrailerLoading(true);
             const fetchTrailer = async () => {
                 try {
-                    // FIX: Pass the country code as the required third argument.
                     const details = currentItem.media_type === 'movie'
                         ? await getMovieDetails(apiKey, currentItem.id, country.code)
                         : await getTVShowDetails(apiKey, currentItem.id, country.code);
-                    
+
                     const officialTrailer = details.videos?.results.find((v: Video) => v.type === 'Trailer' && v.official && v.site === 'YouTube');
                     const anyTrailer = details.videos?.results.find((v: Video) => v.type === 'Trailer' && v.site === 'YouTube');
                     const trailerKey = officialTrailer?.key || anyTrailer?.key || null;
 
                     if (isMounted) {
                         setTrailers(prev => ({ ...prev, [currentItem.id]: trailerKey }));
+                        const providers = details['watch/providers']?.results?.[country.code] ?? null;
+                        setAvailabilityMap(prev => ({ ...prev, [currentItem.id]: providers }));
                     }
                 } catch (error) {
                     console.error("Failed to fetch trailer:", error);
                     if (isMounted) {
                         setTrailers(prev => ({ ...prev, [currentItem.id]: null })); // Mark as failed
+                        setAvailabilityMap(prev => ({ ...prev, [currentItem.id]: null }));
                     }
                 } finally {
                     if (isMounted) {
@@ -117,11 +140,24 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
 
     const activeItem = items[currentIndex];
     const activeTrailerKey = activeItem ? trailers[activeItem.id] : null;
-    const showVideo = !!activeTrailerKey && !isTrailerLoading;
+    const activeAvailability = activeItem ? availabilityMap[activeItem.id] ?? undefined : undefined;
+    const showVideo = !!activeTrailerKey && !isTrailerLoading && !prefersReducedMotion;
+
+    const activeBuckets = useMemo(
+        () => getAvailabilityBuckets(activeAvailability, providerIds),
+        [activeAvailability, providerIds]
+    );
+
+    const availabilityDescriptors = useMemo(
+        () => buildAvailabilityDescriptors(activeBuckets, 3),
+        [activeBuckets]
+    );
+
+    const showAvailability = useMemo(() => hasAvailability(activeBuckets), [activeBuckets]);
 
     return (
-        <div 
-            className="relative h-[80vh] w-full text-white overflow-hidden"
+        <div
+            className="relative min-h-[520px] sm:h-[80vh] w-full text-white overflow-hidden"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
@@ -148,23 +184,40 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
             <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/60 to-transparent" />
             <div className="absolute inset-0 bg-black/20" />
 
-            <div className="relative h-full flex flex-col justify-end container mx-auto px-4 sm:px-6 lg:px-8 pb-32 md:pb-40 z-10">
+            <div className="relative h-full flex flex-col justify-end container mx-auto px-4 sm:px-6 lg:px-8 pb-20 sm:pb-28 md:pb-40 z-10">
                 {activeItem && (
-                    <div className="w-full md:w-1/2 lg:w-2/5 animate-fade-in-up">
-                        <h2 className="text-4xl md:text-6xl font-bold drop-shadow-lg">{activeItem.media_type === 'movie' ? activeItem.title : (activeItem as TVShow).name}</h2>
-                        <p className="mt-4 text-lg text-slate-200 line-clamp-3 drop-shadow-md">{activeItem.overview}</p>
-                        <div className="mt-6 flex items-center gap-4">
+                    <div className="w-full md:w-1/2 lg:w-2/5 max-w-2xl animate-fade-in-up space-y-4">
+                        <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold drop-shadow-lg leading-tight">
+                            {activeItem.media_type === 'movie' ? activeItem.title : (activeItem as TVShow).name}
+                        </h2>
+                        <p className="text-base sm:text-lg text-slate-200 line-clamp-4 sm:line-clamp-3 drop-shadow-md">
+                            {activeItem.overview}
+                        </p>
+                        {showAvailability && (
+                            <div className="flex flex-wrap gap-2 text-xs sm:text-sm text-slate-200">
+                                {availabilityDescriptors.map(descriptor => (
+                                    <span
+                                        key={descriptor.type}
+                                        className="bg-black/40 border border-white/10 px-3 py-1 rounded-full backdrop-blur-sm"
+                                    >
+                                        <span className="font-semibold text-white mr-1">{descriptor.type}:</span>
+                                        {descriptor.text}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-2">
                             <button
                                 onClick={() => onSelectItem(activeItem)}
-                                className="flex items-center gap-2 bg-white text-black font-bold px-6 py-3 rounded-full hover:bg-slate-200 transition-colors"
+                                className="flex items-center justify-center gap-2 bg-white text-black font-bold px-6 py-3 rounded-full hover:bg-slate-200 transition-colors shadow-lg sm:shadow-none"
                             >
                                 <PlayIcon className="w-6 h-6" />
                                 More Info
                             </button>
                             {showVideo && (
-                                <button 
+                                <button
                                     onClick={() => setIsMuted(!isMuted)}
-                                    className="glass-button rounded-full w-12 h-12 flex items-center justify-center"
+                                    className="glass-button rounded-full w-12 h-12 flex items-center justify-center self-center"
                                 >
                                     {isMuted ? <VolumeOffIcon className="w-6 h-6" /> : <VolumeUpIcon className="w-6 h-6" />}
                                 </button>
@@ -175,9 +228,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
             </div>
 
             {/* Progress Indicators */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+            <div className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2">
                 {items.map((_, index) => (
-                    <button key={index} onClick={() => setCurrentIndex(index)} className="w-12 h-1 bg-white/20 rounded-full overflow-hidden">
+                    <button key={index} onClick={() => setCurrentIndex(index)} className="w-8 sm:w-12 h-1 bg-white/20 rounded-full overflow-hidden">
                         <div className={`h-full bg-white ${index === currentIndex ? 'animate-progress' : ''} ${index > currentIndex ? 'w-0' : 'w-full'}`} />
                     </button>
                 ))}

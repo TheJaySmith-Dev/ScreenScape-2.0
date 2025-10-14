@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ensureYouTubeApiIsReady } from '../services/youtubeService';
 
-// Add TypeScript declarations for the YouTube IFrame Player API to resolve compilation errors.
 declare global {
   interface Window {
     YT: typeof YT;
@@ -63,6 +62,33 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
     const playerContainerRef = useRef<HTMLDivElement>(null);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const isMountedRef = useRef(false);
+    const initialMuteRef = useRef(isMuted);
+    const desiredMuteRef = useRef(isMuted);
+    const lastVideoKeyRef = useRef<string | null>(null);
+    const onEndRef = useRef(onEnd);
+
+    const applyMuteState = useCallback((player: YT.Player | null, shouldMute: boolean) => {
+        if (!player) return;
+
+        try {
+            if (shouldMute) {
+                if (typeof player.mute === 'function') {
+                    player.mute();
+                }
+                return;
+            }
+
+            if (typeof player.unMute === 'function') {
+                player.unMute();
+            }
+
+            if (typeof player.playVideo === 'function') {
+                player.playVideo();
+            }
+        } catch (error) {
+            console.error('Failed to sync YouTube player audio state', error);
+        }
+    }, []);
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -71,13 +97,24 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
         };
     }, []);
 
-    // Effect to create and destroy the player ONCE.
+    useEffect(() => {
+        initialMuteRef.current = isMuted;
+        desiredMuteRef.current = isMuted;
+    }, [isMuted]);
+
+    useEffect(() => {
+        onEndRef.current = onEnd;
+    }, [onEnd]);
+
     useEffect(() => {
         if (!playerContainerRef.current) return;
 
+        let isCancelled = false;
+
         const createPlayer = () => {
-            if (!isMountedRef.current || !playerContainerRef.current) return;
-            
+            if (!isMountedRef.current || !playerContainerRef.current || isCancelled) return;
+            if (!window.YT || typeof window.YT.Player !== 'function') return;
+
             const playerVars: YT.PlayerOptions['playerVars'] = {
                 autoplay: 1,
                 controls: 0,
@@ -87,7 +124,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
                 loop: loop ? 1 : 0,
                 fs: 0,
                 iv_load_policy: 3,
-                mute: 1,
+                mute: initialMuteRef.current ? 1 : 0,
             };
 
             if (loop) {
@@ -97,14 +134,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
             playerRef.current = new window.YT.Player(playerContainerRef.current, {
                 playerVars: playerVars,
                 events: {
-                    onReady: () => {
-                        if (isMountedRef.current) {
-                            setIsPlayerReady(true);
+                    onReady: (event) => {
+                        if (!isMountedRef.current || isCancelled) {
+                            return;
                         }
+
+                        applyMuteState(event.target, desiredMuteRef.current);
+                        lastVideoKeyRef.current = null;
+                        setIsPlayerReady(true);
                     },
                     onStateChange: (event) => {
-                        if (isMountedRef.current && event.data === window.YT.PlayerState.ENDED) {
-                            onEnd();
+                        if (!isMountedRef.current || isCancelled) {
+                            return;
+                        }
+
+                        try {
+                            if (window.YT && event.data === window.YT.PlayerState.ENDED) {
+                                onEndRef.current();
+                            }
+                        } catch (error) {
+                            console.error('YouTube player state change handler failed', error);
                         }
                     },
                 },
@@ -114,27 +163,39 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
         ensureYouTubeApiIsReady().then(createPlayer);
 
         return () => {
+            isCancelled = true;
             playerRef.current?.destroy();
+            playerRef.current = null;
+            if (isMountedRef.current) {
+                setIsPlayerReady(false);
+            }
+            lastVideoKeyRef.current = null;
         };
-    }, [onEnd]);
+    }, [applyMuteState, loop, videoKey]);
 
-    // Effect to load a new video when the key changes or player becomes ready.
     useEffect(() => {
-        if (isPlayerReady && playerRef.current && videoKey) {
+        if (!isPlayerReady || !playerRef.current || !videoKey) {
+            return;
+        }
+
+        if (lastVideoKeyRef.current === videoKey) {
+            return;
+        }
+
+        try {
             playerRef.current.loadVideoById(videoKey);
+            lastVideoKeyRef.current = videoKey;
+        } catch (error) {
+            console.error('Failed to load YouTube video', error);
         }
     }, [isPlayerReady, videoKey]);
 
-    // Effect to handle mute/unmute toggles.
     useEffect(() => {
-        if (isPlayerReady && playerRef.current && typeof playerRef.current.mute === 'function') {
-            if (isMuted) {
-                playerRef.current.mute();
-            } else {
-                playerRef.current.unMute();
-            }
-        }
-    }, [isPlayerReady, isMuted]);
+        if (!isPlayerReady || !playerRef.current) return;
+
+        const player = playerRef.current;
+        applyMuteState(player, isMuted);
+    }, [applyMuteState, isPlayerReady, isMuted]);
 
 
     return <div ref={playerContainerRef} className="w-full h-full" />;
