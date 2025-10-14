@@ -416,7 +416,7 @@ body.voice-mode-active {
 /* Mute Toggle Button */
 .mute-toggle {
     position: absolute;
-    top: 1.25rem;
+    bottom: 1.25rem;
     right: 1.25rem;
     z-index: 10;
     background: rgba(20, 20, 30, 0.5);

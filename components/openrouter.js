@@ -1,4 +1,4 @@
-const OPENROUTER_API_KEY = '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';
+const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || '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';
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
 /**

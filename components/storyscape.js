@@ -49,7 +49,7 @@ function buildFallbackSummary(title, overview) {
   }
 
   return {
-    summary,
+    summary: `"${summary}"`,
     tone: DEFAULT_TONE,
     style: DEFAULT_STYLE,
     origin: "fallback",
@@ -105,7 +105,7 @@ export async function generateStoryScapeSummary(title, overview) {
   1. A concise, poetic summary (maximum 60 words).
   2. The emotional tone (e.g., "Hopeful and melancholic", "Tense and thrilling").
   3. A visual style descriptor (e.g., "Visually poetic with neon framing", "Gritty and realistic").
-  
+
   Respond ONLY with a valid JSON object in the following format:
   {
     "summary": "...",
@@ -116,14 +116,45 @@ export async function generateStoryScapeSummary(title, overview) {
 
   try {
     const rawResponse = await queryOpenRouter(prompt);
+
+    // Check for error messages indicating unavailability
+    const normalizedResponse = typeof rawResponse === "string" ? rawResponse.toLowerCase() : "";
+    if (normalizedResponse.includes("unavailable") || normalizedResponse.includes("rate limit") || normalizedResponse.includes("connection issue")) {
+      console.warn("StoryScape API unavailable, using fallback");
+      const fallback = buildFallbackSummary(title, overview);
+      if (fallback) {
+        return fallback;
+      }
+      throw new Error("StoryScape is temporarily unavailable. Please try again later.");
+    }
+
     const parsed = parseStoryScapeResponse(rawResponse);
     if (parsed) {
       return parsed;
     }
 
-    const normalizedResponse = typeof rawResponse === "string" ? rawResponse.toLowerCase() : "";
-    if (normalizedResponse.includes("unavailable") || normalizedResponse.includes("rate limit")) {
-      throw new Error("StoryScape is temporarily unavailable. Please try again later.");
+    // If parsing failed but we got a response, try to use it as direct summary
+    if (rawResponse && typeof rawResponse === "string" && rawResponse.length > 10) {
+      // Extract potential summary from response
+      const summaryMatch = rawResponse.match(/"([^"]{10,200})"/);
+      if (summaryMatch) {
+        return {
+          summary: summaryMatch[1],
+          tone: DEFAULT_TONE,
+          style: DEFAULT_STYLE,
+          origin: "ai-fallback",
+        };
+      }
+
+      // Use response directly if it looks like a summary
+      if (rawResponse.length > 20 && rawResponse.length < 100) {
+        return {
+          summary: rawResponse,
+          tone: DEFAULT_TONE,
+          style: DEFAULT_STYLE,
+          origin: "ai-direct",
+        };
+      }
     }
 
     const fallback = buildFallbackSummary(title, overview);
