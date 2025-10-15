@@ -11,10 +11,13 @@ import AIAssistant, { AIStatus } from './components/AIAssistant';
 import TypeToAssist from './components/TypeToAssist';
 import AIGlow from './components/AIGlow';
 import QuickJump from './components/QuickJump';
+import Auth from './components/Auth';
+import { useAuth } from './contexts/AuthContext';
 
 export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game';
 
 const App: React.FC = () => {
+    const { user, loading, userSettings, updateUserSettings, syncLoading } = useAuth();
     const [apiKey, setApiKey] = useState<string | null>(null);
     const [isKeyInvalid, setIsKeyInvalid] = useState(false);
     const [view, setView] = useState<ViewType>('screenSearch');
@@ -25,15 +28,36 @@ const App: React.FC = () => {
     const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
 
     useEffect(() => {
-        const storedKey = localStorage.getItem('tmdb_api_key');
-        if (storedKey) {
-            setApiKey(storedKey);
-            setIsKeyInvalid(false);
-        } else {
-            // No key found, prompt user
-            setIsKeyInvalid(true); 
+        // Sync TMDB API key with database when user logs in
+        if (user && userSettings) {
+            const syncedKey = userSettings.tmdb_api_key;
+            if (syncedKey) {
+                setApiKey(syncedKey);
+                localStorage.setItem('tmdb_api_key', syncedKey);
+                setIsKeyInvalid(false);
+            } else {
+                // Check localStorage as fallback for first-time users
+                const localKey = localStorage.getItem('tmdb_api_key');
+                if (localKey) {
+                    setApiKey(localKey);
+                    setIsKeyInvalid(false);
+                    // Sync to database for future logins
+                    updateUserSettings({ tmdb_api_key: localKey }).catch(console.error);
+                } else {
+                    setIsKeyInvalid(true);
+                }
+            }
+        } else if (!user) {
+            // User not logged in, check localStorage
+            const localKey = localStorage.getItem('tmdb_api_key');
+            if (localKey) {
+                setApiKey(localKey);
+                setIsKeyInvalid(false);
+            } else {
+                setIsKeyInvalid(true);
+            }
         }
-    }, []);
+    }, [user, userSettings, updateUserSettings]);
 
     const handleInvalidApiKey = useCallback(() => {
         localStorage.removeItem('tmdb_api_key');
@@ -94,6 +118,22 @@ const App: React.FC = () => {
         }
     };
 
+    // Show authentication screen if not authenticated
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-primary text-white flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                    <p>Loading ScreenScape...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!user) {
+        return <Auth />;
+    }
+
     if (!apiKey) {
         return <ApiKeySetup isKeyInvalid={isKeyInvalid} />;
     }
@@ -102,7 +142,7 @@ const App: React.FC = () => {
         <div className="bg-primary text-white min-h-screen font-sans">
             <AIGlow status={aiStatus} />
             <Header view={view} setView={setView} onSettingsClick={() => setIsSettingsOpen(true)} />
-            
+
             <main className="pt-20">
                 {renderView()}
             </main>

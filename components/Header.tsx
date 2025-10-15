@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { GearIcon, MenuIcon, XIcon } from './Icons';
 import { ViewType } from '../App';
+import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
     view: ViewType;
@@ -10,6 +11,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const { user, signOut } = useAuth();
 
     const NavButton: React.FC<{ viewName: ViewType, children: React.ReactNode, isMobile?: boolean }> = ({ viewName, children, isMobile = false }) => (
         <button 
@@ -40,11 +42,24 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
 
                     {/* Right-side controls */}
                     <div className="flex items-center gap-2 sm:gap-4">
+                        {/* User Info and Logout */}
+                        {user && (
+                            <div className="flex items-center gap-2 text-sm text-slate-300">
+                                <span className="hidden sm:inline">{user.email}</span>
+                                <button
+                                    onClick={signOut}
+                                    className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                                >
+                                    Logout
+                                </button>
+                            </div>
+                        )}
+
                         {/* Settings Icon (Desktop) */}
                         <button onClick={onSettingsClick} className="text-slate-300 hover:text-white transition-colors p-2 rounded-full glass-button hidden md:block">
                             <GearIcon className="w-6 h-6" />
                         </button>
-                        
+
                         {/* Mobile Menu Icon */}
                         <div className="md:hidden flex items-center">
                             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-slate-300 hover:text-white p-2">

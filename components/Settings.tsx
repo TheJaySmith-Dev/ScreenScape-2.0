@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme, ThemeKey } from '../hooks/useTheme';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import { useVoicePreferences, VoiceKey, LanguageKey } from '../hooks/useVoicePreferences';
 import { useGeolocation } from '../hooks/useGeolocation';
+import { useAuth } from '../contexts/AuthContext';
 import * as Icons from './Icons';
 
 type SettingsPage = 'main' | 'region' | 'streaming' | 'voice' | 'theme';
@@ -11,12 +12,25 @@ type SettingsPage = 'main' | 'region' | 'streaming' | 'voice' | 'theme';
 
 const ThemeSelector: React.FC = () => {
   const { theme, setCurrentTheme, availableThemes } = useTheme();
+  const { updateUserSettings } = useAuth();
+
+  const handleThemeChange = async (themeKey: ThemeKey) => {
+    setCurrentTheme(themeKey);
+    try {
+      await updateUserSettings({
+        theme_preferences: { theme: themeKey }
+      });
+    } catch (error) {
+      console.error('Failed to sync theme preference:', error);
+    }
+  };
+
   return (
     <div className="grid grid-cols-2 gap-4">
       {availableThemes.map(({ key, name }) => (
         <button
           key={key}
-          onClick={() => setCurrentTheme(key as ThemeKey)}
+          onClick={() => handleThemeChange(key as ThemeKey)}
           className={`p-4 rounded-lg text-left transition-all duration-300 ${theme === key ? 'ring-2 ring-accent-500 bg-accent-500/30' : 'bg-white/5 hover:bg-white/10'}`}
         >
           <span className="font-semibold">{name}</span>
@@ -155,6 +169,7 @@ const MainSettingsPage: React.FC<{ onNavigate: (page: SettingsPage) => void }> =
 
 const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [page, setPage] = useState<SettingsPage>('main');
+    const { syncLoading, syncData } = useAuth();
 
     const pageTitles: Record<SettingsPage, string> = {
         main: 'Settings',
@@ -195,9 +210,17 @@ const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         {pageTitles[page]}
                     </h2>
                     {page === 'main' && (
-                         <button onClick={onClose} className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
-                            <Icons.XIcon className="w-6 h-6" />
-                        </button>
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                            {syncLoading && (
+                                <div className="flex items-center gap-1 text-xs text-slate-400">
+                                    <div className="w-3 h-3 border border-slate-500 rounded-full animate-spin border-t-transparent"></div>
+                                    <span>Syncing</span>
+                                </div>
+                            )}
+                            <button onClick={onClose} className="text-slate-400 hover:text-white">
+                                <Icons.XIcon className="w-6 h-6" />
+                            </button>
+                        </div>
                     )}
                 </div>
                 

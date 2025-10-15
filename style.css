@@ -2,7 +2,38 @@
 :root {
   --color-primary: #0a0a0f;
   --color-glass-edge: rgba(255, 255, 255, 0.1);
-  --color-glow: 0 0 10px var(--color-accent-400), 0 0 20px var(--color-accent-500);
+  --color-glow: 0 0 10px var(--color-accent-400) 10px 0 20px var(--color-accent-500);
+  /* Liquid Glass Variables */
+  --glass-gradient-start: #E8EAF0;
+  --glass-gradient-end: #C9CCD8;
+  --glass-blue-violet-start: #6B73FF;
+  --glass-blue-violet-end: #000DFF;
+  --icon-gradient-start: #8BB6FF;
+  --icon-gradient-end: #C6B3FF;
+  --spotlight-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Liquid Glass Utility Classes */
+.glass-element {
+  background: rgba(20, 20, 30, 0.5);
+  backdrop-filter: blur(25px) saturate(180%);
+  -webkit-backdrop-filter: blur(25px) saturate(180%);
+  border: 1px solid var(--color-glass-edge);
+}
+
+.glass-element-liquid {
+  background:
+    linear-gradient(135deg, var(--glass-gradient-start) 0%, var(--glass-gradient-end) 100%),
+    rgba(232, 234, 240, 0.85);
+  backdrop-filter: blur(25px) saturate(180%);
+  -webkit-backdrop-filter: blur(25px) saturate(180%);
+  border: 1px solid var(--color-glass-edge);
+  border-radius: 24px;
+  position: relative;
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
 }
 
 /* Theme Definitions */
@@ -42,13 +73,70 @@ body.voice-mode-active {
   }
 }
 
-/* Glass UI Elements */
+/* Liquid Glass UI Elements - Apple Liquid Glass Inspired */
 .glass-panel {
-  background: rgba(20, 20, 30, 0.5);
+  /* Base gradient background */
+  background:
+    linear-gradient(135deg, var(--glass-gradient-start) 0%, var(--glass-gradient-end) 100%),
+    rgba(232, 234, 240, 0.85);
   backdrop-filter: blur(25px) saturate(180%);
   -webkit-backdrop-filter: blur(25px) saturate(180%);
   border: 1px solid var(--color-glass-edge);
-  border-radius: 1.5rem;
+
+  /* Glass panel configuration */
+  border-radius: 24px;
+
+  /* Panel depth and reflection */
+  position: relative;
+  box-shadow:
+    /* Main drop shadow with luminous glow */
+    0 8px 40px rgba(107, 115, 255, 0.2),
+    0 0 0 1px rgba(0, 13, 255, 0.1),
+    /* Inner highlight from top for glass sheen */
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    /* Bottom vignette for depth */
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+
+/* Add spotlight lighting effect to body for cinematic feel */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 700px;
+  height: 500px;
+  background: var(--spotlight-color);
+  filter: blur(350px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Responsive spotlight adjustments */
+@media (max-width: 1024px) {
+  body::before {
+    width: 500px;
+    height: 400px;
+    filter: blur(250px);
+  }
+}
+
+@media (max-width: 768px) {
+  body::before {
+    width: 300px;
+    height: 300px;
+    filter: blur(200px);
+  }
+}
+
+@media (max-width: 480px) {
+  body::before {
+    width: 200px;
+    height: 200px;
+    filter: blur(150px);
+  }
 }
 
 .glass-button {
@@ -56,10 +144,12 @@ body.voice-mode-active {
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.15);
   transition: all 0.3s ease;
+  border-radius: 24px;
 }
 .glass-button:hover {
   background: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 15px rgba(107, 115, 255, 0.2);
 }
 .glass-button-primary {
     background: rgba(from var(--color-accent-500) r g b / 0.4);
@@ -436,6 +526,39 @@ body.voice-mode-active {
     transform: scale(1.1);
 }
 
+
+/* Liquid Glass Typography & Icons */
+h1, h2, h3, h4, h5, h6 {
+    color: #FFFFFF;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+}
+
+h1, .text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl {
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 600;
+}
+
+h2, .text-lg, .text-lg {
+    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 500;
+}
+
+.subtext, small, p.text-gray-400, p.text-slate-400, .text-sm {
+    color: #C6C9D0;
+    font-weight: 400;
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+/* Icon Gradient Styling */
+.icon-glow {
+    filter: drop-shadow(0 0 10px rgba(107, 115, 255, 0.5)) drop-shadow(0 0 20px rgba(0, 13, 255, 0.3));
+    transition: filter 0.3s ease;
+}
+
+.icon-glow:hover {
+    filter: drop-shadow(0 0 15px rgba(107, 115, 255, 0.7)) drop-shadow(0 0 30px rgba(0, 13, 255, 0.5));
+}
 
 /* StoryScape Styles */
 .storyscape-generate-button {
