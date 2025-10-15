@@ -311,11 +311,7 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                         {isMuted ? <Icons.VolumeOffIcon className="w-6 h-6" /> : <Icons.VolumeUpIcon className="w-6 h-6" />}
                     </button>
                 )}
-            </div>
 
-            <div className="trailer-gradient" />
-
-            <div className="title-glass-panel">
                 {shouldRenderTrailer && (
                     <div className="trailer-logo-overlay">
                         {details.images?.logos && details.images.logos.length > 0 && (
@@ -327,10 +323,20 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                         )}
                     </div>
                 )}
+            </div>
 
+            <div className="trailer-gradient" />
+
+            <div className="title-glass-panel">
                 <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8">
                     <div className="w-full text-center md:text-left space-y-3">
-                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-tight">{title}</h1>
+                        {shouldRenderTrailer ? (
+                            <div className="video-title-overlay">
+                                <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-tight">{title}</h1>
+                            </div>
+                        ) : (
+                            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-tight">{title}</h1>
+                        )}
                         <div className="flex flex-wrap justify-center md:justify-start items-center gap-x-3 gap-y-2 text-slate-300">
                             <span>{year}</span>
                             <span className="w-1 h-1 bg-slate-400 rounded-full hidden sm:block" />

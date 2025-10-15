@@ -426,14 +426,14 @@ body::before {
 /* Logo overlay styles */
 .trailer-logo-overlay {
     position: absolute;
-    top: 2rem;
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
+    transform: translate(-50%, -50%);
+    z-index: 60;
     max-width: 60%;
-    max-height: 20vh;
-    opacity: 0.9;
-    filter: drop-shadow(0 0 15px rgba(0, 0, 0, 0.7));
+    max-height: 30vh;
+    opacity: 0.95;
+    filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.8));
 }
 .trailer-logo {
     width: auto;
@@ -441,7 +441,7 @@ body::before {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
-    mix-blend-mode: lighten;
+    mix-blend-mode: screen;
 }
 .trailer-logo-overlay.showcase {
     top: 50%;
@@ -453,7 +453,7 @@ body::before {
 @media (max-width: 768px) {
     .trailer-logo-overlay {
         max-width: 70%;
-        max-height: 15vh;
+        max-height: 25vh;
     }
     .trailer-logo-overlay.showcase {
         max-width: 60%;
@@ -462,11 +462,14 @@ body::before {
 @media (max-width: 480px) {
     .trailer-logo-overlay {
         max-width: 80%;
-        max-height: 12vh;
+        max-height: 20vh;
     }
     .trailer-logo-overlay.showcase {
         max-width: 70%;
     }
+}
+.video-title-overlay {
+    display: none;
 }
 .trailer-gradient {
     position: relative;
