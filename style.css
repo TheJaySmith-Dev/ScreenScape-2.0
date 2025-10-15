@@ -414,7 +414,7 @@ body::before {
     width: 100%;
     aspect-ratio: 16 / 9;
     overflow: hidden;
-    z-index: 1;
+    z-index: 60;
 }
 .trailer-container iframe {
     width: 100%;
