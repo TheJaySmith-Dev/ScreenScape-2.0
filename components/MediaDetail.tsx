@@ -316,12 +316,19 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
             <div className="trailer-gradient" />
 
             <div className="title-glass-panel">
+                {shouldRenderTrailer && (
+                    <div className="trailer-logo-overlay">
+                        {details.images?.logos && details.images.logos.length > 0 && (
+                            <img
+                                src={`${IMAGE_BASE_URL}w500${details.images.logos.find(logo => logo.iso_639_1 === 'en' || !logo.iso_639_1)!.file_path}`}
+                                alt={`${title} logo`}
+                                className="trailer-logo"
+                            />
+                        )}
+                    </div>
+                )}
+
                 <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8">
-                    <img
-                        src={details.poster_path ? `${IMAGE_BASE_URL}w500${details.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'}
-                        alt={title}
-                        className="title-poster"
-                    />
                     <div className="w-full text-center md:text-left space-y-3">
                         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-tight">{title}</h1>
                         <div className="flex flex-wrap justify-center md:justify-start items-center gap-x-3 gap-y-2 text-slate-300">

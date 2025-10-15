@@ -152,6 +152,7 @@ export interface MovieDetails extends Movie {
     videos: { results: Video[] };
     credits: { cast: CastMember[]; crew: CrewMember[] };
     'watch/providers': WatchProviderResponse;
+    images: ImagesResponse;
     revenue: number; // Ensure revenue is here
 }
 
@@ -164,6 +165,7 @@ export interface TVShowDetails extends TVShow {
     videos: { results: Video[] };
     credits: { cast: CastMember[]; crew: CrewMember[] };
     'watch/providers': WatchProviderResponse;
+    images: ImagesResponse;
 }
 
 // Types for Release Dates endpoint

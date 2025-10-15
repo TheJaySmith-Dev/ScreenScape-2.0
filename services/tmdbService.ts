@@ -53,11 +53,11 @@ export const getPopularTVShows = async (apiKey: string, page: number = 1): Promi
 };
 
 export const getMovieDetails = (apiKey: string, movieId: number, region: string): Promise<MovieDetails> => {
-  return apiFetch(apiKey, `/movie/${movieId}`, { append_to_response: 'videos,credits,watch/providers', region });
+  return apiFetch(apiKey, `/movie/${movieId}`, { append_to_response: 'videos,credits,watch/providers,images', region });
 };
 
 export const getTVShowDetails = (apiKey: string, tvId: number, region: string): Promise<TVShowDetails> => {
-  return apiFetch(apiKey, `/tv/${tvId}`, { append_to_response: 'videos,credits,watch/providers', region });
+  return apiFetch(apiKey, `/tv/${tvId}`, { append_to_response: 'videos,credits,watch/providers,images', region });
 };
 
 export const getMovieReleaseDates = (apiKey: string, movieId: number): Promise<ReleaseDatesResponse> => {
