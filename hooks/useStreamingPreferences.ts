@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 const PREFERENCES_KEY = 'screenScapeStreamingProviders';
 
@@ -19,12 +20,22 @@ const getStoredSet = (): Set<number> => {
 
 export const useStreamingPreferences = () => {
   const [providerIds, setProviderIds] = useState<Set<number>>(new Set());
+  const { userSettings, updateUserSettings, user } = useAuth();
 
   useEffect(() => {
-    setProviderIds(getStoredSet());
-  }, []);
+    // Load from user settings if available, otherwise from localStorage
+    if (user && userSettings?.streaming_preferences) {
+      const syncedProviders = new Set(userSettings.streaming_preferences as number[]);
+      setProviderIds(syncedProviders);
+      // Also sync to localStorage
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify(Array.from(syncedProviders)));
+    } else {
+      // Fall back to localStorage
+      setProviderIds(getStoredSet());
+    }
+  }, [user, userSettings]);
 
-  const toggleProvider = useCallback((providerId: number) => {
+  const toggleProvider = useCallback(async (providerId: number) => {
     setProviderIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(providerId)) {
@@ -32,11 +43,23 @@ export const useStreamingPreferences = () => {
       } else {
         newSet.add(providerId);
       }
+
+      // Sync to localStorage
       localStorage.setItem(PREFERENCES_KEY, JSON.stringify(Array.from(newSet)));
+
+      // Sync to database if user is logged in
+      if (user) {
+        updateUserSettings({
+          streaming_preferences: Array.from(newSet)
+        }).catch(error => {
+          console.error('Failed to sync streaming preferences:', error);
+        });
+      }
+
       return newSet;
     });
-  }, []);
-  
+  }, [user, updateUserSettings]);
+
   const isProviderSelected = useCallback((providerId: number) => {
     return providerIds.has(providerId);
   }, [providerIds]);

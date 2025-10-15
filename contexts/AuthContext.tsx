@@ -145,6 +145,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setWatchlist([]);
         setSearchHistory([]);
         setGameProgress({});
+        // Clear local streaming preferences from user data
+        localStorage.removeItem('screenScapeStreamingProviders');
       }
     });
 
