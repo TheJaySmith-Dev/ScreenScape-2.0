@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import syncManager from '../utils/syncOffline';
 
 const PREFERENCES_KEY = 'screenScapeStreamingProviders';
 
@@ -23,17 +24,29 @@ export const useStreamingPreferences = () => {
   const { userSettings, updateUserSettings, user } = useAuth();
 
   useEffect(() => {
-    // Load from user settings if available, otherwise from localStorage
-    if (user && userSettings?.streaming_preferences) {
-      const syncedProviders = new Set(userSettings.streaming_preferences as number[]);
-      setProviderIds(syncedProviders);
-      // Also sync to localStorage
-      localStorage.setItem(PREFERENCES_KEY, JSON.stringify(Array.from(syncedProviders)));
+    if (user) {
+      // Logged in: use database as source of truth
+      if (userSettings?.streaming_preferences) {
+        setProviderIds(new Set(userSettings.streaming_preferences as number[]));
+      } else {
+        // Check if we have local preferences to migrate
+        const localPrefs = getStoredSet();
+        if (localPrefs.size > 0) {
+          // Migrate local preferences to database
+          const prefsArray = Array.from(localPrefs);
+          updateUserSettings({ streaming_preferences: prefsArray }).catch(error => {
+            console.error('Failed to migrate streaming preferences:', error);
+          });
+          setProviderIds(localPrefs);
+        } else {
+          setProviderIds(new Set());
+        }
+      }
     } else {
-      // Fall back to localStorage
+      // Not logged in: use localStorage
       setProviderIds(getStoredSet());
     }
-  }, [user, userSettings]);
+  }, [user, userSettings, updateUserSettings]);
 
   const toggleProvider = useCallback(async (providerId: number) => {
     setProviderIds(prev => {
@@ -44,21 +57,23 @@ export const useStreamingPreferences = () => {
         newSet.add(providerId);
       }
 
-      // Sync to localStorage
-      localStorage.setItem(PREFERENCES_KEY, JSON.stringify(Array.from(newSet)));
+      const prefsArray = Array.from(newSet);
 
-      // Sync to database if user is logged in
       if (user) {
-        updateUserSettings({
-          streaming_preferences: Array.from(newSet)
-        }).catch(error => {
-          console.error('Failed to sync streaming preferences:', error);
+        // For logged in users: sync to both localStorage and database (via syncManager for offline support)
+        localStorage.setItem(PREFERENCES_KEY, JSON.stringify(prefsArray));
+        syncManager.addToOfflineQueue('user_settings', {
+          user_id: user.id,
+          settings: { streaming_preferences: prefsArray }
         });
+      } else {
+        // For non-logged in users: only localStorage
+        localStorage.setItem(PREFERENCES_KEY, JSON.stringify(prefsArray));
       }
 
       return newSet;
     });
-  }, [user, updateUserSettings]);
+  }, [user]);
 
   const isProviderSelected = useCallback((providerId: number) => {
     return providerIds.has(providerId);
