@@ -117,7 +117,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
 
             const playerVars: YT.PlayerOptions['playerVars'] = {
                 autoplay: 1,
-                controls: 0,
+                controls: 1,
                 showinfo: 0,
                 rel: 0,
                 modestbranding: 1,
