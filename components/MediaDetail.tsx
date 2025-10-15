@@ -315,6 +315,9 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                 {shouldRenderTrailer && (
                     <div className="trailer-logo-overlay">
                         {details.images?.logos && details.images.logos.length > 0 && (
+                            <div className="logo-background"></div>
+                        )}
+                        {details.images?.logos && details.images.logos.length > 0 && (
                             <img
                                 src={`${IMAGE_BASE_URL}w500${details.images.logos.find(logo => logo.iso_639_1 === 'en' || !logo.iso_639_1)!.file_path}`}
                                 alt={`${title} logo`}
