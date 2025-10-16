@@ -7,14 +7,16 @@ import GameView, { Game } from './components/GameView';
 import MediaDetail from './components/MediaDetail';
 import ApiKeySetup from './components/ApiKeySetup';
 import Settings from './components/Settings';
+import ImageGenerator from './components/ImageGenerator';
 import AIAssistant, { AIStatus } from './components/AIAssistant';
 import TypeToAssist from './components/TypeToAssist';
 import AIGlow from './components/AIGlow';
 import QuickJump from './components/QuickJump';
 import Auth from './components/Auth';
+import { StudioMode } from './src/components/StudioMode/StudioMode';
 import { useAuth } from './contexts/AuthContext';
 
-export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game';
+export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game' | 'imageGenerator' | 'studio';
 
 const App: React.FC = () => {
     const { user, loading, userSettings, updateUserSettings, syncLoading } = useAuth();
@@ -111,6 +113,10 @@ const App: React.FC = () => {
                 return <NetflixView apiKey={apiKey!} searchQuery={searchQuery} onSelectItem={handleSelectItem} onSelectGame={handleSelectGame} onInvalidApiKey={handleInvalidApiKey} view={view} />;
             case 'game':
                 return <GameView apiKey={apiKey!} onInvalidApiKey={handleInvalidApiKey} initialGame={selectedGame} />;
+            case 'imageGenerator':
+                return <ImageGenerator />;
+            case 'studio':
+                return <StudioMode />;
             case 'watchlist':
                  return <div className="container mx-auto px-4 py-8 text-center"><h1 className="text-3xl font-bold">Watchlist</h1><p className="text-slate-400 mt-4">This feature is coming soon!</p></div>;
             default:

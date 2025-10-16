@@ -35,6 +35,8 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                         <nav className="hidden md:flex items-center gap-6">
                             <NavButton viewName="screenSearch">Home</NavButton>
                             <NavButton viewName="explore">Explore</NavButton>
+                            <NavButton viewName="imageGenerator">AI Images</NavButton>
+                            <NavButton viewName="studio">🎬 Studio Mode</NavButton>
                             <NavButton viewName="watchlist">Watchlist</NavButton>
                             <NavButton viewName="game">Games</NavButton>
                         </nav>
@@ -76,6 +78,8 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                     <nav className="flex flex-col gap-2 mb-4">
                         <NavButton viewName="screenSearch" isMobile>Home</NavButton>
                         <NavButton viewName="explore" isMobile>Explore</NavButton>
+                        <NavButton viewName="imageGenerator" isMobile>AI Images</NavButton>
+                        <NavButton viewName="studio" isMobile>🎬 Studio Mode</NavButton>
                         <NavButton viewName="watchlist" isMobile>Watchlist</NavButton>
                         <NavButton viewName="game" isMobile>Games</NavButton>
                     </nav>

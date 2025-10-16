@@ -4,8 +4,9 @@ import SixDegreesGame from './SixDegreesGame';
 import GuessThePosterGame from './GuessThePosterGame';
 import BoxOfficeCompareGame from './BoxOfficeCompareGame';
 import BizIdleGame from './BizIdleGame';
+import BoxOfficeMonopolyGame from './BoxOfficeMonopolyGame';
 
-export type Game = 'trivia' | 'six-degrees' | 'guess-poster' | 'box-office-compare' | 'biz-idle' | null;
+export type Game = 'trivia' | 'six-degrees' | 'guess-poster' | 'box-office-compare' | 'biz-idle' | 'box-office-monopoly' | null;
 
 interface GameViewProps {
   apiKey: string;
@@ -34,6 +35,8 @@ const GameView: React.FC<GameViewProps> = ({ apiKey, onInvalidApiKey, initialGam
         return <BoxOfficeCompareGame apiKey={apiKey} onInvalidApiKey={onInvalidApiKey} onExit={() => setActiveGame(null)} />;
       case 'biz-idle':
         return <BizIdleGame onExit={() => setActiveGame(null)} />;
+      case 'box-office-monopoly':
+        return <BoxOfficeMonopolyGame onExit={() => setActiveGame(null)} />;
       default:
         return (
           <div className="text-center animate-fade-in-up">
@@ -63,6 +66,11 @@ const GameView: React.FC<GameViewProps> = ({ apiKey, onInvalidApiKey, initialGam
                 title="BizIdle"
                 description="Build studios. Shape the industry."
                 onClick={() => setActiveGame('biz-idle')}
+              />
+              <GameCard
+                title="Box Office Monopoly"
+                description="Compete against AI moguls in Hollywood strategy."
+                onClick={() => setActiveGame('box-office-monopoly')}
               />
             </div>
           </div>
