@@ -31,7 +31,7 @@ const ThemeSelector: React.FC = () => {
         <button
           key={key}
           onClick={() => handleThemeChange(key as ThemeKey)}
-          className={`p-4 rounded-lg text-left transition-all duration-300 ${theme === key ? 'ring-2 ring-accent-500 bg-accent-500/30' : 'bg-white/5 hover:bg-white/10'}`}
+          className={`p-4 rounded-lg text-left transition-all duration-300 text-white ${theme === key ? 'ring-2 ring-accent-500 bg-accent-500/30' : 'bg-slate-700 hover:bg-slate-600'}`}
         >
           <span className="font-semibold">{name}</span>
         </button>
@@ -130,10 +130,10 @@ const SettingsNavItem: React.FC<{icon: React.ReactNode, title: string, subtitle:
     <button onClick={onClick} className="settings-nav-item">
         {icon}
         <div className="text-left">
-            <p className="font-semibold text-slate-100">{title}</p>
-            <p className="text-sm text-slate-400">{subtitle}</p>
+            <p className="font-semibold text-white">{title}</p>
+            <p className="text-sm text-slate-300">{subtitle}</p>
         </div>
-        <Icons.ChevronRightIcon className="w-5 h-5 text-slate-500 ml-auto flex-shrink-0" />
+        <Icons.ChevronRightIcon className="w-5 h-5 text-slate-400 ml-auto flex-shrink-0" />
     </button>
 );
 
@@ -190,12 +190,12 @@ const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     };
 
     return (
-        <div 
-            className="fixed inset-0 bg-black/70 z-[100] flex justify-center items-center animate-fade-in"
+        <div
+            className="fixed inset-0 bg-primary z-[100] flex justify-center items-center animate-fade-in"
             onClick={onClose}
         >
-            <div 
-                className="w-full max-w-md m-4 glass-panel p-6 rounded-3xl shadow-2xl animate-fade-in-up"
+            <div
+                className="w-full max-w-md m-4 bg-slate-800 text-white p-6 rounded-3xl shadow-2xl animate-fade-in-up"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Dynamic Header */}
@@ -206,7 +206,7 @@ const Settings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                             <span className="font-semibold">Back</span>
                         </button>
                     )}
-                    <h2 className="text-2xl font-bold absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2">
+                    <h2 className="text-2xl font-bold absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 text-white">
                         {pageTitles[page]}
                     </h2>
                     {page === 'main' && (

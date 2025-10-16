@@ -62,31 +62,32 @@ const ImageGenerator: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-2">AI Image Generator</h1>
-        <p className="text-slate-400">Generate stunning images with AI models powered by Pollinations.ai</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-primary via-secondary to-accent text-white">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-2">AI Image Generator</h1>
+          <p className="text-slate-400">Generate stunning images with AI models powered by Pollinations.ai</p>
+        </div>
 
-      <div className="glass-panel p-6 mb-8">
-        <div className="space-y-6">
-          {/* Model Selection */}
+        <div className="bg-slate-800 p-6 mb-8 rounded-3xl text-white">
+          <div className="space-y-6">
+            {/* Model Selection */}
           <div>
-            <label className="block text-sm font-medium mb-3">AI Model</label>
+            <label className="block text-sm font-medium mb-3 text-white">AI Model</label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {availableModels.map((model) => (
                 <button
                   key={model}
                   onClick={() => setSelectedModel(model)}
-                  className={`p-4 rounded-lg text-left transition-all duration-300 ${
+                  className={`p-4 rounded-lg text-left transition-all duration-300 text-white ${
                     selectedModel === model
-                      ? 'glass-button-primary text-white'
-                      : 'glass-button-secondary text-slate-300 hover:text-white'
+                      ? 'bg-slate-700 ring-2 ring-accent-500'
+                      : 'bg-slate-700 hover:bg-slate-600'
                   }`}
                 >
                   <div className="font-medium">{model}</div>
-                  <div className="text-sm opacity-75">FLUX Series</div>
-                  <div className="text-xs opacity-50">Powered by Pollinations.ai</div>
+                  <div className="text-sm text-slate-300">FLUX Series</div>
+                  <div className="text-xs text-slate-400">Powered by Pollinations.ai</div>
                 </button>
               ))}
             </div>
@@ -94,7 +95,7 @@ const ImageGenerator: React.FC = () => {
 
           {/* Prompt Input */}
           <div>
-            <label htmlFor="prompt" className="block text-sm font-medium mb-2">
+            <label htmlFor="prompt" className="block text-sm font-medium mb-2 text-white">
               Describe your image
             </label>
             <textarea
@@ -145,7 +146,7 @@ const ImageGenerator: React.FC = () => {
       {/* Generated Image Display */}
       {generatedImageUrl && (
         <div className="text-center">
-          <div className="glass-panel p-6 inline-block">
+          <div className="bg-slate-800 p-6 inline-block rounded-3xl text-white">
             <h3 className="text-xl font-semibold mb-4">Generated Image</h3>
             <div className="relative">
               <img
@@ -172,6 +173,7 @@ const ImageGenerator: React.FC = () => {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };

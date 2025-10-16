@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { MediaItem, Movie, MovieDetails, TVShowDetails, WatchProvider, WatchProviderCountry } from '../types';
 import { getMovieDetails, getTVShowDetails, getMovieRecommendations } from '../services/tmdbService';
+import { generateFactsAI } from './openrouter.js';
 import { generateStoryScapeSummary } from './storyscape.js';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
@@ -149,6 +150,10 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     const [isStoryScapeLoading, setIsStoryScapeLoading] = useState(false);
     const [storyScapeError, setStoryScapeError] = useState<string | null>(null);
 
+    const [factsAI, setFactsAI] = useState<string | null>(null);
+    const [isFactsAILoading, setIsFactsAILoading] = useState(false);
+    const [factsAIError, setFactsAIError] = useState<string | null>(null);
+
     const { country } = useGeolocation();
     const { providerIds } = useStreamingPreferences();
 
@@ -233,6 +238,28 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
             }
         } finally {
             setIsStoryScapeLoading(false);
+        }
+    };
+
+    const handleGenerateFactsAI = async () => {
+        if (!details) return;
+        setIsFactsAILoading(true);
+        setFactsAIError(null);
+        setFactsAI(null);
+        try {
+            const facts = await generateFactsAI(
+                'title' in details ? details.title : details.name,
+                details.overview
+            );
+            setFactsAI(facts);
+        } catch (err) {
+            if (err instanceof Error) {
+                setFactsAIError(err.message);
+            } else {
+                setFactsAIError("FactsAI is still processing this title. Try again in a moment.");
+            }
+        } finally {
+            setIsFactsAILoading(false);
         }
     };
 
@@ -406,6 +433,37 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                         {storyScape.origin === 'fallback' && !storyScape.note && (
                             <p className="text-xs text-slate-400 mt-4">StoryScape's live summary is unavailable, so this description was adapted from the synopsis.</p>
                         )}
+                    </section>
+                )}
+
+                <div className="text-center mt-8">
+                    {!factsAI && !isFactsAILoading && !factsAIError && (
+                        <button onClick={handleGenerateFactsAI} className="factsai-generate-button">
+                            <Icons.SparklesIcon className="w-5 h-5" /> Generate FactsAI
+                        </button>
+                    )}
+                    {isFactsAILoading && (
+                        <div className="factsai-loading">
+                            <div className="shimmer" />
+                        </div>
+                    )}
+                    {factsAIError && <p className="factsai-error">{factsAIError}</p>}
+                </div>
+
+                {factsAI && (
+                     <section className="my-8 sm:my-12 glass-panel p-4 sm:p-6 rounded-xl animate-fade-in">
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-accent-400"><Icons.SparklesIcon className="w-6 h-6"/> FactsAI</h2>
+                        <div className="text-slate-900">
+                            <ul className="space-y-2">
+                                {factsAI.split('\n').filter(line => line.trim()).map((line, index) => {
+                                    const fact = line.trim();
+                                    const boldText = fact.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                                    return (
+                                        <li key={index} className="ml-4" dangerouslySetInnerHTML={{ __html: `• ${boldText}` }} />
+                                    );
+                                })}
+                            </ul>
+                        </div>
                     </section>
                 )}
 
