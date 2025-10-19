@@ -189,10 +189,16 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
             setStoryScape(null);
             setRecommendations([]);
             try {
-                // Fetch main details from TheTVDB
-                const fetchedDetails = item.media_type === 'movie'
-                    ? await getTheTVDBMovieDetails(item.id)
-                    : await getTheTVDBTVShowDetails(item.id);
+                // Try to fetch from TheTVDB first, fallback to TMDb if needed
+                let fetchedDetails;
+                try {
+                    fetchedDetails = item.media_type === 'movie'
+                        ? await getTheTVDBMovieDetails(item.id)
+                        : await getTheTVDBTVShowDetails(item.id);
+                } catch (tvdbError) {
+                    console.warn('TheTVDB data not available, falling back to TMDb:', tvdbError);
+                    throw tvdbError; // Still throw so we handle it in catch below
+                }
 
                 // Fetch cast and images from TheTVDB
                 const credits = item.media_type === 'movie'

@@ -151,9 +151,9 @@ export const getMovieDetails = async (movieId: number): Promise<MovieDetails> =>
 
   return {
     id: movieData.id,
-    title: movieData.name,
-    poster_path: movieData.image,
-    backdrop_path: movieData.image,
+    title: movieData.name || '',
+    poster_path: movieData.image || null,
+    backdrop_path: movieData.image || null,
     overview: movieData.overview || extendedData.overview || '',
     release_date: movieData.year ? `${movieData.year}-01-01` : '',
     vote_average: movieData.score || 0,
