@@ -5,12 +5,11 @@ import { Game } from './GameView';
 import HeroCarousel from './HeroCarousel';
 import MediaRow from './MediaRow';
 import {
-    getPopularMovies,
-    getPopularTVShows,
-    getMoviesByProviders,
-    searchMulti,
+    getTrending,
     normalizeMovie,
     normalizeTVShow,
+    searchMulti,
+    getMovieWatchProviders,
 } from '../services/tmdbService';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import { useGeolocation } from '../hooks/useGeolocation';
@@ -74,14 +73,15 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
         let isMounted = true;
         const fetchHomeData = async () => {
             try {
-                const [moviesRes, showsRes] = await Promise.all([
-                    getPopularMovies(apiKey),
-                    getPopularTVShows(apiKey),
-                ]);
+                // Use TMDb trending data since TheTVDB doesn't have popular endpoints
+                const trending = await getTrending(apiKey, 'week');
+                // Separate movies and shows from trending
+                const movies = trending.results.filter(item => item.media_type === 'movie').slice(0, 10);
+                const shows = trending.results.filter(item => item.media_type === 'tv').slice(0, 10);
 
                 if (isMounted) {
-                    setPopularMovies(moviesRes.results);
-                    setPopularShows(showsRes.results);
+                    setPopularMovies(movies);
+                    setPopularShows(shows);
                 }
             } catch (error) {
                 console.error(error);
@@ -109,12 +109,17 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
             }
 
             try {
-                const forYouRes = await getMoviesByProviders(apiKey, providersToFetch, country.code);
+                // Use TMDb trending for "For You" recommendations since streaming availability is TMDb only
+                const trendingRes = await getTrending(apiKey, 'week');
+                const movies = trendingRes.results.filter(item => item.media_type === 'movie').slice(0, 10);
                 if (isMounted) {
-                    setForYou(forYouRes.results ?? []);
+                    setForYou(movies);
                 }
             } catch (error) {
                 console.error("Failed to fetch 'For You' recommendations:", error);
+                if (error instanceof Error && error.message.includes('Invalid API Key')) {
+                    onInvalidApiKey();
+                }
             }
         };
 

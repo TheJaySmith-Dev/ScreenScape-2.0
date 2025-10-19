@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MediaItem, Movie, TVShow, PersonMovieCredit, Person } from '../types';
-import { searchMulti, normalizeMovie, normalizeTVShow, getCollectionDetails, getPersonMovieCredits, getMovieDetails } from '../services/tmdbService';
+import { searchMulti } from '../services/tmdbService';
+import { normalizeMovie, normalizeTVShow, getCollectionDetails, getPersonMovieCredits, getMovieDetailsForCollections } from '../services/tmdbService';
 import { findFranchise } from '../services/franchiseService';
 import { SearchIcon, StarIcon, XIcon } from './Icons';
 import Loader from './Loader';
@@ -211,7 +212,7 @@ const ScreenSearch: React.FC<ScreenSearchProps> = ({ apiKey, onSelectItem, onInv
                             const collection = await getCollectionDetails(apiKey, franchise.id);
                             processAndSetPath(franchise.name, collection.parts);
                         } else if (franchise.type === 'curated_list' && franchise.ids) {
-                            const moviePromises = franchise.ids.map(id => getMovieDetails(apiKey, id, 'US')); // Region is required
+                            const moviePromises = franchise.ids.map(id => getMovieDetailsForCollections(apiKey, id)); // Region is required
                             const movies = await Promise.all(moviePromises);
                             processAndSetPath(franchise.name, movies);
                         }
@@ -225,7 +226,7 @@ const ScreenSearch: React.FC<ScreenSearchProps> = ({ apiKey, onSelectItem, onInv
                         }
 
                         if (topResult.media_type === 'movie') {
-                            const movieDetails = await getMovieDetails(apiKey, topResult.id, 'US');
+                            const movieDetails = await getMovieDetailsForCollections(apiKey, topResult.id);
                             if (movieDetails.belongs_to_collection) {
                                 const collection = await getCollectionDetails(apiKey, movieDetails.belongs_to_collection.id);
                                 processAndSetPath(collection.name, collection.parts);

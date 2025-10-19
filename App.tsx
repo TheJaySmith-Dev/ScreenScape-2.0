@@ -12,7 +12,7 @@ import AIAssistant, { AIStatus } from './components/AIAssistant';
 import TypeToAssist from './components/TypeToAssist';
 import AIGlow from './components/AIGlow';
 import QuickJump from './components/QuickJump';
-import LiveView from './components/LiveView';
+import LiveView from './components/LiveView.tsx';
 import Auth from './components/Auth';
 
 import { useAuth } from './contexts/AuthContext';

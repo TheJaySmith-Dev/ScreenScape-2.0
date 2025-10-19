@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bloomberg Live Stream Test</title>
+</head>
+<body>
+    <h1>Bloomberg Channel ID Test</h1>
+    <p>Testing live stream detection for Bloomberg channel</p>
+
+    <!-- Bloomberg Live Stream Player -->
+    <div style="width: 100%; height: 500px; background: black;">
+        <iframe
+            src="https://www.youtube.com/embed/live_stream?channel=UCIALMKvObZNtJ6AmdCLP7Lg&autoplay=0&controls=1"
+            width="100%"
+            height="100%"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+        ></iframe>
+    </div>
+
+    <p>Channel ID: UCIALMKvObZNtJ6AmdCLP7Lg</p>
+
+    <script>
+        // Test the API call manually
+        async function testAPI() {
+            try {
+                const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=UCIALMKvObZNtJ6AmdCLP7Lg&eventType=live&type=video&key=YOUR_API_KEY&maxResults=1`);
+                const data = await response.json();
+                console.log('API Response:', data);
+            } catch (error) {
+                console.error('API Error:', error);
+            }
+        }
+
+        // Uncomment and add your API key to test
+        // testAPI();
+    </script>
+</body>
+</html>
