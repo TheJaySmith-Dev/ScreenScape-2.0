@@ -1,3 +1,15 @@
+/**
+ * Fetches the current live video ID for a given YouTube channel.
+ * Returns the video ID if the channel is currently live, otherwise null.
+ * @param channelId The YouTube channel ID
+ * @returns Promise<string | null>
+ */
+// For now, return null to avoid loading issues without API key
+// This allows the app to work with static "no live stream" state
+export const getLiveVideoId = async (channelId: string): Promise<string | null> => {
+  return null; // Return null until proper API key is configured
+};
+
 // This module handles the asynchronous loading of the YouTube IFrame Player API.
 // It should be imported once at the root of the application (e.g., in index.tsx)
 // to set up the global callback before the YouTube script executes.

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { MediaItem, Video, TVShow, WatchProviderCountry } from '../types';
-import { getTrending, getMovieDetails, getTVShowDetails } from '../services/tmdbService';
+import { getTrending, getMovieVideos, getTVShowVideos, getMovieWatchProviders, getTVShowWatchProviders } from '../services/tmdbService';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import VideoPlayer from './VideoPlayer';
@@ -92,17 +92,23 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
             setIsTrailerLoading(true);
             const fetchTrailer = async () => {
                 try {
-                    const details = currentItem.media_type === 'movie'
-                        ? await getMovieDetails(apiKey, currentItem.id, country.code)
-                        : await getTVShowDetails(apiKey, currentItem.id, country.code);
+                    // Get videos from TMDb for trailer
+                    const videos = currentItem.media_type === 'movie'
+                        ? await getMovieVideos(apiKey, currentItem.id)
+                        : await getTVShowVideos(apiKey, currentItem.id);
 
-                    const officialTrailer = details.videos?.results.find((v: Video) => v.type === 'Trailer' && v.official && v.site === 'YouTube');
-                    const anyTrailer = details.videos?.results.find((v: Video) => v.type === 'Trailer' && v.site === 'YouTube');
+                    const officialTrailer = videos.results.find((v: Video) => v.type === 'Trailer' && v.official && v.site === 'YouTube');
+                    const anyTrailer = videos.results.find((v: Video) => v.type === 'Trailer' && v.site === 'YouTube');
                     const trailerKey = officialTrailer?.key || anyTrailer?.key || null;
+
+                    // Get watch providers separately
+                    const providersResponse = currentItem.media_type === 'movie'
+                        ? await getMovieWatchProviders(apiKey, currentItem.id, country.code)
+                        : await getTVShowWatchProviders(apiKey, currentItem.id, country.code);
 
                     if (isMounted) {
                         setTrailers(prev => ({ ...prev, [currentItem.id]: trailerKey }));
-                        const providers = details['watch/providers']?.results?.[country.code] ?? null;
+                        const providers = providersResponse.results?.[country.code] ?? null;
                         setAvailabilityMap(prev => ({ ...prev, [currentItem.id]: providers }));
                     }
                 } catch (error) {

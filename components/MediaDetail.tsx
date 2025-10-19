@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { MediaItem, Movie, MovieDetails, TVShowDetails, WatchProvider, WatchProviderCountry } from '../types';
-import { getMovieDetails, getTVShowDetails, getMovieRecommendations } from '../services/tmdbService';
+import { getMovieDetails as getTheTVDBMovieDetails, getTVShowDetails as getTheTVDBTVShowDetails, getMovieCredits, getTVShowCredits, getMovieImages, getTVShowImages } from '../services/thetvdbService';
+import { getMovieRecommendations } from '../services/tmdbService';
+import { getMovieVideos, getTVShowVideos, getMovieWatchProviders, getTVShowWatchProviders } from '../services/tmdbService';
 import { generateFactsAI } from './openrouter.js';
 import { generateStoryScapeSummary } from './storyscape.js';
 import { useGeolocation } from '../hooks/useGeolocation';
@@ -187,9 +189,38 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
             setStoryScape(null);
             setRecommendations([]);
             try {
+                // Fetch main details from TheTVDB
                 const fetchedDetails = item.media_type === 'movie'
-                    ? await getMovieDetails(apiKey, item.id, country.code)
-                    : await getTVShowDetails(apiKey, item.id, country.code);
+                    ? await getTheTVDBMovieDetails(item.id)
+                    : await getTheTVDBTVShowDetails(item.id);
+
+                // Fetch cast and images from TheTVDB
+                const credits = item.media_type === 'movie'
+                    ? await getMovieCredits(item.id)
+                    : await getTVShowCredits(item.id);
+                fetchedDetails.credits = credits;
+
+                const images = item.media_type === 'movie'
+                    ? await getMovieImages(item.id)
+                    : await getTVShowImages(item.id);
+                fetchedDetails.images = images;
+
+                // Fetch watch providers from TMDb (only for streaming availability)
+                const providers = item.media_type === 'movie'
+                    ? await getMovieWatchProviders(apiKey, item.id, country.code)
+                    : await getTVShowWatchProviders(apiKey, item.id, country.code);
+                fetchedDetails['watch/providers'] = providers;
+
+                // Try to get videos/trailers from TMDb (will be used as fallback)
+                try {
+                    const videos = item.media_type === 'movie'
+                        ? await getMovieVideos(apiKey, item.id)
+                        : await getTVShowVideos(apiKey, item.id);
+                    fetchedDetails.videos = videos;
+                } catch (videoError) {
+                    console.warn('Trailer data not available, trailers will not be shown:', videoError);
+                    fetchedDetails.videos = { results: [] };
+                }
 
                 if (!isMounted) return;
                 setDetails(fetchedDetails);
@@ -468,6 +499,23 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                 )}
 
                 <WhereToWatch providers={providersForCountry} providerIds={providerIds} />
+
+                {/* TheTVDB Attribution */}
+                <div className="my-8 sm:my-12 text-center">
+                    <p className="text-sm text-slate-400 mb-2">• Powered by TheTVDB</p>
+                    <a
+                        href="https://www.thetvdb.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block hover:opacity-80 transition-opacity"
+                    >
+                        <img
+                            src="https://www.thetvdb.com/images/attribution/logo2.png"
+                            alt="TheTVDB Logo"
+                            className="h-8"
+                        />
+                    </a>
+                </div>
 
                 {details.credits?.cast && details.credits.cast.length > 0 && (
                     <section className="my-8 sm:my-12">

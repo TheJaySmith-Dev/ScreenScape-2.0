@@ -14,11 +14,11 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
     const { user, signOut } = useAuth();
 
     const NavButton: React.FC<{ viewName: ViewType, children: React.ReactNode, isMobile?: boolean }> = ({ viewName, children, isMobile = false }) => (
-        <button 
+        <button
             onClick={() => {
                 setView(viewName);
                 if (isMobile) setIsMenuOpen(false);
-            }} 
+            }}
             className={`font-semibold transition-colors duration-300 ${isMobile ? 'text-xl w-full text-left p-2 rounded-md' : 'text-lg'} ${view === viewName ? (isMobile ? 'bg-white/10 text-white' : 'text-white') : 'text-slate-400'} hover:text-white`}
         >
             {children}
@@ -35,8 +35,8 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                         <nav className="hidden md:flex items-center gap-6">
                             <NavButton viewName="screenSearch">Home</NavButton>
                             <NavButton viewName="explore">Explore</NavButton>
-                            <NavButton viewName="imageGenerator">AI Images</NavButton>
-                            <NavButton viewName="studio">🎬 Studio Mode</NavButton>
+                            <NavButton viewName="imageGenerator">ScreenGenAI</NavButton>
+                            <NavButton viewName="live">Live</NavButton>
                             <NavButton viewName="watchlist">Watchlist</NavButton>
                             <NavButton viewName="game">Games</NavButton>
                         </nav>
@@ -78,8 +78,8 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                     <nav className="flex flex-col gap-2 mb-4">
                         <NavButton viewName="screenSearch" isMobile>Home</NavButton>
                         <NavButton viewName="explore" isMobile>Explore</NavButton>
-                        <NavButton viewName="imageGenerator" isMobile>AI Images</NavButton>
-                        <NavButton viewName="studio" isMobile>🎬 Studio Mode</NavButton>
+                        <NavButton viewName="imageGenerator" isMobile>ScreenGenAI</NavButton>
+                        <NavButton viewName="live" isMobile>Live</NavButton>
                         <NavButton viewName="watchlist" isMobile>Watchlist</NavButton>
                         <NavButton viewName="game" isMobile>Games</NavButton>
                     </nav>

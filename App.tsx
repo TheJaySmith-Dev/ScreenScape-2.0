@@ -12,11 +12,12 @@ import AIAssistant, { AIStatus } from './components/AIAssistant';
 import TypeToAssist from './components/TypeToAssist';
 import AIGlow from './components/AIGlow';
 import QuickJump from './components/QuickJump';
+import LiveView from './components/LiveView';
 import Auth from './components/Auth';
-import { StudioMode } from './src/components/StudioMode/StudioMode';
+
 import { useAuth } from './contexts/AuthContext';
 
-export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game' | 'imageGenerator' | 'studio';
+export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game' | 'imageGenerator' | 'live';
 
 const App: React.FC = () => {
     const { user, loading, userSettings, updateUserSettings, syncLoading } = useAuth();
@@ -115,8 +116,8 @@ const App: React.FC = () => {
                 return <GameView apiKey={apiKey!} onInvalidApiKey={handleInvalidApiKey} initialGame={selectedGame} />;
             case 'imageGenerator':
                 return <ImageGenerator />;
-            case 'studio':
-                return <StudioMode />;
+            case 'live':
+                return <LiveView />;
             case 'watchlist':
                  return <div className="container mx-auto px-4 py-8 text-center"><h1 className="text-3xl font-bold">Watchlist</h1><p className="text-slate-400 mt-4">This feature is coming soon!</p></div>;
             default:
