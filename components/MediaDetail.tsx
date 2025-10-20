@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { MediaItem, Movie, MovieDetails, TVShowDetails, WatchProvider, WatchProviderCountry } from '../types';
-import { getMovieDetails as getTheTVDBMovieDetails, getTVShowDetails as getTheTVDBTVShowDetails, getMovieCredits, getTVShowCredits, getMovieImages, getTVShowImages } from '../services/thetvdbService';
+import { getMovieDetails as getTMDbMovieDetails, getTVShowDetails as getTMDbTVShowDetails, getMovieCredits } from '../services/tmdbService';
 import { getMovieRecommendations } from '../services/tmdbService';
 import { getMovieVideos, getTVShowVideos, getMovieWatchProviders, getTVShowWatchProviders } from '../services/tmdbService';
 import { generateFactsAI } from './openrouter.js';
@@ -189,47 +189,37 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
             setStoryScape(null);
             setRecommendations([]);
             try {
-                // Try to fetch from TheTVDB first, fallback to TMDb if needed
-                let fetchedDetails;
-                try {
-                    fetchedDetails = item.media_type === 'movie'
-                        ? await getTheTVDBMovieDetails(item.id)
-                        : await getTheTVDBTVShowDetails(item.id);
-                } catch (tvdbError) {
-                    console.warn('TheTVDB data not available, falling back to TMDb:', tvdbError);
-                    throw tvdbError; // Still throw so we handle it in catch below
+                // Fetch from TMDb
+                let fetchedDetails = await (item.media_type === 'movie'
+                    ? getTMDbMovieDetails(apiKey, item.id, country.code)
+                    : getTMDbTVShowDetails(apiKey, item.id));
+
+                // Fetch cast from TMDb
+                if (item.media_type === 'movie') {
+                    const credits = await getMovieCredits(apiKey, item.id);
+                    fetchedDetails.credits = credits;
                 }
 
-                // Fetch cast and images from TheTVDB
-                const credits = item.media_type === 'movie'
-                    ? await getMovieCredits(item.id)
-                    : await getTVShowCredits(item.id);
-                fetchedDetails.credits = credits;
-
-                const images = item.media_type === 'movie'
-                    ? await getMovieImages(item.id)
-                    : await getTVShowImages(item.id);
-                fetchedDetails.images = images;
-
-                // Fetch watch providers from TMDb (only for streaming availability)
+                // Fetch watch providers from TMDb
                 const providers = item.media_type === 'movie'
                     ? await getMovieWatchProviders(apiKey, item.id, country.code)
                     : await getTVShowWatchProviders(apiKey, item.id, country.code);
-                fetchedDetails['watch/providers'] = providers;
 
-                // Try to get videos/trailers from TMDb (will be used as fallback)
+                // Fetch videos/trailers from TMDb
                 try {
                     const videos = item.media_type === 'movie'
                         ? await getMovieVideos(apiKey, item.id)
                         : await getTVShowVideos(apiKey, item.id);
-                    fetchedDetails.videos = videos;
+                    (fetchedDetails as any).videos = videos;
+                    (fetchedDetails as any)['watch/providers'] = providers;
                 } catch (videoError) {
                     console.warn('Trailer data not available, trailers will not be shown:', videoError);
-                    fetchedDetails.videos = { results: [] };
+                    (fetchedDetails as any).videos = { results: [] };
+                    (fetchedDetails as any)['watch/providers'] = providers;
                 }
 
                 if (!isMounted) return;
-                setDetails(fetchedDetails);
+                setDetails(fetchedDetails as any);
 
                 if (item.media_type === 'movie') {
                     const recs = await getMovieRecommendations(apiKey, item.id);
@@ -506,18 +496,18 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
                 <WhereToWatch providers={providersForCountry} providerIds={providerIds} />
 
-                {/* TheTVDB Attribution */}
+                {/* TMDB Attribution */}
                 <div className="my-8 sm:my-12 text-center">
-                    <p className="text-sm text-slate-400 mb-2">• Powered by TheTVDB</p>
+                    <p className="text-sm text-slate-400 mb-2">• Powered by The Movie Database (TMDB)</p>
                     <a
-                        href="https://www.thetvdb.com"
+                        href="https://www.themoviedb.org"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-block hover:opacity-80 transition-opacity"
                     >
                         <img
-                            src="https://www.thetvdb.com/images/attribution/logo2.png"
-                            alt="TheTVDB Logo"
+                            src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1.svg"
+                            alt="TMDB Logo"
                             className="h-8"
                         />
                     </a>
