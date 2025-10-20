@@ -513,8 +513,8 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
                 {/* Display OMDb data when available */}
                 {(omdbData && item.media_type === 'movie') && (
-                    <section className="my-8 sm:my-12 glass-panel p-4 sm:p-6 rounded-xl animate-fade-in">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icons.StarIcon className="w-6 h-6 text-blue-400"/> Additional Info</h2>
+                    <section className="my-8 sm:my-12 glass-panel p-4 sm:p-6 rounded-xl animate-fade-in" style={{backgroundColor: '#4B0082', border: '1px solid rgba(255, 255, 255, 0.1)'}}>
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icons.StarIcon className="w-6 h-6 text-white"/> Additional Info</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {omdbData.Plot && omdbData.Plot !== details?.overview && (
                                 <div>
@@ -525,14 +525,14 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                             {(omdbData.Rated || omdbData.Awards) && (
                                 <div>
                                     <h4 className="font-semibold text-slate-400 mb-2">Ratings & Awards</h4>
-                                    <div className="space-y-1 text-sm">
-                                        {omdbData.Rated && omdbData.Rated !== 'N/A' && (
-                                            <p><span className="font-medium text-slate-300">Rating:</span> {omdbData.Rated}</p>
-                                        )}
-                                        {omdbData.Awards && omdbData.Awards !== 'N/A' && (
-                                            <p><span className="font-medium text-slate-300">Awards:</span> {omdbData.Awards}</p>
-                                        )}
-                                    </div>
+                            <div className="space-y-1 text-sm">
+                                {omdbData.Rated && omdbData.Rated !== 'N/A' && (
+                                    <p><span className="font-medium text-white">Rating:</span> <span className="text-slate-200">{omdbData.Rated}</span></p>
+                                )}
+                                {omdbData.Awards && omdbData.Awards !== 'N/A' && (
+                                    <p><span className="font-medium text-white">Awards:</span> <span className="text-slate-200">{omdbData.Awards}</span></p>
+                                )}
+                            </div>
                                 </div>
                             )}
                             {(omdbData.BoxOffice || omdbData.Production) && (
