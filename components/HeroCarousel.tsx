@@ -4,6 +4,7 @@ import { getTrending, getMovieVideos, getTVShowVideos, getMovieWatchProviders, g
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import VideoPlayer from './VideoPlayer';
+import { isMobileDevice } from '../utils/deviceDetection';
 import { PlayIcon, VolumeOffIcon, VolumeUpIcon } from './Icons';
 import {
     getAvailabilityBuckets,
@@ -23,7 +24,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
     const [items, setItems] = useState<MediaItem[]>([]);
     const [trailers, setTrailers] = useState<Record<string, string | null>>({});
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [isMuted, setIsMuted] = useState(true);
+    const [isMuted, setIsMuted] = useState(isMobileDevice());
     const [isHovered, setIsHovered] = useState(false);
     const [isTrailerLoading, setIsTrailerLoading] = useState(true);
     const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);

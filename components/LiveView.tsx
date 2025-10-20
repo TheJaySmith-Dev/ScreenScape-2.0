@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { isMobileDevice } from '../utils/deviceDetection';
 
 interface Channel {
   id: string;
@@ -68,7 +69,7 @@ const LiveView: React.FC = () => {
 
             <div className="relative bg-black rounded-xl overflow-hidden" style={{paddingBottom: '56.25%'}}>
               <iframe
-                src={`https://www.youtube.com/embed/${selectedChannel.url}?autoplay=1&mute=0&controls=0&modestbranding=1&rel=0&showinfo=0&disablekb=1&fs=1`}
+                src={`https://www.youtube.com/embed/${selectedChannel.url}?autoplay=1&mute=${isMobileDevice() ? 1 : 0}&controls=0&modestbranding=1&rel=0&showinfo=0&disablekb=1&fs=1`}
                 title={selectedChannel.name}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                 allowFullScreen

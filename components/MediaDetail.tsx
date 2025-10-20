@@ -9,6 +9,7 @@ import { generateStoryScapeSummary } from './storyscape.js';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import VideoPlayer from './VideoPlayer';
+import { isMobileDevice } from '../utils/deviceDetection';
 import Loader from './Loader';
 import * as Icons from './Icons';
 import {
@@ -147,7 +148,7 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     const [recommendations, setRecommendations] = useState<MediaItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isMuted, setIsMuted] = useState(true);
+        const [isMuted, setIsMuted] = useState(isMobileDevice());
     const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
     const [isStoryScapeLoading, setIsStoryScapeLoading] = useState(false);

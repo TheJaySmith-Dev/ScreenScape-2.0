@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ensureYouTubeApiIsReady } from '../services/youtubeService';
+import { isMobileDevice } from '../utils/deviceDetection';
 
 declare global {
   interface Window {
@@ -115,6 +116,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
             if (!isMountedRef.current || !playerContainerRef.current || isCancelled) return;
             if (!window.YT || typeof window.YT.Player !== 'function') return;
 
+            // Force mute on mobile for autoplay compliance
+            const forceMute = isMobileDevice();
+            const muteValue = forceMute ? 1 : (initialMuteRef.current ? 1 : 0);
+
             const playerVars: YT.PlayerOptions['playerVars'] = {
                 autoplay: 1,
                 controls: 0,
@@ -124,7 +129,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
                 loop: loop ? 1 : 0,
                 fs: 0,
                 iv_load_policy: 3,
-                mute: initialMuteRef.current ? 1 : 0,
+                mute: muteValue,
             };
 
             if (loop) {
@@ -193,8 +198,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
     useEffect(() => {
         if (!isPlayerReady || !playerRef.current) return;
 
+        // On mobile, always keep muted for autoplay compliance
         const player = playerRef.current;
-        applyMuteState(player, isMuted);
+        const shouldMute = isMobileDevice() ? true : isMuted;
+        applyMuteState(player, shouldMute);
     }, [applyMuteState, isPlayerReady, isMuted]);
 
 
