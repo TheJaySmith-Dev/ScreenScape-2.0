@@ -30,37 +30,7 @@ const App: React.FC = () => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
 
-    useEffect(() => {
-        // Sync TMDB API key with database when user logs in
-        if (user && userSettings) {
-            const syncedKey = userSettings.tmdb_api_key;
-            if (syncedKey) {
-                setApiKey(syncedKey);
-                localStorage.setItem('tmdb_api_key', syncedKey);
-                setIsKeyInvalid(false);
-            } else {
-                // Check localStorage as fallback for first-time users
-                const localKey = localStorage.getItem('tmdb_api_key');
-                if (localKey) {
-                    setApiKey(localKey);
-                    setIsKeyInvalid(false);
-                    // Sync to database for future logins
-                    updateUserSettings({ tmdb_api_key: localKey }).catch(console.error);
-                } else {
-                    setIsKeyInvalid(true);
-                }
-            }
-        } else if (!user) {
-            // User not logged in, check localStorage
-            const localKey = localStorage.getItem('tmdb_api_key');
-            if (localKey) {
-                setApiKey(localKey);
-                setIsKeyInvalid(false);
-            } else {
-                setIsKeyInvalid(true);
-            }
-        }
-    }, [user, userSettings, updateUserSettings]);
+
 
     const handleInvalidApiKey = useCallback(() => {
         localStorage.removeItem('tmdb_api_key');
