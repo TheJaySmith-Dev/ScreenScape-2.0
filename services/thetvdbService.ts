@@ -12,7 +12,7 @@ import {
 } from '../types';
 
 const API_BASE_URL = 'https://api4.thetvdb.com/v4';
-const API_KEY = import.meta.env.VITE_THE_TVDB_API_KEY || '383fda5c-9b10-4a49-9701-783d88023f55';
+const API_KEY = import.meta.env.VITE_THE_TVDB_API_KEY;
 
 // Authentication
 let authToken: string | null = null;
@@ -34,6 +34,9 @@ const getAuthToken = async (): Promise<string> => {
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Invalid API Key for TheTVDB. Please check your VITE_THE_TVDB_API_KEY environment variable.');
+    }
     throw new Error(`TheTVDB Auth failed: ${response.status} ${response.statusText}`);
   }
 
