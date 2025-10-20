@@ -21,7 +21,12 @@ export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game' | 'imag
 
 const App: React.FC = () => {
     const { user, loading, userSettings, updateUserSettings, syncLoading } = useAuth();
-    const [apiKey, setApiKey] = useState<string | null>(import.meta.env.VITE_TMDB_API_KEY || null);
+    const [apiKey, setApiKey] = useState<string | null>(() => {
+        // Check localStorage first, then fall back to env var or hardcoded key
+        const localKey = localStorage.getItem('tmdb_api_key');
+        if (localKey) return localKey;
+        return (import.meta.env as any).VITE_TMDB_API_KEY || '09b97a49759876f2fde9eadb163edc44';
+    });
     const [isKeyInvalid, setIsKeyInvalid] = useState(false);
     const [view, setView] = useState<ViewType>('screenSearch');
     const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
