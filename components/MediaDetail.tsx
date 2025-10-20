@@ -513,50 +513,50 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
                 {/* Display OMDb data when available */}
                 {(omdbData && item.media_type === 'movie') && (
-                    <section className="my-8 sm:my-12 glass-panel p-4 sm:p-6 rounded-xl animate-fade-in" style={{backgroundColor: 'rgb(75, 0, 130)', border: '1px solid rgba(255, 255, 255, 0.1)'}}>
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-200"><Icons.StarIcon className="w-6 h-6 text-slate-400"/> Additional Info</h2>
+                    <section className="my-8 sm:my-12 glass-panel p-4 sm:p-6 rounded-xl animate-fade-in" style={{backgroundColor: 'rgba(255, 255, 255, 0.35)', backdropFilter: 'blur(11px)', WebkitBackdropFilter: 'blur(11px)', border: '1px solid rgba(255, 255, 255, 0.1)'}}>
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-black" style={{textShadow: '0 1px 2px rgba(0,0,0,0.3)'}} ><Icons.StarIcon className="w-6 h-6 text-slate-400"/> Additional Info</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {omdbData.Plot && omdbData.Plot !== details?.overview && (
                                 <div>
-                                    <h4 className="font-semibold text-slate-400 mb-2">Extended Plot</h4>
-                                    <p className="text-slate-200 text-sm leading-relaxed">{omdbData.Plot}</p>
+                                    <h4 className="font-semibold mb-2" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Extended Plot</h4>
+                                    <p className="leading-relaxed" style={{color: 'rgba(0,0,0,0.8)', fontSize: '0.875rem', fontWeight: '500', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>{omdbData.Plot}</p>
                                 </div>
                             )}
                             {(omdbData.Rated || omdbData.Awards) && (
                                 <div>
-                                    <h4 className="font-semibold text-slate-400 mb-2">Ratings & Awards</h4>
-                            <div className="space-y-1 text-sm">
+                                    <h4 className="font-semibold mb-2" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Ratings & Awards</h4>
+                            <div className="space-y-1" style={{fontSize: '0.875rem'}}>
                                 {omdbData.Rated && omdbData.Rated !== 'N/A' && (
-                                    <p><span className="font-medium text-white">Rating:</span> <span className="text-slate-200">{omdbData.Rated}</span></p>
+                                    <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}><span className="font-medium" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Rating:</span> {omdbData.Rated}</p>
                                 )}
                                 {omdbData.Awards && omdbData.Awards !== 'N/A' && (
-                                    <p><span className="font-medium text-white">Awards:</span> <span className="text-slate-200">{omdbData.Awards}</span></p>
+                                    <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}><span className="font-medium" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Awards:</span> {omdbData.Awards}</p>
                                 )}
                             </div>
                                 </div>
                             )}
                             {(omdbData.BoxOffice || omdbData.Production) && (
                                 <div>
-                                    <h4 className="font-semibold text-slate-400 mb-2">Box Office</h4>
-                                    <div className="space-y-1 text-sm">
+                                    <h4 className="font-semibold mb-2" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Box Office</h4>
+                                    <div className="space-y-1" style={{fontSize: '0.875rem'}}>
                                         {omdbData.BoxOffice && omdbData.BoxOffice !== 'N/A' && (
-                                            <p><span className="font-medium text-slate-300">Worldwide:</span> {omdbData.BoxOffice}</p>
+                                            <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}><span className="font-medium" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Worldwide:</span> {omdbData.BoxOffice}</p>
                                         )}
                                         {omdbData.Production && omdbData.Production !== 'N/A' && (
-                                            <p><span className="font-medium text-slate-300">Production:</span> {omdbData.Production}</p>
+                                            <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}><span className="font-medium" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Production:</span> {omdbData.Production}</p>
                                         )}
                                     </div>
                                 </div>
                             )}
                             {omdbData.imdbRating && omdbData.imdbRating !== 'N/A' && (
                                 <div>
-                                    <h4 className="font-semibold text-slate-400 mb-2">IMDb Rating</h4>
+                                    <h4 className="font-semibold mb-2" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>IMDb Rating</h4>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-yellow-400 text-lg">⭐</span>
-                                        <span className="text-xl font-bold">{omdbData.imdbRating}</span>
-                                        <span className="text-slate-300">/ 10</span>
+                                        <span className="text-lg" style={{textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>⭐</span>
+                                        <span className="text-xl font-bold" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>{omdbData.imdbRating}</span>
+                                        <span style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>/ 10</span>
                                         {omdbData.imdbVotes && omdbData.imdbVotes !== 'N/A' && (
-                                            <span className="text-sm text-slate-400">({omdbData.imdbVotes} votes)</span>
+                                            <span style={{color: 'rgba(0,0,0,0.8)', fontSize: '0.875rem', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>({omdbData.imdbVotes} votes)</span>
                                         )}
                                     </div>
                                 </div>
