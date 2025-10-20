@@ -514,7 +514,7 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                 {/* Display OMDb data when available */}
                 {(omdbData && item.media_type === 'movie') && (
                     <section className="my-8 sm:my-12 glass-panel p-4 sm:p-6 rounded-xl animate-fade-in" style={{backgroundColor: 'rgb(10, 20, 40)', border: '1px solid rgba(255, 255, 255, 0.1)'}}>
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icons.StarIcon className="w-6 h-6 text-white"/> Additional Info</h2>
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-200"><Icons.StarIcon className="w-6 h-6 text-slate-400"/> Additional Info</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {omdbData.Plot && omdbData.Plot !== details?.overview && (
                                 <div>
