@@ -3,6 +3,7 @@ import { MediaItem, Movie, MovieDetails, TVShowDetails, WatchProvider, WatchProv
 import { getMovieDetails as getTMDbMovieDetails, getTVShowDetails as getTMDbTVShowDetails, getMovieCredits } from '../services/tmdbService';
 import { getMovieRecommendations } from '../services/tmdbService';
 import { getMovieVideos, getTVShowVideos, getMovieWatchProviders, getTVShowWatchProviders } from '../services/tmdbService';
+import { getOMDbFromTMDBDetails, OMDbMovieDetails } from '../services/omdbService';
 import { generateFactsAI } from './openrouter.js';
 import { generateStoryScapeSummary } from './storyscape.js';
 import { useGeolocation } from '../hooks/useGeolocation';
@@ -156,6 +157,9 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     const [isFactsAILoading, setIsFactsAILoading] = useState(false);
     const [factsAIError, setFactsAIError] = useState<string | null>(null);
 
+    const [omdbData, setOmdbData] = useState<OMDbMovieDetails | null>(null);
+    const [isOmdbLoading, setIsOmdbLoading] = useState(false);
+
     const { country } = useGeolocation();
     const { providerIds } = useStreamingPreferences();
 
@@ -224,6 +228,19 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                 if (item.media_type === 'movie') {
                     const recs = await getMovieRecommendations(apiKey, item.id);
                     if (isMounted) setRecommendations(recs.results.map(r => ({...r, media_type: 'movie'})));
+
+                    // Fetch OMDb data for extended movie information
+                    setIsOmdbLoading(true);
+                    try {
+                        const omdbInfo = await getOMDbFromTMDBDetails(fetchedDetails);
+                        if (isMounted && omdbInfo) {
+                            setOmdbData(omdbInfo);
+                        }
+                    } catch (omdbError) {
+                        console.warn('OMDb data not available:', omdbError);
+                    } finally {
+                        if (isMounted) setIsOmdbLoading(false);
+                    }
                 }
 
             } catch (err) {
@@ -494,23 +511,94 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                     </section>
                 )}
 
+                {/* Display OMDb data when available */}
+                {(omdbData && item.media_type === 'movie') && (
+                    <section className="my-8 sm:my-12 glass-panel p-4 sm:p-6 rounded-xl animate-fade-in">
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icons.StarIcon className="w-6 h-6 text-blue-400"/> Additional Info</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {omdbData.Plot && omdbData.Plot !== details?.overview && (
+                                <div>
+                                    <h4 className="font-semibold text-slate-400 mb-2">Extended Plot</h4>
+                                    <p className="text-slate-200 text-sm leading-relaxed">{omdbData.Plot}</p>
+                                </div>
+                            )}
+                            {(omdbData.Rated || omdbData.Awards) && (
+                                <div>
+                                    <h4 className="font-semibold text-slate-400 mb-2">Ratings & Awards</h4>
+                                    <div className="space-y-1 text-sm">
+                                        {omdbData.Rated && omdbData.Rated !== 'N/A' && (
+                                            <p><span className="font-medium text-slate-300">Rating:</span> {omdbData.Rated}</p>
+                                        )}
+                                        {omdbData.Awards && omdbData.Awards !== 'N/A' && (
+                                            <p><span className="font-medium text-slate-300">Awards:</span> {omdbData.Awards}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {(omdbData.BoxOffice || omdbData.Production) && (
+                                <div>
+                                    <h4 className="font-semibold text-slate-400 mb-2">Box Office</h4>
+                                    <div className="space-y-1 text-sm">
+                                        {omdbData.BoxOffice && omdbData.BoxOffice !== 'N/A' && (
+                                            <p><span className="font-medium text-slate-300">Worldwide:</span> {omdbData.BoxOffice}</p>
+                                        )}
+                                        {omdbData.Production && omdbData.Production !== 'N/A' && (
+                                            <p><span className="font-medium text-slate-300">Production:</span> {omdbData.Production}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {omdbData.imdbRating && omdbData.imdbRating !== 'N/A' && (
+                                <div>
+                                    <h4 className="font-semibold text-slate-400 mb-2">IMDb Rating</h4>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-yellow-400 text-lg">⭐</span>
+                                        <span className="text-xl font-bold">{omdbData.imdbRating}</span>
+                                        <span className="text-slate-300">/ 10</span>
+                                        {omdbData.imdbVotes && omdbData.imdbVotes !== 'N/A' && (
+                                            <span className="text-sm text-slate-400">({omdbData.imdbVotes} votes)</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </section>
+                )}
+
                 <WhereToWatch providers={providersForCountry} providerIds={providerIds} />
 
-                {/* TMDB Attribution */}
+                {/* Attribution */}
                 <div className="my-8 sm:my-12 text-center">
-                    <p className="text-sm text-slate-400 mb-2">• Powered by The Movie Database (TMDB)</p>
-                    <a
-                        href="https://www.themoviedb.org"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-block hover:opacity-80 transition-opacity"
-                    >
-                        <img
-                            src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1.svg"
-                            alt="TMDB Logo"
-                            className="h-8"
-                        />
-                    </a>
+                    <div className="flex justify-center items-center gap-4 flex-wrap">
+                        <div>
+                            <p className="text-sm text-slate-400 mb-2">• Powered by The Movie Database (TMDB)</p>
+                            <a
+                                href="https://www.themoviedb.org"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block hover:opacity-80 transition-opacity"
+                            >
+                                <img
+                                    src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1.svg"
+                                    alt="TMDB Logo"
+                                    className="h-8"
+                                />
+                            </a>
+                        </div>
+                        {omdbData && item.media_type === 'movie' && (
+                            <div>
+                                <p className="text-sm text-slate-400 mb-2">& The Open Movie Database (OMDb)</p>
+                                <a
+                                    href="https://www.omdbapi.com"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-block hover:opacity-80 transition-opacity text-blue-400 text-xs"
+                                >
+                                    OMDb API
+                                </a>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {details.credits?.cast && details.credits.cast.length > 0 && (
