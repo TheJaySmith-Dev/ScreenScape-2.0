@@ -21,7 +21,7 @@ export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game' | 'imag
 
 const App: React.FC = () => {
     const { user, loading, userSettings, updateUserSettings, syncLoading } = useAuth();
-    const [apiKey, setApiKey] = useState<string | null>(null);
+    const [apiKey, setApiKey] = useState<string | null>('09b97a49759876f2fde9eadb163edc44'); // Temporary fix for mobile user
     const [isKeyInvalid, setIsKeyInvalid] = useState(false);
     const [view, setView] = useState<ViewType>('screenSearch');
     const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
