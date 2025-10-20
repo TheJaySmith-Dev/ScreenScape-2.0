@@ -31,9 +31,8 @@ export interface OMDbMovieDetails {
   Response: string;
   Error?: string;
 }
-
-// Use a free OMDb API key - users need to sign up at https://www.omdbapi.com for their own key if they exceed the limits
-const OMDb_API_KEY = '72c70bbe'; // This is a demo key with rate limits
+// Use user's personal OMDb API key - get one at https://www.omdbapi.com
+const OMDb_API_KEY = '2b067fb4'; // User's personal API key
 
 export const searchOMDb = async (title: string, year?: string): Promise<OMDbMovieDetails | null> => {
   try {
