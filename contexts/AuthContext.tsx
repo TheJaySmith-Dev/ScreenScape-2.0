@@ -124,9 +124,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     // Check active session
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      setLoading(false);
+      // Set a timeout to force loading false after 5 seconds to prevent stuck loading
+      const timeoutId = setTimeout(() => {
+        console.warn('Auth loading timeout - forcing no user state');
+        setUser(null);
+        setLoading(false);
+      }, 5000);
+
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Session error:', error);
+        }
+        setUser(session?.user ?? null);
+      } catch (err) {
+        console.error('Failed to get session:', err);
+        // Set user to null for guest mode if Supabase fails
+        setUser(null);
+      } finally {
+        clearTimeout(timeoutId);
+        setLoading(false);
+      }
     };
 
     getSession();

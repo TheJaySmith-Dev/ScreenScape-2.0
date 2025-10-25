@@ -42,8 +42,6 @@ const App: React.FC = () => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
 
-
-
     const handleInvalidApiKey = useCallback(() => {
         localStorage.removeItem('tmdb_api_key');
         setApiKey(null);
@@ -58,7 +56,7 @@ const App: React.FC = () => {
         setView('game');
         setSelectedGame(game);
     }, []);
-    
+
     const handleCloseDetail = useCallback(() => {
         setSelectedItem(null);
     }, []);
@@ -68,7 +66,7 @@ const App: React.FC = () => {
             const customEvent = event as CustomEvent<MediaItem>;
             handleSelectItem(customEvent.detail);
         };
-        
+
         const setSearchViewHandler = (event: Event) => {
             const customEvent = event as CustomEvent<{ query: string }>;
             setView('explore');
@@ -83,7 +81,7 @@ const App: React.FC = () => {
             window.removeEventListener('setSearchView', setSearchViewHandler);
         };
     }, [handleSelectItem]);
-    
+
     const renderView = () => {
         if (selectedItem) {
             return <MediaDetail key={selectedItem.id} item={selectedItem} apiKey={apiKey!} onClose={handleCloseDetail} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
@@ -133,7 +131,7 @@ const App: React.FC = () => {
         <ImageGeneratorProvider>
             <div className="bg-primary text-white min-h-screen font-sans">
                 <AIGlow status={aiStatus} />
-                <Header view={view} setView={setView} onSettingsClick={() => setIsSettingsOpen(true)} />
+                <Header view={view} setView={setView} onSettingsClick={() => setIsSettingsOpen(true)} isMediaDetailView={!!selectedItem} />
 
                 <MainContainer>
                     {renderView()}

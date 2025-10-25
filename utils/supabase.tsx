@@ -9,9 +9,11 @@ declare global {
 
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co'
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-export default supabase
+// Note: Add these to your .env file for proper Supabase functionality:
+// VITE_SUPABASE_URL=your_supabase_project_url
+// VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
