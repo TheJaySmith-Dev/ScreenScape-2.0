@@ -6,7 +6,7 @@ import { getMovieDetails as getTMDbMovieDetails, getTVShowDetails as getTMDbTVSh
 import { getMovieRecommendations } from '../services/tmdbService';
 import { getMovieVideos, getTVShowVideos, getMovieWatchProviders, getTVShowWatchProviders } from '../services/tmdbService';
 import { getOMDbFromTMDBDetails, OMDbMovieDetails } from '../services/omdbService';
-import { generateFactsAI } from './openrouter.js';
+import { generateFactsAI, generateReviewsAI } from './openrouter.js';
 import { generateStoryScapeSummary } from './storyscape.js';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
@@ -218,9 +218,35 @@ const ContentPanel = styled(motion.div)`
     min-height: calc(100vh - 300px);
 `;
 
+const TrailerModalOverlay = styled.div`
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+`;
+
+const TrailerModalContent = styled.div`
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    background: black;
+    border-radius: 12px;
+    overflow: hidden;
+`;
+
+const TrailerVideoContainer = styled.div`
+    aspect-ratio: 16/9;
+    width: 100%;
+`;
+
 // --- Main Component ---
 const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSelectItem, onInvalidApiKey }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'cast' | 'reviews'>('overview');
+    const [showTrailerModal, setShowTrailerModal] = useState(false);
     const [details, setDetails] = useState<MovieDetails | TVShowDetails | null>(null);
     const [storyScape, setStoryScape] = useState<{
         summary: string;
@@ -232,7 +258,7 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     const [recommendations, setRecommendations] = useState<MediaItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-        const [isMuted, setIsMuted] = useState(isMobileDevice());
+    const [isMuted, setIsMuted] = useState(isMobileDevice());
     const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
     const [isStoryScapeLoading, setIsStoryScapeLoading] = useState(false);
@@ -244,6 +270,10 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
     const [omdbData, setOmdbData] = useState<OMDbMovieDetails | null>(null);
     const [isOmdbLoading, setIsOmdbLoading] = useState(false);
+
+    const [aiReviews, setAiReviews] = useState<string | null>(null);
+    const [isAiReviewsLoading, setIsAiReviewsLoading] = useState(false);
+    const [aiReviewsError, setAiReviewsError] = useState<string | null>(null);
 
     const { country } = useGeolocation();
     const { providerIds } = useStreamingPreferences();
@@ -418,6 +448,40 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         [availabilityBuckets]
     );
 
+    const handlePlayTrailer = () => {
+        if (mainTrailerKey) {
+            setShowTrailerModal(true);
+        }
+    };
+
+    const handleCloseTrailerModal = () => {
+        setShowTrailerModal(false);
+    };
+
+    const handleGenerateReviewsAI = async () => {
+        if (!details) return;
+        setIsAiReviewsLoading(true);
+        setAiReviewsError(null);
+        setAiReviews(null);
+        try {
+            const genres = details.genres?.map(g => g.name).filter(Boolean) || [];
+            const reviews = await generateReviewsAI(
+                'title' in details ? details.title : details.name,
+                details.overview,
+                details.vote_average,
+                genres
+            );
+            setAiReviews(reviews);
+        } catch (err) {
+            if (err instanceof Error) {
+                setAiReviewsError(err.message);
+            } else {
+                setAiReviewsError("Reviews are still being generated. Try again in a moment.");
+            }
+        } finally {
+            setIsAiReviewsLoading(false);
+        }
+    };
 
     if (isLoading) {
         return (
@@ -449,8 +513,12 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                 return (
                     <div className="space-y-6">
                         <div className="text-center">
-                            <button onClick={() => {}} className="bg-white text-black font-bold px-6 py-3 rounded-full mb-6">
-                                Play Trailer
+                            <button
+                                onClick={handlePlayTrailer}
+                                disabled={!mainTrailerKey}
+                                className={`bg-white text-black font-bold px-6 py-3 rounded-full mb-6 ${!mainTrailerKey ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200'}`}
+                            >
+                                {mainTrailerKey ? 'Play Trailer' : 'No Trailer Available'}
                             </button>
                         </div>
 
@@ -530,6 +598,34 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                                             <h5 className="font-semibold text-slate-400">Cinematic Style</h5>
                                             <p>{storyScape.style}</p>
                                         </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {!aiReviews && !isAiReviewsLoading && !aiReviewsError && (
+                                <button onClick={handleGenerateReviewsAI} className="bg-blue-500 text-white font-bold px-6 py-3 rounded-full">
+                                    Generate AI Reviews
+                                </button>
+                            )}
+
+                            {isAiReviewsLoading && (
+                                <div className="text-center py-4">
+                                    <div className="spinner mx-auto mb-2"></div>
+                                    <p className="text-slate-400">Generating AI reviews...</p>
+                                </div>
+                            )}
+
+                            {aiReviewsError && (
+                                <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4">
+                                    <p className="text-red-400">Error generating reviews: {aiReviewsError}</p>
+                                </div>
+                            )}
+
+                            {aiReviews && (
+                                <div className="bg-blue-500/10 backdrop-blur-sm rounded-xl p-6">
+                                    <h4 className="font-semibold text-blue-400 mb-4">AI-Generated Reviews</h4>
+                                    <div className="text-slate-200 whitespace-pre-line leading-relaxed">
+                                        {aiReviews}
                                     </div>
                                 </div>
                             )}
@@ -626,6 +722,27 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                     </ContentPanel>
                 </AnimatePresence>
             </DetailContainer>
+
+            {/* Trailer Modal */}
+            {showTrailerModal && mainTrailerKey && (
+                <TrailerModalOverlay onClick={handleCloseTrailerModal}>
+                    <TrailerModalContent onClick={(e) => e.stopPropagation()}>
+                        <button
+                            onClick={handleCloseTrailerModal}
+                            className="absolute top-4 right-4 z-10 p-2 bg-black/50 rounded-full text-white hover:bg-white/20 transition-colors"
+                        >
+                            <Icons.XIcon className="w-6 h-6" />
+                        </button>
+                        <TrailerVideoContainer>
+                            <VideoPlayer
+                                videoKey={mainTrailerKey}
+                                isMuted={isMuted}
+                                onEnd={handleCloseTrailerModal}
+                            />
+                        </TrailerVideoContainer>
+                    </TrailerModalContent>
+                </TrailerModalOverlay>
+            )}
         </>
     );
 };

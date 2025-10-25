@@ -48,9 +48,38 @@ export async function queryOpenRouter(prompt) {
  */
 export async function generateFactsAI(title, overview) {
   const prompt = `Provide 3-5 interesting and fun facts about the movie or TV show "${title}". Use the following synopsis as context: "${overview}". Make the facts engaging, lesser-known, and accurate. Format as a bulleted list without extra commentary.`;
-  
+
   const facts = await queryOpenRouter(prompt);
-  
+
   // Since queryOpenRouter might fail, we let it handle errors and return messages
   return facts;
+}
+
+/**
+ * Generates AI-powered reviews about a movie or TV show using the OpenRouter API.
+ * @param {string} title The title of the movie or TV show.
+ * @param {string} overview A brief overview or synopsis of the title.
+ * @param {number} rating The TMDB rating out of 10.
+ * @param {string[]} genres Array of genre names.
+ * @returns {Promise<string>} Generated reviews or an error message.
+ */
+export async function generateReviewsAI(title, overview, rating, genres = []) {
+  const genreList = genres.length > 0 ? genres.join(', ') : 'various genres';
+  const prompt = `Generate 2-3 detailed, realistic reviews for the movie or TV show "${title}" which has a rating of ${rating}/10 and belongs to these genres: ${genreList}.
+
+Use the following synopsis as context: "${overview}"
+
+Each review should:
+- Be 2-4 sentences long
+- Sound like a real critic or viewer
+- Include both positive and critical points where appropriate
+- Reference specific elements from the story or style when possible
+- Vary in perspective (some enthusiastic, some mixed, some focused on different aspects)
+
+Format as a series of separate reviews, clearly separated. Don't add any introduction or conclusion text.`;
+
+  const reviews = await queryOpenRouter(prompt);
+
+  // Since queryOpenRouter might fail, we let it handle errors and return messages
+  return reviews;
 }

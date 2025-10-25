@@ -11,6 +11,16 @@ interface HeaderProps {
     onSettingsClick: () => void;
 }
 
+interface NavItem {
+    viewName: ViewType | 'more';
+    icon: any;
+    label: string;
+    unique?: boolean;
+    pulse?: boolean;
+    badge?: number;
+    isMore?: boolean;
+}
+
 const shimmer = keyframes`
     0%, 100% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.1); }
     50% { box-shadow: 0 0 30px rgba(255, 255, 255, 0.3); }
@@ -34,16 +44,18 @@ const NavContainer = styled.nav<{ isDesktop: boolean }>`
             ? 'width: 72px; height: 100vh;'
             : 'width: 100vw; padding: 0 20px 34px 20px; height: auto;'
     }
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(12px);
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(20px);
     border-top-left-radius: ${({ isDesktop }) => (isDesktop ? '0' : '24px')};
     border-top-right-radius: ${({ isDesktop }) => (isDesktop ? '0' : '24px')};
     border-bottom-left-radius: ${({ isDesktop }) => (isDesktop ? '24px' : '0')};
     border-bottom-right-radius: ${({ isDesktop }) => (isDesktop ? '24px' : '0')};
-    border-bottom: ${({ isDesktop }) => (isDesktop ? 'none' : '1px solid rgba(255, 255, 255, 0.1)')};
+    border-top: ${({ isDesktop }) => (isDesktop ? 'none' : '1px solid rgba(255, 255, 255, 0.1)')};
+    border-bottom: ${({ isDesktop }) => (isDesktop ? 'none' : '1px solid rgba(255, 255, 255, 0.05)')};
     border-right: ${({ isDesktop }) => (isDesktop ? '1px solid rgba(255, 255, 255, 0.1)' : 'none')};
     min-height: ${({ isDesktop }) => (isDesktop ? '100vh' : '80px')};
-    transition: transform 0.3s ease;
+    transition: all 0.3s ease;
+    box-shadow: ${({ isDesktop }) => (isDesktop ? '2px 0 10px rgba(0,0,0,0.3)' : '0 -2px 20px rgba(0,0,0,0.2)')};
 `;
 
 const NavButton = styled(motion.button)<{ active: boolean }>`
@@ -121,7 +133,7 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const navItems = [
+    const navItems: NavItem[] = [
         { viewName: 'screenSearch', icon: FaHome, label: 'Home' },
         { viewName: 'explore', icon: FaSearch, label: 'Explore' },
         { viewName: 'imageGenerator', icon: FaPlay, label: 'ScreenGenAI', unique: true },
@@ -132,18 +144,15 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
     ];
 
     // For mobile, collapse less-used items
-    const mobileItems = navItems.slice(0, 4).concat([
-        {
-            viewName: 'more',
-            icon: FaCog,
-            label: 'More',
-            isMore: true,
-        }
-    ]);
+    const mobileItems: NavItem[] = [...navItems.slice(0, 4), {
+        viewName: 'more',
+        icon: FaCog,
+        label: 'More',
+    }];
 
     const [showMore, setShowMore] = useState(false);
 
-    const handleNavClick = (viewName: ViewType) => {
+    const handleNavClick = (viewName: ViewType | 'more') => {
         if (viewName === 'more') {
             setShowMore(true);
         } else {
