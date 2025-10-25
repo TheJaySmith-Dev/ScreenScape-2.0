@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { motion } from 'framer-motion';
-import { FaHome, FaSearch, FaCog, FaUser, FaGamepad, FaPlay, FaListUl } from 'react-icons/fa';
+import { FaHome, FaSearch, FaCog, FaUser, FaGamepad, FaPlay, FaListUl, FaSignOutAlt } from 'react-icons/fa';
 import { ViewType } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import { useImageGenerator } from '../contexts/ImageGeneratorContext';
@@ -131,6 +131,8 @@ const NavIcon = styled.div<{ view: ViewType; currentView: ViewType }>`
 const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
     const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
     const { selectedModel } = useImageGenerator();
+    const { user, signOut } = useAuth();
+    const [showUserMenu, setShowUserMenu] = useState(false);
 
     useEffect(() => {
         const handleResize = () => {
@@ -169,8 +171,55 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
 
     const currentNavItems = isDesktop ? navItems : mobileItems;
 
+    const handleUserMenuToggle = () => {
+        setShowUserMenu(!showUserMenu);
+    };
+
+    const handleUserMenuClose = () => {
+        setShowUserMenu(false);
+    };
+
+    const handleSignOut = async () => {
+        try {
+            await signOut();
+            setShowUserMenu(false);
+        } catch (error) {
+            console.error('Error signing out:', error);
+        }
+    };
+
     return (
         <>
+            {/* User Button - Desktop Version */}
+            {isDesktop && (
+                <motion.button
+                    onClick={handleUserMenuToggle}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    style={{
+                        position: 'fixed',
+                        top: 24,
+                        right: 24,
+                        zIndex: 60,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 12,
+                        borderRadius: 16,
+                        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)',
+                        backdropFilter: 'blur(24px)',
+                        border: '1px solid rgba(51, 65, 85, 0.3)',
+                        color: 'white',
+                        fontSize: 18,
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
+                    }}
+                >
+                    <FaUser />
+                </motion.button>
+            )}
+
             <NavContainer isDesktop={isDesktop}>
                 {currentNavItems.map((item) => (
                     <NavButton
@@ -239,6 +288,23 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                         </div>
                     </NavButton>
                 ))}
+
+                {/* User Button for Mobile */}
+                {!isDesktop && (
+                    <NavButton
+                        active={false}
+                        onClick={handleUserMenuToggle}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        <NavIcon view="screenSearch" currentView="screenSearch" style={{ opacity: 1 }}>
+                            <FaUser />
+                        </NavIcon>
+                        <div style={{ fontSize: '11px', textAlign: 'center' }}>
+                            Account
+                        </div>
+                    </NavButton>
+                )}
             </NavContainer>
 
             {/* More Menu for Mobile */}
@@ -308,6 +374,104 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                         <FaCog style={{ marginRight: 12, fontSize: 18 }} />
                         Settings
                     </motion.button>
+                </motion.div>
+            )}
+
+            {/* User Menu */}
+            {showUserMenu && (
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    onClick={handleUserMenuClose}
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0, 0, 0, 0.5)',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: isDesktop ? 'flex-start' : 'flex-end',
+                        justifyContent: 'center',
+                        zIndex: 70,
+                        padding: isDesktop ? '80px 24px 0 0' : '0 20px 120px 20px',
+                    }}
+                >
+                    <motion.div
+                        onClick={(e) => e.stopPropagation()}
+                        initial={{ y: -20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)',
+                            backdropFilter: 'blur(24px)',
+                            borderRadius: 16,
+                            border: '1px solid rgba(51, 65, 85, 0.3)',
+                            padding: 16,
+                            minWidth: 200,
+                            boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+                            position: 'relative',
+                        }}
+                    >
+                        {/* User Info Section */}
+                        <div style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: 12 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 4 }}>
+                                {user?.email || 'User'}
+                            </div>
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+                                Signed in
+                            </div>
+                        </div>
+
+                        {/* Menu Items */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <motion.button
+                                onClick={() => {
+                                    onSettingsClick();
+                                    handleUserMenuClose();
+                                }}
+                                whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    padding: 12,
+                                    borderRadius: 8,
+                                    background: 'transparent',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: 14,
+                                    justifyContent: 'flex-start',
+                                    gap: 12,
+                                }}
+                            >
+                                <FaCog style={{ fontSize: 16 }} />
+                                Settings
+                            </motion.button>
+
+                            <motion.button
+                                onClick={handleSignOut}
+                                whileHover={{ backgroundColor: 'rgba(239, 68, 68, 0.2)' }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    padding: 12,
+                                    borderRadius: 8,
+                                    background: 'transparent',
+                                    color: '#ef4444',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: 14,
+                                    justifyContent: 'flex-start',
+                                    gap: 12,
+                                }}
+                            >
+                                <FaSignOutAlt style={{ fontSize: 16 }} />
+                                Sign Out
+                            </motion.button>
+                        </div>
+                    </motion.div>
                 </motion.div>
             )}
         </>
