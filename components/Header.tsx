@@ -42,7 +42,7 @@ const NavContainer = styled.nav<{ isDesktop: boolean }>`
     flex-direction: ${({ isDesktop }) => (isDesktop ? 'column' : 'row')};
     ${({ isDesktop }) =>
         isDesktop
-            ? 'width: 280px; height: 100vh;'
+            ? 'width: 80px; height: 100vh;'
             : 'width: 100vw; padding: 0 20px 34px 20px; height: auto;'
     }
     background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);

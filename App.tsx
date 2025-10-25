@@ -24,7 +24,7 @@ export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game' | 'imag
 
 const MainContainer = styled.main`
     @media (min-width: 768px) {
-        margin-left: 280px;
+        margin-left: 80px;
         padding-top: 0;
     }
     @media (max-width: 767px) {
