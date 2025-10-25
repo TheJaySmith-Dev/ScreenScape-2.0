@@ -18,16 +18,17 @@ import SportsView from './components/SportsView';
 import Auth from './components/Auth';
 
 import { useAuth } from './contexts/AuthContext';
+import { ImageGeneratorProvider } from './contexts/ImageGeneratorContext';
 
 export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game' | 'imageGenerator' | 'live' | 'sports';
 
 const MainContainer = styled.main`
     @media (min-width: 768px) {
-        margin-left: 72px;
+        margin-left: 280px;
         padding-top: 0;
     }
     @media (max-width: 767px) {
-        padding-bottom: 80px;
+        padding-bottom: 88px;
     }
 `;
 
@@ -130,20 +131,22 @@ const App: React.FC = () => {
     }
 
     return (
-        <div className="bg-primary text-white min-h-screen font-sans">
-            <AIGlow status={aiStatus} />
-            <Header view={view} setView={setView} onSettingsClick={() => setIsSettingsOpen(true)} />
+        <ImageGeneratorProvider>
+            <div className="bg-primary text-white min-h-screen font-sans">
+                <AIGlow status={aiStatus} />
+                <Header view={view} setView={setView} onSettingsClick={() => setIsSettingsOpen(true)} />
 
-            <MainContainer>
-                {renderView()}
-            </MainContainer>
+                <MainContainer>
+                    {renderView()}
+                </MainContainer>
 
-            {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} />}
+                {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} />}
 
-            <AIAssistant tmdbApiKey={apiKey} setAiStatus={setAiStatus} />
-            <TypeToAssist tmdbApiKey={apiKey} />
-            <QuickJump apiKey={apiKey} />
-        </div>
+                <AIAssistant tmdbApiKey={apiKey} setAiStatus={setAiStatus} />
+                <TypeToAssist tmdbApiKey={apiKey} />
+                <QuickJump apiKey={apiKey} />
+            </div>
+        </ImageGeneratorProvider>
     );
 };
 

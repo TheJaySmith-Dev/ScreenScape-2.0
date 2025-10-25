@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { FaHome, FaSearch, FaCog, FaUser, FaGamepad, FaPlay, FaListUl } from 'react-icons/fa';
 import { ViewType } from '../App';
 import { useAuth } from '../contexts/AuthContext';
+import { useImageGenerator } from '../contexts/ImageGeneratorContext';
 
 interface HeaderProps {
     view: ViewType;
@@ -41,21 +42,24 @@ const NavContainer = styled.nav<{ isDesktop: boolean }>`
     flex-direction: ${({ isDesktop }) => (isDesktop ? 'column' : 'row')};
     ${({ isDesktop }) =>
         isDesktop
-            ? 'width: 72px; height: 100vh;'
+            ? 'width: 280px; height: 100vh;'
             : 'width: 100vw; padding: 0 20px 34px 20px; height: auto;'
     }
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(20px);
-    border-top-left-radius: ${({ isDesktop }) => (isDesktop ? '0' : '24px')};
-    border-top-right-radius: ${({ isDesktop }) => (isDesktop ? '0' : '24px')};
-    border-bottom-left-radius: ${({ isDesktop }) => (isDesktop ? '24px' : '0')};
-    border-bottom-right-radius: ${({ isDesktop }) => (isDesktop ? '24px' : '0')};
-    border-top: ${({ isDesktop }) => (isDesktop ? 'none' : '1px solid rgba(255, 255, 255, 0.1)')};
-    border-bottom: ${({ isDesktop }) => (isDesktop ? 'none' : '1px solid rgba(255, 255, 255, 0.05)')};
-    border-right: ${({ isDesktop }) => (isDesktop ? '1px solid rgba(255, 255, 255, 0.1)' : 'none')};
-    min-height: ${({ isDesktop }) => (isDesktop ? '100vh' : '80px')};
-    transition: all 0.3s ease;
-    box-shadow: ${({ isDesktop }) => (isDesktop ? '2px 0 10px rgba(0,0,0,0.3)' : '0 -2px 20px rgba(0,0,0,0.2)')};
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
+    backdrop-filter: blur(24px);
+    border-top-left-radius: ${({ isDesktop }) => (isDesktop ? '0' : '32px')};
+    border-top-right-radius: ${({ isDesktop }) => (isDesktop ? '0' : '32px')};
+    border-bottom-left-radius: ${({ isDesktop }) => (isDesktop ? '32px' : '0')};
+    border-bottom-right-radius: ${({ isDesktop }) => (isDesktop ? '32px' : '0')};
+    border-top: ${({ isDesktop }) => (isDesktop ? 'none' : '1px solid rgba(148, 163, 184, 0.2)')};
+    border-bottom: ${({ isDesktop }) => (isDesktop ? 'none' : '1px solid rgba(51, 65, 85, 0.2)')};
+    border-right: ${({ isDesktop }) => (isDesktop ? '1px solid rgba(51, 65, 85, 0.3)' : 'none')};
+    min-height: ${({ isDesktop }) => (isDesktop ? '100vh' : '88px')};
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: ${({ isDesktop }) => (isDesktop
+        ? '4px 0 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
+        : '0 -8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(148, 163, 184, 0.1)')};
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 `;
 
 const NavButton = styled(motion.button)<{ active: boolean }>`
@@ -124,6 +128,7 @@ const NavIcon = styled.div<{ view: ViewType; currentView: ViewType }>`
 
 const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
     const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+    const { selectedModel } = useImageGenerator();
 
     useEffect(() => {
         const handleResize = () => {
@@ -215,7 +220,21 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                                 </motion.div>
                             )}
                         </NavIcon>
-                        {item.label}
+                        <div style={{ fontSize: '11px', textAlign: 'center' }}>
+                            {item.label}
+                            {item.viewName === 'imageGenerator' && isDesktop && selectedModel && (
+                                <div style={{
+                                    fontSize: '9px',
+                                    opacity: 0.8,
+                                    marginTop: '2px',
+                                    fontWeight: '400',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                }}>
+                                    {selectedModel}
+                                </div>
+                            )}
+                        </div>
                     </NavButton>
                 ))}
             </NavContainer>

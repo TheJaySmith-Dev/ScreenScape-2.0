@@ -1,31 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { generateImage, getAvailableModels, type AvailableModel, FALLBACK_MODELS } from '../services/imageGenerationService';
+import { generateImage } from '../services/imageGenerationService';
+import { useImageGenerator } from '../contexts/ImageGeneratorContext';
 
 const ImageGenerator: React.FC = () => {
+  const { selectedModel, setSelectedModel, availableModels } = useImageGenerator();
   const [prompt, setPrompt] = useState('');
-  const [selectedModel, setSelectedModel] = useState<AvailableModel>(FALLBACK_MODELS[0]);
-  const [availableModels, setAvailableModels] = useState<string[]>(FALLBACK_MODELS);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // Load available models on component mount
-  useEffect(() => {
-    const loadModels = async () => {
-      try {
-        const models = await getAvailableModels();
-        setAvailableModels(models);
-        if (!selectedModel || !models.includes(selectedModel)) {
-          setSelectedModel(models[0]);
-        }
-      } catch (err) {
-        console.warn('Failed to load models, using fallbacks:', err);
-        setAvailableModels([...FALLBACK_MODELS]);
-      }
-    };
-
-    loadModels();
-  }, []);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
