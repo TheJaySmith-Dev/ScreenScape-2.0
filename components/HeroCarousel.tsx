@@ -188,8 +188,11 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                 </div>
             ))}
             
-            <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/60 to-transparent" />
-            <div className="absolute inset-0 bg-black/20" />
+            <div className="absolute inset-0 bg-primary/60 backdrop-blur-sm" />
+            <div
+                className="absolute inset-0 bg-gradient-to-t from-primary via-primary/40 to-transparent"
+                style={{ backdropFilter: 'blur(2px)' }}
+            />
 
             <div className="relative h-full flex flex-col justify-end container mx-auto px-4 sm:px-6 lg:px-8 pb-20 sm:pb-28 md:pb-40 z-10">
                 {activeItem && (

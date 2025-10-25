@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { GearIcon, MenuIcon, XIcon } from './Icons';
+import React, { useState, useEffect } from 'react';
+import styled, { keyframes } from 'styled-components';
+import { motion } from 'framer-motion';
+import { FaHome, FaSearch, FaCog, FaUser, FaGamepad, FaPlay, FaListUl } from 'react-icons/fa';
 import { ViewType } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -9,95 +11,275 @@ interface HeaderProps {
     onSettingsClick: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const { user, signOut } = useAuth();
+const shimmer = keyframes`
+    0%, 100% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.1); }
+    50% { box-shadow: 0 0 30px rgba(255, 255, 255, 0.3); }
+`;
 
-    const NavButton: React.FC<{ viewName: ViewType, children: React.ReactNode, isMobile?: boolean }> = ({ viewName, children, isMobile = false }) => (
-        <button
-            onClick={() => {
-                setView(viewName);
-                if (isMobile) setIsMenuOpen(false);
-            }}
-            className={`font-semibold transition-colors duration-300 ${isMobile ? 'text-xl w-full text-left p-2 rounded-md' : 'text-lg'} ${view === viewName ? (isMobile ? 'bg-white/10 text-white' : 'text-white') : 'text-slate-400'} hover:text-white`}
-        >
-            {children}
-        </button>
-    );
-    
+const ripple = keyframes`
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.2); opacity: 0; }
+`;
+
+const NavContainer = styled.nav<{ isDesktop: boolean }>`
+    position: fixed;
+    bottom: ${({ isDesktop }) => (isDesktop ? 'auto' : '0')};
+    left: ${({ isDesktop }) => (isDesktop ? '0' : '0')};
+    top: ${({ isDesktop }) => (isDesktop ? '0' : 'auto')};
+    z-index: 50;
+    display: flex;
+    flex-direction: ${({ isDesktop }) => (isDesktop ? 'column' : 'row')};
+    ${({ isDesktop }) =>
+        isDesktop
+            ? 'width: 72px; height: 100vh;'
+            : 'width: 100vw; padding: 0 20px 34px 20px; height: auto;'
+    }
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(12px);
+    border-top-left-radius: ${({ isDesktop }) => (isDesktop ? '0' : '24px')};
+    border-top-right-radius: ${({ isDesktop }) => (isDesktop ? '0' : '24px')};
+    border-bottom-left-radius: ${({ isDesktop }) => (isDesktop ? '24px' : '0')};
+    border-bottom-right-radius: ${({ isDesktop }) => (isDesktop ? '24px' : '0')};
+    border-bottom: ${({ isDesktop }) => (isDesktop ? 'none' : '1px solid rgba(255, 255, 255, 0.1)')};
+    border-right: ${({ isDesktop }) => (isDesktop ? '1px solid rgba(255, 255, 255, 0.1)' : 'none')};
+    min-height: ${({ isDesktop }) => (isDesktop ? '100vh' : '80px')};
+    transition: transform 0.3s ease;
+`;
+
+const NavButton = styled(motion.button)<{ active: boolean }>`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    margin: 4px;
+    border-radius: 16px;
+    background: ${({ active }) =>
+        active
+            ? 'rgba(255, 255, 255, 0.3)'
+            : 'transparent'
+    };
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 60px;
+
+    &:hover {
+        transform: scale(1.1);
+        animation: ${shimmer} 1.5s ease-in-out infinite;
+    }
+
+    &:active::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+        transform: translate(-50%, -50%);
+        animation: ${ripple} 0.6s ease-out;
+    }
+
+    @media (max-width: 768px) {
+        font-size: 10px;
+        padding: 8px;
+        min-width: 44px;
+    }
+`;
+
+const NavIcon = styled.div<{ view: ViewType; currentView: ViewType }>`
+    font-size: 20px;
+    margin-bottom: 4px;
+    opacity: ${({ view, currentView }) => (view === currentView ? 1 : 0.6)};
+    transition: all 0.3s ease;
+
+    ${NavButton}:hover & {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+
+    @media (max-width: 768px) {
+        font-size: 16px;
+    }
+`;
+
+const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
+    const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsDesktop(window.innerWidth >= 768);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const navItems = [
+        { viewName: 'screenSearch', icon: FaHome, label: 'Home' },
+        { viewName: 'explore', icon: FaSearch, label: 'Explore' },
+        { viewName: 'imageGenerator', icon: FaPlay, label: 'ScreenGenAI', unique: true },
+        { viewName: 'live', icon: FaPlay, label: 'Live', pulse: true },
+        { viewName: 'watchlist', icon: FaListUl, label: 'Watchlist', badge: 3 },
+        { viewName: 'game', icon: FaGamepad, label: 'Games' },
+        { viewName: 'sports', icon: FaPlay, label: 'Sports' },
+    ];
+
+    // For mobile, collapse less-used items
+    const mobileItems = navItems.slice(0, 4).concat([
+        {
+            viewName: 'more',
+            icon: FaCog,
+            label: 'More',
+            isMore: true,
+        }
+    ]);
+
+    const [showMore, setShowMore] = useState(false);
+
+    const handleNavClick = (viewName: ViewType) => {
+        if (viewName === 'more') {
+            setShowMore(true);
+        } else {
+            setView(viewName);
+        }
+    };
+
+    const currentNavItems = isDesktop ? navItems : mobileItems;
+
     return (
         <>
-            <header className="fixed top-0 left-0 right-0 bg-primary/80 backdrop-blur-xl z-40 h-20 flex items-center border-b border-glass-edge">
-                <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-                    {/* Logo and Desktop Nav */}
-                    <div className="flex items-center gap-8">
-                        <button onClick={() => setView('screenSearch')} className="text-2xl md:text-3xl font-bold text-white animate-glow tracking-wider">SS</button>
-                        <nav className="hidden md:flex items-center gap-6">
-                            <NavButton viewName="screenSearch">Home</NavButton>
-                            <NavButton viewName="explore">Explore</NavButton>
-                            <NavButton viewName="imageGenerator">ScreenGenAI</NavButton>
-                            <NavButton viewName="live">Live</NavButton>
-                            <NavButton viewName="watchlist">Watchlist</NavButton>
-                            <NavButton viewName="game">Games</NavButton>
-                        </nav>
-                    </div>
-
-                    {/* Right-side controls */}
-                    <div className="flex items-center gap-2 sm:gap-4">
-                        {/* User Info and Logout */}
-                        {user && (
-                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                                <span className="hidden sm:inline">{user.email}</span>
-                                <button
-                                    onClick={signOut}
-                                    className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+            <NavContainer isDesktop={isDesktop}>
+                {currentNavItems.map((item) => (
+                    <NavButton
+                        key={item.viewName}
+                        active={view === item.viewName}
+                        onClick={() => handleNavClick(item.viewName as ViewType)}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        <NavIcon view={item.viewName as ViewType} currentView={view}>
+                            <item.icon />
+                            {item.pulse && (
+                                <motion.div
+                                    style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        right: 0,
+                                        width: 8,
+                                        height: 8,
+                                        backgroundColor: 'red',
+                                        borderRadius: '50%',
+                                    }}
+                                    animate={{ opacity: [1, 0.5, 1] }}
+                                    transition={{ duration: 2, repeat: Infinity }}
+                                />
+                            )}
+                            {item.badge && (
+                                <motion.div
+                                    style={{
+                                        position: 'absolute',
+                                        top: -5,
+                                        right: -5,
+                                        width: 16,
+                                        height: 16,
+                                        backgroundColor: '#007AFF',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: 10,
+                                        color: 'white',
+                                        fontWeight: 'bold',
+                                    }}
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    transition={{ type: 'spring', stiffness: 500, damping: 15 }}
                                 >
-                                    Logout
-                                </button>
-                            </div>
-                        )}
+                                    {item.badge}
+                                </motion.div>
+                            )}
+                        </NavIcon>
+                        {item.label}
+                    </NavButton>
+                ))}
+            </NavContainer>
 
-                        {/* Settings Icon (Desktop) */}
-                        <button onClick={onSettingsClick} className="text-slate-300 hover:text-white transition-colors p-2 rounded-full glass-button hidden md:block">
-                            <GearIcon className="w-6 h-6" />
-                        </button>
-
-                        {/* Mobile Menu Icon */}
-                        <div className="md:hidden flex items-center">
-                            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-slate-300 hover:text-white p-2">
-                                {isMenuOpen ? <XIcon className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            {/* Mobile Menu Dropdown */}
-            {isMenuOpen && (
-                <div className="fixed top-20 left-0 right-0 bg-primary/95 backdrop-blur-lg z-30 p-4 border-b border-glass-edge animate-fade-in-down md:hidden">
-                    <nav className="flex flex-col gap-2 mb-4">
-                        <NavButton viewName="screenSearch" isMobile>Home</NavButton>
-                        <NavButton viewName="explore" isMobile>Explore</NavButton>
-                        <NavButton viewName="imageGenerator" isMobile>ScreenGenAI</NavButton>
-                        <NavButton viewName="live" isMobile>Live</NavButton>
-                        <NavButton viewName="watchlist" isMobile>Watchlist</NavButton>
-                        <NavButton viewName="game" isMobile>Games</NavButton>
-                    </nav>
-                    <div className="border-t border-glass-edge pt-4 flex flex-col items-start gap-4">
-                        <button onClick={() => { onSettingsClick(); setIsMenuOpen(false); }} className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors text-lg">
-                            <GearIcon className="w-6 h-6" />
-                            Settings
-                        </button>
-                    </div>
-                </div>
+            {/* More Menu for Mobile */}
+            {showMore && !isDesktop && (
+                <motion.div
+                    initial={{ opacity: 0, y: 100 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 100 }}
+                    style={{
+                        position: 'fixed',
+                        bottom: 120,
+                        left: 20,
+                        right: 20,
+                        background: 'rgba(255, 255, 255, 0.15)',
+                        backdropFilter: 'blur(12px)',
+                        borderRadius: 24,
+                        padding: 20,
+                        zIndex: 100,
+                    }}
+                >
+                    {navItems.slice(4).map((item) => (
+                        <motion.button
+                            key={item.viewName}
+                            onClick={() => {
+                                setView(item.viewName as ViewType);
+                                setShowMore(false);
+                            }}
+                            whileHover={{ scale: 1.05 }}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: 12,
+                                margin: 4,
+                                borderRadius: 16,
+                                background: 'transparent',
+                                color: 'white',
+                                border: 'none',
+                                cursor: 'pointer',
+                                width: '100%',
+                                justifyContent: 'flex-start',
+                            }}
+                        >
+                            <item.icon style={{ marginRight: 12, fontSize: 18 }} />
+                            {item.label}
+                        </motion.button>
+                    ))}
+                    <motion.button
+                        onClick={() => {
+                            onSettingsClick();
+                            setShowMore(false);
+                        }}
+                        whileHover={{ scale: 1.05 }}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: 12,
+                            margin: 4,
+                            borderRadius: 16,
+                            background: 'transparent',
+                            color: 'white',
+                            border: 'none',
+                            cursor: 'pointer',
+                            width: '100%',
+                            justifyContent: 'flex-start',
+                        }}
+                    >
+                        <FaCog style={{ marginRight: 12, fontSize: 18 }} />
+                        Settings
+                    </motion.button>
+                </motion.div>
             )}
-            <style>{`
-                @keyframes animate-fade-in-down {
-                    0% { opacity: 0; transform: translateY(-10px); }
-                    100% { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fade-in-down { animation: animate-fade-in-down 0.3s ease-out both; }
-            `}</style>
         </>
     );
 };

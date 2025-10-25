@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import styled, { keyframes } from 'styled-components';
+import { motion } from 'framer-motion';
 import { MediaItem, Movie, TVShow, PersonMovieCredit, Person } from '../types';
 import { searchMulti } from '../services/tmdbService';
 import { normalizeMovie, normalizeTVShow, getCollectionDetails, getPersonMovieCredits, getMovieDetailsForCollections } from '../services/tmdbService';
@@ -6,6 +8,7 @@ import { findFranchise } from '../services/franchiseService';
 import { SearchIcon, StarIcon, XIcon } from './Icons';
 import Loader from './Loader';
 import TrendingStrip from './TrendingStrip';
+import HeroCarousel from './HeroCarousel';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 
@@ -104,39 +107,85 @@ const WatchPathTimeline: React.FC<{
     );
 };
 
+const shimmer = keyframes`
+    0%, 100% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.1); }
+    50% { box-shadow: 0 0 30px rgba(255, 255, 255, 0.3); }
+`;
+
+const ripple = keyframes`
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.2); opacity: 0; }
+`;
+
+const Card = styled(motion.div)<{ active: boolean }>`
+    position: relative;
+    aspect-ratio: 2/3;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+    cursor: pointer;
+
+    &:hover {
+        transform: scale(1.05);
+        animation: ${shimmer} 1.5s ease-in-out infinite;
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(16px);
+    }
+
+    &:active::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+        transform: translate(-50%, -50%);
+        animation: ${ripple} 0.6s ease-out;
+    }
+`;
+
 const SearchResultCard: React.FC<{ item: MediaItem, onClick: (item: MediaItem) => void }> = ({ item, onClick }) => {
     const title = 'title' in item ? item.title : item.name;
     const year = 'release_date' in item && item.release_date ? item.release_date.substring(0, 4) : ('first_air_date' in item && item.first_air_date ? item.first_air_date.substring(0, 4) : '');
 
     return (
-        <div onClick={() => onClick(item)} className="group cursor-pointer animate-fade-in relative">
-            <div className="aspect-[2/3] w-full overflow-hidden rounded-xl bg-glass shadow-lg transition-transform duration-300 group-hover:scale-105">
-                <img
-                    src={item.poster_path ? `${IMAGE_BASE_URL}w500${item.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'}
-                    alt={title}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                />
-                <div className="absolute bottom-0 left-0 p-2 w-full bg-gradient-to-t from-black/70 to-transparent">
-                    <div className="flex items-center justify-between text-xs text-slate-200">
-                        <span>{year || 'N/A'}</span>
-                        <div className="flex items-center gap-1">
-                            <StarIcon className="h-3 w-3 text-yellow-400" isActive />
-                            <span>{item.vote_average.toFixed(1)}</span>
-                        </div>
+        <Card onClick={() => onClick(item)} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <img
+                src={item.poster_path ? `${IMAGE_BASE_URL}w500${item.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'}
+                alt={title}
+                className="h-full w-full object-cover"
+                loading="lazy"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+
+            {/* Info overlay */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/30 backdrop-blur-sm border-t border-white/10">
+                <h3 className="font-bold text-white text-sm mb-1 font-family: 'Inter', sans-serif; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);">{title}</h3>
+                <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-200">{year || 'N/A'}</span>
+                    <div className="flex items-center gap-1 text-yellow-400">
+                        <StarIcon className="h-3 w-3" isActive />
+                        <span className="text-slate-200">{item.vote_average.toFixed(1)}</span>
                     </div>
                 </div>
             </div>
-            <div className="absolute inset-0 z-10 p-3 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/80 backdrop-blur-sm flex flex-col justify-end pointer-events-none">
-                <h3 className="font-bold text-white text-base mb-1">{title}</h3>
-                <p className="text-xs text-slate-300 line-clamp-4 leading-relaxed mb-2">
+
+            {/* Hover overlay */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm opacity-0 hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3 pointer-events-none">
+                <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed mb-3">
                     {item.overview || 'No overview available.'}
                 </p>
-                <div className="text-center w-full text-sm font-semibold bg-white/20 py-1.5 rounded-md">
+                <div className="text-center bg-white/20 py-1.5 rounded-md text-sm font-semibold text-white">
                     View Details
                 </div>
             </div>
-        </div>
+        </Card>
     );
 };
 
@@ -298,41 +347,117 @@ const ScreenSearch: React.FC<ScreenSearchProps> = ({ apiKey, onSelectItem, onInv
         );
     };
 
+    const SearchOverlay = styled.div<{ hasSearched: boolean }>`
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(12px);
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: ${props => props.hasSearched ? 1 : 0};
+        pointer-events: ${props => props.hasSearched ? 'auto' : 'none'};
+        transition: opacity 0.3s ease;
+    `;
+
+    const SearchContent = styled.div`
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(12px);
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 2rem;
+        max-width: 600px;
+        width: 90%;
+        text-align: center;
+    `;
+
     return (
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="max-w-3xl mx-auto mb-12">
-                <h1 className="text-4xl md:text-5xl font-bold text-center mb-4 animate-glow">Screen Search</h1>
-                <p className="text-center text-slate-300 mb-6">Discover movies, TV shows, and cinematic journeys.</p>
+        <>
+            {!hasSearched && (
+                <>
+                    <HeroCarousel apiKey={apiKey} onSelectItem={onSelectItem} onInvalidApiKey={onInvalidApiKey} />
+                    <div className="relative -mt-20 z-10">
+                        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+                            <SearchContent className="mx-auto mb-12">
+                                <h1 className="text-4xl md:text-5xl font-bold mb-4 animate-glow" style={{ fontFamily: 'Inter, sans-serif', color: 'white' }}>ScreenScape</h1>
+                                <p className="text-slate-300 mb-6">Discover movies, TV shows, and cinematic journeys.</p>
 
-                <div className="flex justify-center gap-2 mb-4">
-                    <button onClick={() => setSearchMode('media')} className={`px-4 py-2 rounded-full font-semibold transition-colors ${searchMode === 'media' ? 'bg-accent-500 text-primary' : 'bg-glass hover:bg-white/10'}`}>
-                        Search Media
-                    </button>
-                    <button onClick={() => setSearchMode('path')} className={`px-4 py-2 rounded-full font-semibold transition-colors ${searchMode === 'path' ? 'bg-accent-500 text-primary' : 'bg-glass hover:bg-white/10'}`}>
-                        Create Watch Path
-                    </button>
-                </div>
+                                <div className="flex justify-center gap-2 mb-4">
+                                    <button onClick={() => setSearchMode('media')} className={`px-4 py-2 rounded-full font-semibold transition-colors ${searchMode === 'media' ? 'bg-accent-500 text-primary' : 'bg-glass hover:bg-white/10'}`}>
+                                        Search Media
+                                    </button>
+                                    <button onClick={() => setSearchMode('path')} className={`px-4 py-2 rounded-full font-semibold transition-colors ${searchMode === 'path' ? 'bg-accent-500 text-primary' : 'bg-glass hover:bg-white/10'}`}>
+                                        Create Watch Path
+                                    </button>
+                                </div>
 
-                <div className="relative">
-                    <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <input
-                        type="text"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder={searchMode === 'media' ? 'Search for a movie, TV show...' : "e.g., 'Marvel Cinematic Universe'"}
-                        className="w-full bg-glass border border-glass-edge rounded-full py-3 pl-12 pr-10 text-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-accent-500 outline-none transition-shadow"
-                    />
-                    {query && (
-                        <button onClick={() => setQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
-                            <XIcon className="w-5 h-5"/>
+                                <div className="relative">
+                                    <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        value={query}
+                                        onChange={(e) => setQuery(e.target.value)}
+                                        placeholder={searchMode === 'media' ? 'Search for a movie, TV show...' : "e.g., 'Marvel Cinematic Universe'"}
+                                        className="w-full bg-glass border border-glass-edge rounded-full py-3 pl-12 pr-10 text-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-accent-500 outline-none transition-shadow"
+                                        onFocus={() => setHasSearched(true)}
+                                    />
+                                    {query && (
+                                        <button onClick={() => setQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                                            <XIcon className="w-5 h-5"/>
+                                        </button>
+                                    )}
+                                </div>
+                            </SearchContent>
+                        </div>
+
+                        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                            {renderContent()}
+                        </div>
+                    </div>
+                </>
+            )}
+
+            <SearchOverlay hasSearched={hasSearched}>
+                <SearchContent>
+                    <div className="flex justify-center gap-2 mb-6">
+                        <button onClick={() => { setSearchMode('media'); setHasSearched(false); }} className={`px-4 py-2 rounded-full font-semibold transition-colors ${searchMode === 'media' ? 'bg-accent-500 text-primary' : 'bg-glass hover:bg-white/10'}`}>
+                            Search Media
                         </button>
-                    )}
-                </div>
-            </div>
-            
-            {renderContent()}
+                        <button onClick={() => { setSearchMode('path'); setHasSearched(false); }} className={`px-4 py-2 rounded-full font-semibold transition-colors ${searchMode === 'path' ? 'bg-accent-500 text-primary' : 'bg-glass hover:bg-white/10'}`}>
+                            Create Watch Path
+                        </button>
+                        <button onClick={() => { setQuery(''); setHasSearched(false); }} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+                            ✕
+                        </button>
+                    </div>
 
-        </div>
+                    <div className="relative mb-6">
+                        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                        <input
+                            type="text"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder={searchMode === 'media' ? 'Search for a movie, TV show...' : "e.g., 'Marvel Cinematic Universe'"}
+                            className="w-full bg-glass border border-glass-edge rounded-full py-3 pl-12 pr-10 text-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-accent-500 outline-none transition-shadow"
+                            autoFocus
+                        />
+                        {query && (
+                            <button onClick={() => setQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                                <XIcon className="w-5 h-5"/>
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="max-h-96 overflow-y-auto">
+                        {renderContent()}
+                    </div>
+                </SearchContent>
+            </SearchOverlay>
+        </>
     );
 };
 

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import styled, { keyframes } from 'styled-components';
+import { motion, AnimatePresence } from 'framer-motion';
 import { MediaItem, Movie, MovieDetails, TVShowDetails, WatchProvider, WatchProviderCountry } from '../types';
 import { getMovieDetails as getTMDbMovieDetails, getTVShowDetails as getTMDbTVShowDetails, getMovieCredits } from '../services/tmdbService';
 import { getMovieRecommendations } from '../services/tmdbService';
@@ -135,8 +137,90 @@ const WhereToWatch: React.FC<WhereToWatchProps> = ({ providers, providerIds }) =
 };
 
 
+// --- Styled Components ---
+const Backdrop = styled.div<{ backdropPath: string }>`
+    position: fixed;
+    inset: 0;
+    background-image: url('${props => `${IMAGE_BASE_URL}original${props.backdropPath}`}');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: blur(20px);
+    opacity: 0.6;
+    z-index: 0;
+`;
+
+const Overlay = styled.div`
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1;
+`;
+
+const DetailContainer = styled.div`
+    position: relative;
+    z-index: 2;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    color: white;
+`;
+
+const HeaderSection = styled.div`
+    padding: 2rem 1rem 0;
+    background: linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.8) 0%,
+        rgba(0, 0, 0, 0.4) 50%,
+        transparent 100%
+    );
+`;
+
+const TabsContainer = styled.div`
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+    padding: 0 1rem;
+`;
+
+const TabButton = styled.button<{ active: boolean }>`
+    padding: 0.5rem 1.5rem;
+    margin: 0 0.25rem;
+    border-radius: 24px 24px 0 0;
+    background: ${props => props.active ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.1)'};
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    font-family: 'Inter', sans-serif;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    @media (max-width: 640px) {
+        padding: 0.375rem 1rem;
+        font-size: 0.75rem;
+    }
+`;
+
+const ContentPanel = styled(motion.div)`
+    flex: 1;
+    padding: 2rem 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px 20px 0 0;
+    min-height: calc(100vh - 300px);
+`;
+
 // --- Main Component ---
 const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSelectItem, onInvalidApiKey }) => {
+    const [activeTab, setActiveTab] = useState<'overview' | 'cast' | 'reviews'>('overview');
     const [details, setDetails] = useState<MovieDetails | TVShowDetails | null>(null);
     const [storyScape, setStoryScape] = useState<{
         summary: string;
@@ -359,255 +443,57 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
     const shouldRenderTrailer = Boolean(mainTrailerKey) && !prefersReducedMotion;
 
-    return (
-        <div className="fixed inset-0 bg-primary z-50 overflow-y-auto animate-fade-in scrollbar-thin scrollbar-thumb-zinc-700">
-            <button onClick={onClose} className="fixed top-6 right-6 z-50 p-2 bg-black/50 rounded-full text-white hover:bg-white/20 transition-colors">
-                <Icons.XIcon className="w-6 h-6" />
-            </button>
-
-            <div className="trailer-container">
-                {shouldRenderTrailer ? (
-                    <VideoPlayer videoKey={mainTrailerKey} isMuted={isMuted} onEnd={() => {}} loop={!prefersReducedMotion} />
-                ) : (
-                    details.backdrop_path && (
-                        <img src={`${IMAGE_BASE_URL}original${details.backdrop_path}`} alt={`${title} backdrop`} className="w-full h-full object-cover"/>
-                    )
-                )}
-
-                {shouldRenderTrailer && (
-                    <button
-                        onClick={() => setIsMuted(prev => !prev)}
-                        className="mute-toggle"
-                        aria-label={isMuted ? 'Unmute trailer' : 'Mute trailer'}
-                    >
-                        {isMuted ? <Icons.VolumeOffIcon className="w-6 h-6" /> : <Icons.VolumeUpIcon className="w-6 h-6" />}
-                    </button>
-                )}
-
-                {shouldRenderTrailer && (
-                    <div className="trailer-logo-overlay">
-                        {details.images?.logos && details.images.logos.length > 0 && (
-                            <div className="logo-background"></div>
-                        )}
-                        {details.images?.logos && details.images.logos.length > 0 && (
-                            <img
-                                src={`${IMAGE_BASE_URL}w500${details.images.logos.find(logo => logo.iso_639_1 === 'en' || !logo.iso_639_1)!.file_path}`}
-                                alt={`${title} logo`}
-                                className="trailer-logo"
-                            />
-                        )}
-                    </div>
-                )}
-            </div>
-
-            <div className="trailer-gradient" />
-
-            <div className="title-glass-panel">
-                <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8">
-                    <div className="w-full text-center md:text-left space-y-3">
-                        {shouldRenderTrailer ? (
-                            <div className="video-title-overlay">
-                                <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-tight">{title}</h1>
-                            </div>
-                        ) : (
-                            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-tight">{title}</h1>
-                        )}
-                        <div className="flex flex-wrap justify-center md:justify-start items-center gap-x-3 gap-y-2 text-slate-300">
-                            <span>{year}</span>
-                            <span className="w-1 h-1 bg-slate-400 rounded-full hidden sm:block" />
-                            <span>{details.genres?.map(g => g?.name).filter(Boolean).join(', ')}</span>
-                            {runtimeInfo && <span className="w-1 h-1 bg-slate-400 rounded-full hidden sm:block" />}
-                            {runtimeInfo && <span>{runtimeInfo}</span>}
+    const renderTabContent = () => {
+        switch (activeTab) {
+            case 'overview':
+                return (
+                    <div className="space-y-6">
+                        <div className="text-center">
+                            <button onClick={() => {}} className="bg-white text-black font-bold px-6 py-3 rounded-full mb-6">
+                                Play Trailer
+                            </button>
                         </div>
-                        <div className="flex items-center justify-center md:justify-start gap-2">
-                            <Icons.StarIcon className="w-5 h-5 text-yellow-400" isActive />
-                            <span className="text-xl font-bold">{details.vote_average.toFixed(1)}</span>
-                            <span className="text-sm text-slate-400">/ 10</span>
-                        </div>
-                        {hasStreamingAvailability && (
-                            <div className="flex flex-wrap justify-center md:justify-start gap-2 text-xs sm:text-sm text-slate-200">
-                                {availabilityDescriptors.map(descriptor => (
-                                    <span
-                                        key={descriptor.type}
-                                        className="bg-white/10 border border-white/20 px-3 py-1 rounded-full backdrop-blur-sm"
-                                    >
-                                        <span className="font-semibold text-white mr-1">{descriptor.type}:</span>
-                                        {descriptor.text}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
 
-                <p className="mt-6 text-slate-200 leading-relaxed max-w-3xl mx-auto md:mx-0">
-                    {details.overview}
-                </p>
+                        <p className="text-slate-200 leading-relaxed text-lg">
+                            {details.overview}
+                        </p>
 
-                <div className="text-center mt-8">
-                    {!storyScape && !isStoryScapeLoading && !storyScapeError && (
-                        <button onClick={handleGenerateStoryScape} className="storyscape-generate-button">
-                            <Icons.SparklesIcon className="w-5 h-5" /> Generate StoryScape
-                        </button>
-                    )}
-                    {isStoryScapeLoading && (
-                        <div className="storyscape-loading">
-                            <div className="shimmer" />
-                        </div>
-                    )}
-                    {storyScapeError && <p className="storyscape-error">{storyScapeError}</p>}
-                </div>
-
-                {storyScape && (
-                     <section className="my-8 sm:my-12 glass-panel p-4 sm:p-6 rounded-xl animate-fade-in">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-accent-400"><Icons.SparklesIcon className="w-6 h-6"/> StoryScape AI</h2>
-                        <p className="text-slate-200 italic mb-4">"{storyScape.summary}"</p>
-                        <div className="flex flex-col sm:flex-row gap-4 text-sm border-t border-glass-edge pt-4">
-                            <div className="flex-1">
-                                <h4 className="font-semibold text-slate-400 mb-1">EMOTIONAL TONE</h4>
-                                <p>{storyScape.tone}</p>
-                            </div>
-                            <div className="flex-1">
-                                <h4 className="font-semibold text-slate-400 mb-1">CINEMATIC STYLE</h4>
-                                <p>{storyScape.style}</p>
-                            </div>
-                        </div>
-                        {storyScape.note && (
-                            <p className="storyscape-notice mt-4">{storyScape.note}</p>
-                        )}
-                        {storyScape.origin === 'fallback' && !storyScape.note && (
-                            <p className="text-xs text-slate-400 mt-4">StoryScape's live summary is unavailable, so this description was adapted from the synopsis.</p>
-                        )}
-                    </section>
-                )}
-
-                <div className="text-center mt-8">
-                    {!factsAI && !isFactsAILoading && !factsAIError && (
-                        <button onClick={handleGenerateFactsAI} className="factsai-generate-button">
-                            <Icons.SparklesIcon className="w-5 h-5" /> Generate FactsAI
-                        </button>
-                    )}
-                    {isFactsAILoading && (
-                        <div className="factsai-loading">
-                            <div className="shimmer" />
-                        </div>
-                    )}
-                    {factsAIError && <p className="factsai-error">{factsAIError}</p>}
-                </div>
-
-                {factsAI && (
-                     <section className="my-8 sm:my-12 glass-panel p-4 sm:p-6 rounded-xl animate-fade-in">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-accent-400"><Icons.SparklesIcon className="w-6 h-6"/> FactsAI</h2>
-                        <div className="text-slate-900">
-                            <ul className="space-y-2">
-                                {factsAI.split('\n').filter(line => line.trim()).map((line, index) => {
-                                    const fact = line.trim();
-                                    const boldText = fact.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                                    return (
-                                        <li key={index} className="ml-4" dangerouslySetInnerHTML={{ __html: `• ${boldText}` }} />
-                                    );
-                                })}
-                            </ul>
-                        </div>
-                    </section>
-                )}
-
-                {/* Display OMDb data when available */}
-                {(omdbData && item.media_type === 'movie') && (
-                    <section className="my-8 sm:my-12 glass-panel p-4 sm:p-6 rounded-xl animate-fade-in" style={{backgroundColor: 'rgba(255, 255, 255, 0.35)', backdropFilter: 'blur(11px)', WebkitBackdropFilter: 'blur(11px)', border: '1px solid rgba(255, 255, 255, 0.1)'}}>
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-black" style={{textShadow: '0 1px 2px rgba(0,0,0,0.3)'}} ><Icons.StarIcon className="w-6 h-6 text-slate-400"/> Additional Info</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {omdbData.Plot && omdbData.Plot !== details?.overview && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {hasStreamingAvailability && (
                                 <div>
-                                    <h4 className="font-semibold mb-2" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Extended Plot</h4>
-                                    <p className="leading-relaxed" style={{color: 'rgba(0,0,0,0.8)', fontSize: '0.875rem', fontWeight: '500', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>{omdbData.Plot}</p>
-                                </div>
-                            )}
-                            {(omdbData.Rated || omdbData.Awards) && (
-                                <div>
-                                    <h4 className="font-semibold mb-2" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Ratings & Awards</h4>
-                            <div className="space-y-1" style={{fontSize: '0.875rem'}}>
-                                {omdbData.Rated && omdbData.Rated !== 'N/A' && (
-                                    <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}><span className="font-medium" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Rating:</span> {omdbData.Rated}</p>
-                                )}
-                                {omdbData.Awards && omdbData.Awards !== 'N/A' && (
-                                    <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}><span className="font-medium" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Awards:</span> {omdbData.Awards}</p>
-                                )}
-                            </div>
-                                </div>
-                            )}
-                            {(omdbData.BoxOffice || omdbData.Production) && (
-                                <div>
-                                    <h4 className="font-semibold mb-2" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Box Office</h4>
-                                    <div className="space-y-1" style={{fontSize: '0.875rem'}}>
-                                        {omdbData.BoxOffice && omdbData.BoxOffice !== 'N/A' && (
-                                            <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}><span className="font-medium" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Worldwide:</span> {omdbData.BoxOffice}</p>
-                                        )}
-                                        {omdbData.Production && omdbData.Production !== 'N/A' && (
-                                            <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}><span className="font-medium" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Production:</span> {omdbData.Production}</p>
-                                        )}
+                                    <h3 className="font-semibold text-white mb-3">Where to Watch</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {availabilityDescriptors.slice(0, 3).map(descriptor => (
+                                            <span
+                                                key={descriptor.type}
+                                                className="bg-white/10 border border-white/20 px-3 py-1 rounded-full backdrop-blur-sm text-sm"
+                                            >
+                                                <span className="font-semibold text-white mr-1">{descriptor.type}:</span>
+                                                {descriptor.text}
+                                            </span>
+                                        ))}
                                     </div>
                                 </div>
                             )}
-                            {omdbData.imdbRating && omdbData.imdbRating !== 'N/A' && (
-                                <div>
-                                    <h4 className="font-semibold mb-2" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>IMDb Rating</h4>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-lg" style={{textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>⭐</span>
-                                        <span className="text-xl font-bold" style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>{omdbData.imdbRating}</span>
-                                        <span style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>/ 10</span>
-                                        {omdbData.imdbVotes && omdbData.imdbVotes !== 'N/A' && (
-                                            <span style={{color: 'rgba(0,0,0,0.8)', fontSize: '0.875rem', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>({omdbData.imdbVotes} votes)</span>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </section>
-                )}
 
-                <WhereToWatch providers={providersForCountry} providerIds={providerIds} />
-
-                {/* Attribution */}
-                <div className="my-8 sm:my-12 text-center">
-                    <div className="flex justify-center items-center gap-4 flex-wrap">
-                        <div>
-                            <p className="text-sm text-slate-400 mb-2">• Powered by The Movie Database (TMDB)</p>
-                            <a
-                                href="https://www.themoviedb.org"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block hover:opacity-80 transition-opacity"
-                            >
-                                <img
-                                    src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1.svg"
-                                    alt="TMDB Logo"
-                                    className="h-8"
-                                />
-                            </a>
-                        </div>
-                        {omdbData && item.media_type === 'movie' && (
                             <div>
-                                <p className="text-sm text-slate-400 mb-2">& The Open Movie Database (OMDb)</p>
-                                <a
-                                    href="https://www.omdbapi.com"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-block hover:opacity-80 transition-opacity text-blue-400 text-xs"
-                                >
-                                    OMDb API
-                                </a>
+                                <h3 className="font-semibold text-white mb-3">Details</h3>
+                                <div className="space-y-1 text-sm">
+                                    <p><span className="text-slate-400">Rating:</span> {details.vote_average.toFixed(1)}/10</p>
+                                    <p><span className="text-slate-400">Year:</span> {year}</p>
+                                    {runtimeInfo && <p><span className="text-slate-400">Duration:</span> {runtimeInfo}</p>}
+                                </div>
                             </div>
-                        )}
+                        </div>
                     </div>
-                </div>
-
-                {details.credits?.cast && details.credits.cast.length > 0 && (
-                    <section className="my-8 sm:my-12">
-                        <h2 className="text-2xl font-bold mb-4">Top Billed Cast</h2>
-                        <div className="flex overflow-x-auto gap-4 pb-4 scrollbar-thin scrollbar-thumb-zinc-700">
-                            {details.credits?.cast?.slice(0, 10).map(member => member && (
-                                <div key={member.id} className="flex-shrink-0 w-32 text-center">
+                );
+            case 'cast':
+                return (
+                    <div>
+                        <h3 className="text-xl font-bold mb-4">Top Billed Cast</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {details.credits?.cast?.slice(0, 12).map(member => member && (
+                                <div key={member.id} className="text-center">
                                     <img
                                         src={member.profile_path ? `${IMAGE_BASE_URL}w185${member.profile_path}` : 'https://via.placeholder.com/185x278?text=N/A'}
                                         alt={member.name}
@@ -618,25 +504,129 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                                 </div>
                             ))}
                         </div>
-                    </section>
-                )}
+                    </div>
+                );
+            case 'reviews':
+                return (
+                    <div>
+                        <h3 className="text-xl font-bold mb-4">Reviews & Analysis</h3>
+                        <div className="space-y-6">
+                            {!storyScape && !isStoryScapeLoading && !storyScapeError && (
+                                <button onClick={handleGenerateStoryScape} className="bg-accent-500 text-white font-bold px-6 py-3 rounded-full">
+                                    Generate AI Summary
+                                </button>
+                            )}
 
-                {recommendations && recommendations.length > 0 && (
-                    <section className="my-8 sm:my-12">
-                        <h2 className="text-2xl font-bold mb-4">More Like This</h2>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                            {recommendations.slice(0, 10).map(rec => (
-                               <div key={rec.id} onClick={() => onSelectItem(rec)} className="group cursor-pointer">
-                                   <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-glass transition-transform duration-300 group-hover:scale-105">
-                                      <img src={rec.poster_path ? `${IMAGE_BASE_URL}w500${rec.poster_path}` : 'https://via.placeholder.com/500x750?text=N/A'} alt={'title' in rec ? rec.title : rec.name} className="w-full h-full object-cover"/>
-                                   </div>
-                               </div>
-                            ))}
+                            {storyScape && (
+                                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                                    <h4 className="font-semibold text-accent-400 mb-2">AI Analysis</h4>
+                                    <p className="text-slate-200 italic mb-3">"{storyScape.summary}"</p>
+                                    <div className="flex flex-col sm:flex-row gap-4 text-sm">
+                                        <div>
+                                            <h5 className="font-semibold text-slate-400">Emotional Tone</h5>
+                                            <p>{storyScape.tone}</p>
+                                        </div>
+                                        <div>
+                                            <h5 className="font-semibold text-slate-400">Cinematic Style</h5>
+                                            <p>{storyScape.style}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {(omdbData && item.media_type === 'movie') && (
+                                <div className="bg-white/30 backdrop-blur-sm rounded-xl p-4">
+                                    <h4 className="font-semibold text-black mb-3" style={{textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Additional Information</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                        {omdbData.Rated && omdbData.Rated !== 'N/A' && (
+                                            <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>
+                                                <span className="font-medium">Rating:</span> {omdbData.Rated}
+                                            </p>
+                                        )}
+                                        {omdbData.Awards && omdbData.Awards !== 'N/A' && (
+                                            <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>
+                                                <span className="font-medium">Awards:</span> {omdbData.Awards}
+                                            </p>
+                                        )}
+                                        {omdbData.BoxOffice && omdbData.BoxOffice !== 'N/A' && (
+                                            <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>
+                                                <span className="font-medium">Box Office:</span> {omdbData.BoxOffice}
+                                            </p>
+                                        )}
+                                        {omdbData.imdbRating && omdbData.imdbRating !== 'N/A' && (
+                                            <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>
+                                                <span className="font-medium">IMDb Score:</span> {omdbData.imdbRating}/10
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    </section>
-                )}
-            </div>
-        </div>
+                    </div>
+                );
+        }
+    };
+
+    return (
+        <>
+            <Backdrop backdropPath={details.backdrop_path!} />
+            <Overlay />
+            <DetailContainer>
+                <button
+                    onClick={onClose}
+                    className="absolute top-6 right-6 z-10 p-2 bg-black/50 rounded-full text-white hover:bg-white/20 transition-colors"
+                    style={{zIndex: 10}}
+                >
+                    <Icons.XIcon className="w-6 h-6" />
+                </button>
+
+                <HeaderSection>
+                    <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-4" style={{textShadow: '0 1px 2px rgba(0, 0, 0, 0.8)'}}>
+                        {title}
+                    </h1>
+                    <div className="flex flex-wrap items-center gap-3 mb-4 text-slate-200">
+                        <span>{year}</span>
+                        <span>•</span>
+                        <span>{details.genres?.map(g => g?.name).filter(Boolean).join(', ')}</span>
+                        {runtimeInfo && (
+                            <>
+                                <span>•</span>
+                                <span>{runtimeInfo}</span>
+                            </>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2 mb-4">
+                        <Icons.StarIcon className="w-6 h-6 text-yellow-400" isActive />
+                        <span className="text-xl font-bold">{details.vote_average.toFixed(1)}</span>
+                        <span className="text-slate-400">/ 10</span>
+                    </div>
+                </HeaderSection>
+
+                <TabsContainer>
+                    <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>
+                        Overview
+                    </TabButton>
+                    <TabButton active={activeTab === 'cast'} onClick={() => setActiveTab('cast')}>
+                        Cast
+                    </TabButton>
+                    <TabButton active={activeTab === 'reviews'} onClick={() => setActiveTab('reviews')}>
+                        Reviews
+                    </TabButton>
+                </TabsContainer>
+
+                <AnimatePresence mode="wait">
+                    <ContentPanel
+                        key={activeTab}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.3 }}
+                    >
+                        {renderTabContent()}
+                    </ContentPanel>
+                </AnimatePresence>
+            </DetailContainer>
+        </>
     );
 };
 
