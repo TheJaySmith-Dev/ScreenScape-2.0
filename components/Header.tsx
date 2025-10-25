@@ -36,28 +36,30 @@ const NavContainer = styled.nav<{ isDesktop: boolean }>`
     position: fixed;
     bottom: ${({ isDesktop }) => (isDesktop ? 'auto' : '0')};
     left: ${({ isDesktop }) => (isDesktop ? '0' : '0')};
-    top: ${({ isDesktop }) => (isDesktop ? '0' : 'auto')};
+    top: ${({ isDesktop }) => (isDesktop ? '50%' : 'auto')};
+    transform: ${({ isDesktop }) => (isDesktop ? 'translateY(-50%)' : 'none')};
     z-index: 50;
     display: flex;
     flex-direction: ${({ isDesktop }) => (isDesktop ? 'column' : 'row')};
     ${({ isDesktop }) =>
         isDesktop
-            ? 'width: 80px; height: 100vh;'
+            ? `
+                left: 24px;
+                width: 148px;
+                height: auto;
+                padding: 16px;
+                gap: 8px;
+              `
             : 'width: 100vw; padding: 0 20px 34px 20px; height: auto;'
     }
     background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
     backdrop-filter: blur(24px);
-    border-top-left-radius: ${({ isDesktop }) => (isDesktop ? '0' : '32px')};
-    border-top-right-radius: ${({ isDesktop }) => (isDesktop ? '0' : '32px')};
-    border-bottom-left-radius: ${({ isDesktop }) => (isDesktop ? '32px' : '0')};
-    border-bottom-right-radius: ${({ isDesktop }) => (isDesktop ? '32px' : '0')};
-    border-top: ${({ isDesktop }) => (isDesktop ? 'none' : '1px solid rgba(148, 163, 184, 0.2)')};
-    border-bottom: ${({ isDesktop }) => (isDesktop ? 'none' : '1px solid rgba(51, 65, 85, 0.2)')};
-    border-right: ${({ isDesktop }) => (isDesktop ? '1px solid rgba(51, 65, 85, 0.3)' : 'none')};
-    min-height: ${({ isDesktop }) => (isDesktop ? '100vh' : '88px')};
+    border-radius: ${({ isDesktop }) => (isDesktop ? '24px' : '32px 32px 0 0')};
+    border: ${({ isDesktop }) => (isDesktop ? '1px solid rgba(51, 65, 85, 0.3)' : '1px solid rgba(148, 163, 184, 0.2)')};
+    min-height: ${({ isDesktop }) => (isDesktop ? 'auto' : '88px')};
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: ${({ isDesktop }) => (isDesktop
-        ? '4px 0 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
+        ? '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
         : '0 -8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(148, 163, 184, 0.1)')};
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 `;

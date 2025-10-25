@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { MediaItem, Video, TVShow, WatchProviderCountry } from '../types';
-import { getTrending, getMovieVideos, getTVShowVideos, getMovieWatchProviders, getTVShowWatchProviders } from '../services/tmdbService';
+import { MediaItem, TVShow, WatchProviderCountry } from '../types';
+import { getTrending, getMovieWatchProviders, getTVShowWatchProviders } from '../services/tmdbService';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
-import VideoPlayer from './VideoPlayer';
-import { isMobileDevice } from '../utils/deviceDetection';
-import { PlayIcon, VolumeOffIcon, VolumeUpIcon } from './Icons';
+import { PlayIcon } from './Icons';
 import {
     getAvailabilityBuckets,
     buildAvailabilityDescriptors,
@@ -22,41 +20,12 @@ interface HeroCarouselProps {
 
 const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInvalidApiKey }) => {
     const [items, setItems] = useState<MediaItem[]>([]);
-    const [trailers, setTrailers] = useState<Record<string, string | null>>({});
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [isMuted, setIsMuted] = useState(isMobileDevice());
     const [isHovered, setIsHovered] = useState(false);
-    const [isTrailerLoading, setIsTrailerLoading] = useState(true);
-    const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
     const [availabilityMap, setAvailabilityMap] = useState<Record<number, WatchProviderCountry | null>>({});
     const intervalRef = useRef<number | null>(null);
     const { country } = useGeolocation();
     const { providerIds } = useStreamingPreferences();
-
-    const handleControlTrailerAudio = useCallback((event: Event) => {
-        const customEvent = event as CustomEvent<{ action: 'mute' | 'unmute' }>;
-        if (!customEvent.detail) return;
-        setIsMuted(customEvent.detail.action === 'mute');
-    }, []);
-
-    useEffect(() => {
-        window.addEventListener('controlTrailerAudio', handleControlTrailerAudio);
-        return () => {
-            window.removeEventListener('controlTrailerAudio', handleControlTrailerAudio);
-        };
-    }, [handleControlTrailerAudio]);
-
-    useEffect(() => {
-        const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-        setPrefersReducedMotion(mediaQuery.matches);
-
-        const handleChange = (event: MediaQueryListEvent) => {
-            setPrefersReducedMotion(event.matches);
-        };
-
-        mediaQuery.addEventListener('change', handleChange);
-        return () => mediaQuery.removeEventListener('change', handleChange);
-    }, []);
 
     useEffect(() => {
         let isMounted = true;
@@ -69,7 +38,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                     .slice(0, 7);
                 if (isMounted) {
                     setItems(filteredItems);
-                    setTrailers({});
                     setAvailabilityMap({});
                 }
             } catch (error) {
@@ -88,49 +56,29 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
 
         let isMounted = true;
         const currentItem = items[currentIndex];
-        // If we haven't checked for this trailer yet
-        if (trailers[currentItem.id] === undefined) {
-            setIsTrailerLoading(true);
-            const fetchTrailer = async () => {
-                try {
-                    // Get videos from TMDb for trailer
-                    const videos = currentItem.media_type === 'movie'
-                        ? await getMovieVideos(apiKey, currentItem.id)
-                        : await getTVShowVideos(apiKey, currentItem.id);
 
-                    const officialTrailer = videos.results.find((v: Video) => v.type === 'Trailer' && v.official && v.site === 'YouTube');
-                    const anyTrailer = videos.results.find((v: Video) => v.type === 'Trailer' && v.site === 'YouTube');
-                    const trailerKey = officialTrailer?.key || anyTrailer?.key || null;
+        // Only fetch watch providers since we don't need trailers anymore
+        const fetchProviders = async () => {
+            try {
+                const providersResponse = currentItem.media_type === 'movie'
+                    ? await getMovieWatchProviders(apiKey, currentItem.id, country.code)
+                    : await getTVShowWatchProviders(apiKey, currentItem.id, country.code);
 
-                    // Get watch providers separately
-                    const providersResponse = currentItem.media_type === 'movie'
-                        ? await getMovieWatchProviders(apiKey, currentItem.id, country.code)
-                        : await getTVShowWatchProviders(apiKey, currentItem.id, country.code);
-
-                    if (isMounted) {
-                        setTrailers(prev => ({ ...prev, [currentItem.id]: trailerKey }));
-                        const providers = providersResponse.results?.[country.code] ?? null;
-                        setAvailabilityMap(prev => ({ ...prev, [currentItem.id]: providers }));
-                    }
-                } catch (error) {
-                    console.error("Failed to fetch trailer:", error);
-                    if (isMounted) {
-                        setTrailers(prev => ({ ...prev, [currentItem.id]: null })); // Mark as failed
-                        setAvailabilityMap(prev => ({ ...prev, [currentItem.id]: null }));
-                    }
-                } finally {
-                    if (isMounted) {
-                        setIsTrailerLoading(false);
-                    }
+                if (isMounted) {
+                    const providers = providersResponse.results?.[country.code] ?? null;
+                    setAvailabilityMap(prev => ({ ...prev, [currentItem.id]: providers }));
                 }
-            };
-            fetchTrailer();
-        } else {
-            // Trailer status is already known, just update loading state
-            setIsTrailerLoading(false);
-        }
+            } catch (error) {
+                console.error("Failed to fetch providers:", error);
+                if (isMounted) {
+                    setAvailabilityMap(prev => ({ ...prev, [currentItem.id]: null }));
+                }
+            }
+        };
+        fetchProviders();
+
         return () => { isMounted = false; };
-    }, [currentIndex, items, apiKey, trailers, country.code]);
+    }, [currentIndex, items, apiKey, country.code]);
 
     const goToNext = useCallback(() => {
         setCurrentIndex(prevIndex => (prevIndex + 1) % (items.length || 1));
@@ -146,9 +94,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
     }, [isHovered, items.length, goToNext]);
 
     const activeItem = items[currentIndex];
-    const activeTrailerKey = activeItem ? trailers[activeItem.id] : null;
     const activeAvailability = activeItem ? availabilityMap[activeItem.id] ?? undefined : undefined;
-    const showVideo = !!activeTrailerKey && !isTrailerLoading && !prefersReducedMotion;
+    // Always show static backdrop images instead of trying to autoplay trailers
+    const showVideo = false;
 
     const activeBuckets = useMemo(
         () => getAvailabilityBuckets(activeAvailability, providerIds),
@@ -173,12 +121,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                     key={item.id}
                     className={`absolute inset-0 transition-opacity duration-1000 ${index === currentIndex ? 'opacity-100' : 'opacity-0'}`}
                 >
-                    {showVideo && index === currentIndex ? (
-                         <div className="absolute inset-0 scale-125">
-                            <VideoPlayer videoKey={activeTrailerKey!} isMuted={isMuted} onEnd={goToNext} loop={!prefersReducedMotion} />
-                        </div>
-                    ) : (
-                        item.backdrop_path &&
+                    {item.backdrop_path && (
                         <img
                             src={`${IMAGE_BASE_URL}${item.backdrop_path}`}
                             alt={item.media_type === 'movie' ? item.title : (item as TVShow).name}
@@ -224,14 +167,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                                 <PlayIcon className="w-6 h-6" />
                                 More Info
                             </button>
-                            {showVideo && (
-                                <button
-                                    onClick={() => setIsMuted(!isMuted)}
-                                    className="glass-button rounded-full w-12 h-12 flex items-center justify-center self-center"
-                                >
-                                    {isMuted ? <VolumeOffIcon className="w-6 h-6" /> : <VolumeUpIcon className="w-6 h-6" />}
-                                </button>
-                            )}
                         </div>
                     </div>
                 )}
