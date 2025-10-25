@@ -356,6 +356,8 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         };
     }, [handleControlTrailerAudio]);
 
+
+
     useEffect(() => {
         let isMounted = true;
         const fetchDetails = async () => {
@@ -680,11 +682,11 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                     <div>
                         <h3 className="text-xl font-bold mb-4">Reviews & Analysis</h3>
                         <div className="space-y-6">
-                            {!storyScape && !isStoryScapeLoading && !storyScapeError && (
-                                <button onClick={handleGenerateStoryScape} className="bg-accent-500 text-white font-bold px-6 py-3 rounded-full">
-                                    Generate AI Summary
-                                </button>
-                            )}
+            {!storyScape && !isStoryScapeLoading && !storyScapeError && (
+                <button onClick={handleGenerateStoryScape} className="bg-accent-500 text-white font-bold px-6 py-3 rounded-full hover:bg-accent-600 transition-colors">
+                    Generate AI Summary
+                </button>
+            )}
 
                             {storyScape && (
                                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">

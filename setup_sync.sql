@@ -3,11 +3,24 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   tmdb_api_key TEXT,
   theme_preferences JSONB DEFAULT '{}',
-  streaming_preferences JSONB DEFAULT '{}',
+  streaming_preferences JSONB DEFAULT '[]',
   voice_preferences JSONB DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   PRIMARY KEY (id)
+);
+
+-- Create user_content_preferences table for likes/dislikes
+CREATE TABLE IF NOT EXISTS public.user_content_preferences (
+  id UUID DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  media_id INTEGER NOT NULL,
+  media_type TEXT NOT NULL CHECK (media_type IN ('movie', 'tv')),
+  preference TEXT NOT NULL CHECK (preference IN ('like', 'dislike')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE(user_id, media_id, media_type)
 );
 
 -- Create user_watchlist table for cross-device sync
@@ -45,6 +58,7 @@ CREATE TABLE IF NOT EXISTS public.user_game_progress (
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_content_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_watchlist ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_search_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_game_progress ENABLE ROW LEVEL SECURITY;
@@ -58,6 +72,19 @@ CREATE POLICY "Users can insert own settings" ON public.user_settings
 
 CREATE POLICY "Users can update own settings" ON public.user_settings
   FOR UPDATE USING (auth.uid() = id);
+
+-- Create RLS policies for user_content_preferences
+CREATE POLICY "Users can view own content preferences" ON public.user_content_preferences
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own content preferences" ON public.user_content_preferences
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own content preferences" ON public.user_content_preferences
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own content preferences" ON public.user_content_preferences
+  FOR DELETE USING (auth.uid() = user_id);
 
 -- Create RLS policies for user_watchlist
 CREATE POLICY "Users can view own watchlist" ON public.user_watchlist
@@ -93,6 +120,8 @@ CREATE POLICY "Users can update own game progress" ON public.user_game_progress
   FOR UPDATE USING (auth.uid() = user_id);
 
 -- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_user_content_preferences_user_id ON public.user_content_preferences(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_content_preferences_media ON public.user_content_preferences(media_id, media_type);
 CREATE INDEX IF NOT EXISTS idx_user_watchlist_user_id ON public.user_watchlist(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_search_history_user_id ON public.user_search_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_search_history_searched_at ON public.user_search_history(searched_at);

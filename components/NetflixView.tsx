@@ -99,19 +99,55 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
 
     useEffect(() => {
         let isMounted = true;
-        const fetchForYou = async () => {
-            const providersToFetch = activeProviderHub ? [activeProviderHub] : Array.from(providerIds);
-            if (providersToFetch.length === 0) {
-                if (isMounted) {
-                    setForYou([]);
-                }
-                return;
+
+        const filterMoviesByProvider = async (movies: Movie[]): Promise<Movie[]> => {
+            if (activeProviderHub === null) {
+                // No specific filter - return all movies
+                return movies;
             }
 
+            const filteredMovies: Movie[] = [];
+
+            for (const movie of movies) {
+                try {
+                    const watchProviders = await getMovieWatchProviders(apiKey, movie.id, country.code);
+                    const countryProviders = watchProviders.results[country.code];
+
+                    if (countryProviders) {
+                        // Check if the active provider is in flatrate, rent, or buy
+                        const hasProvider =
+                            (countryProviders.flatrate && countryProviders.flatrate.some(p => p.provider_id === activeProviderHub)) ||
+                            (countryProviders.rent && countryProviders.rent.some(p => p.provider_id === activeProviderHub)) ||
+                            (countryProviders.buy && countryProviders.buy.some(p => p.provider_id === activeProviderHub));
+
+                        if (hasProvider) {
+                            filteredMovies.push(movie);
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`Failed to fetch providers for movie ${movie.id}:`, error);
+                    // If we can't fetch providers, exclude from filtered results to be safe
+                }
+            }
+
+            return filteredMovies;
+        };
+
+        const fetchForYou = async () => {
             try {
                 // Use TMDb trending for "For You" recommendations since streaming availability is TMDb only
                 const trendingRes = await getTrending(apiKey, 'week');
-                const movies = trendingRes.results.filter(item => item.media_type === 'movie').slice(0, 10);
+
+                // Take more movies initially since we'll filter some out
+                let movies = trendingRes.results.filter(item => item.media_type === 'movie').slice(0, 20);
+
+                // Apply streaming provider filtering
+                if (activeProviderHub !== null) {
+                    movies = await filterMoviesByProvider(movies);
+                    // Take only first 10 after filtering
+                    movies = movies.slice(0, 10);
+                }
+
                 if (isMounted) {
                     setForYou(movies);
                 }
@@ -127,7 +163,7 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
         return () => {
             isMounted = false;
         };
-    }, [apiKey, providerIds, activeProviderHub, country.code]);
+    }, [apiKey, providerIds, activeProviderHub, country.code, onInvalidApiKey]);
 
     useEffect(() => {
         let isMounted = true;
