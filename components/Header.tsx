@@ -45,10 +45,10 @@ const NavContainer = styled.nav<{ isDesktop: boolean }>`
         isDesktop
             ? `
                 left: 24px;
-                width: 148px;
+                width: 78px;
                 height: auto;
-                padding: 16px;
-                gap: 8px;
+                padding: 10px;
+                gap: 4px;
               `
             : 'width: 100vw; padding: 0 20px 34px 20px; height: auto;'
     }
@@ -69,9 +69,9 @@ const NavButton = styled(motion.button)<{ active: boolean }>`
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 12px;
-    margin: 4px;
-    border-radius: 16px;
+    padding: 8px;
+    margin: 2px;
+    border-radius: 12px;
     background: ${({ active }) =>
         active
             ? 'rgba(255, 255, 255, 0.3)'
@@ -80,12 +80,12 @@ const NavButton = styled(motion.button)<{ active: boolean }>`
     color: white;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
     font-family: 'Inter', sans-serif;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     border: none;
     cursor: pointer;
     transition: all 0.3s ease;
-    min-width: 60px;
+    min-width: 50px;
 
     &:hover {
         transform: scale(1.1);
