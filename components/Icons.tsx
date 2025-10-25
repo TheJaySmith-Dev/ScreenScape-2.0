@@ -149,3 +149,18 @@ export const PaletteIcon: React.FC<IconProps> = (props) => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 5.25c0-1.481-1.209-2.69-2.69-2.69s-2.69 1.209-2.69 2.69c0 1.482 1.209 2.69 2.69 2.69s2.69-1.208 2.69-2.69z" />
     </svg>
 );
+
+export const HeartIcon: React.FC<IconProps> = ({ isActive, ...props }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={isActive ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+  </svg>
+);
+
+export const ThumbsDownIcon: React.FC<IconProps> = ({ isActive, ...props }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={isActive ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M17 14V2"></path>
+    <path d="m9 18 3 3 3-3-3-3-3 3"></path>
+    <path d="M10 2h4"></path>
+    <path d="M7 10h10l-3 6H7l-3-6h10z"></path>
+  </svg>
+);

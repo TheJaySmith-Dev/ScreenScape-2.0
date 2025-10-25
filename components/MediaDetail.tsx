@@ -8,8 +8,10 @@ import { getMovieVideos, getTVShowVideos, getMovieWatchProviders, getTVShowWatch
 import { getOMDbFromTMDBDetails, OMDbMovieDetails } from '../services/omdbService';
 import { generateFactsAI, generateReviewsAI } from './openrouter.js';
 import { generateStoryScapeSummary } from './storyscape.js';
+import { generatePersonalizedRecommendations } from '../services/recommendationService';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
+import { useAuth } from '../contexts/AuthContext';
 import VideoPlayer from './VideoPlayer';
 import { isMobileDevice } from '../utils/deviceDetection';
 import Loader from './Loader';
@@ -243,6 +245,59 @@ const TrailerVideoContainer = styled.div`
     width: 100%;
 `;
 
+// Like/Dislike Component
+const LikeDislikeButtons: React.FC<{
+    mediaId: number;
+    mediaType: string;
+    currentPreference: 'like' | 'dislike' | null;
+    onLike: () => void;
+    onDislike: () => void;
+    isLoading: boolean;
+}> = ({ mediaId, mediaType, currentPreference, onLike, onDislike, isLoading }) => {
+    const getLikeButtonClasses = () => {
+        let classes = "flex items-center gap-2 px-4 py-2 rounded-full font-semibold transition-all duration-200 ";
+        if (currentPreference === 'like') {
+            classes += "bg-green-600 text-white shadow-lg";
+        } else {
+            classes += "bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm border border-white/20";
+        }
+        if (isLoading) classes += " opacity-50 cursor-not-allowed";
+        return classes;
+    };
+
+    const getDislikeButtonClasses = () => {
+        let classes = "flex items-center gap-2 px-4 py-2 rounded-full font-semibold transition-all duration-200 ";
+        if (currentPreference === 'dislike') {
+            classes += "bg-red-600 text-white shadow-lg";
+        } else {
+            classes += "bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm border border-white/20";
+        }
+        if (isLoading) classes += " opacity-50 cursor-not-allowed";
+        return classes;
+    };
+
+    return (
+        <div className="flex gap-3 mb-4">
+            <button
+                onClick={onLike}
+                disabled={isLoading}
+                className={getLikeButtonClasses()}
+            >
+                <Icons.HeartIcon className="w-5 h-5" isActive={currentPreference === 'like'} />
+                {currentPreference === 'like' ? 'Liked' : 'Like'}
+            </button>
+            <button
+                onClick={onDislike}
+                disabled={isLoading}
+                className={getDislikeButtonClasses()}
+            >
+                <Icons.ThumbsDownIcon className="w-5 h-5" isActive={currentPreference === 'dislike'} />
+                {currentPreference === 'dislike' ? 'Disliked' : 'Dislike'}
+            </button>
+        </div>
+    );
+};
+
 // --- Main Component ---
 const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSelectItem, onInvalidApiKey }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'cast' | 'reviews'>('overview');
@@ -274,9 +329,11 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     const [aiReviews, setAiReviews] = useState<string | null>(null);
     const [isAiReviewsLoading, setIsAiReviewsLoading] = useState(false);
     const [aiReviewsError, setAiReviewsError] = useState<string | null>(null);
+    const [preferenceLoading, setPreferenceLoading] = useState(false);
 
     const { country } = useGeolocation();
     const { providerIds } = useStreamingPreferences();
+    const { getContentPreference, addContentPreference, removeContentPreference, userSettings } = useAuth();
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -342,7 +399,15 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
                 if (item.media_type === 'movie') {
                     const recs = await getMovieRecommendations(apiKey, item.id);
-                    if (isMounted) setRecommendations(recs.results.map(r => ({...r, media_type: 'movie'})));
+                    const baseRecommendations = recs.results.map(r => ({...r, media_type: 'movie' as const}));
+
+                    // Apply personalized recommendations if user has preferences
+                    const userPreferences = userSettings?.content_preferences || [];
+                    const personalizedRecs = userPreferences.length > 0
+                        ? generatePersonalizedRecommendations(baseRecommendations, userPreferences)
+                        : baseRecommendations;
+
+                    if (isMounted) setRecommendations(personalizedRecs as MediaItem[]);
 
                     // Fetch OMDb data for extended movie information
                     setIsOmdbLoading(true);
@@ -480,6 +545,42 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
             }
         } finally {
             setIsAiReviewsLoading(false);
+        }
+    };
+
+    const handleLike = async () => {
+        setPreferenceLoading(true);
+        try {
+            const currentPreference = getContentPreference(item.id, item.media_type);
+            if (currentPreference === 'like') {
+                // Remove the like
+                await removeContentPreference(item.id, item.media_type);
+            } else {
+                // Add like (this will replace dislike if it exists)
+                await addContentPreference(item.id, item.media_type, 'like');
+            }
+        } catch (error) {
+            console.error('Error updating preference:', error);
+        } finally {
+            setPreferenceLoading(false);
+        }
+    };
+
+    const handleDislike = async () => {
+        setPreferenceLoading(true);
+        try {
+            const currentPreference = getContentPreference(item.id, item.media_type);
+            if (currentPreference === 'dislike') {
+                // Remove the dislike
+                await removeContentPreference(item.id, item.media_type);
+            } else {
+                // Add dislike (this will replace like if it exists)
+                await addContentPreference(item.id, item.media_type, 'dislike');
+            }
+        } catch (error) {
+            console.error('Error updating preference:', error);
+        } finally {
+            setPreferenceLoading(false);
         }
     };
 
@@ -696,6 +797,14 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                         <span className="text-xl font-bold">{details.vote_average.toFixed(1)}</span>
                         <span className="text-slate-400">/ 10</span>
                     </div>
+                    <LikeDislikeButtons
+                        mediaId={item.id}
+                        mediaType={item.media_type}
+                        currentPreference={getContentPreference(item.id, item.media_type)}
+                        onLike={handleLike}
+                        onDislike={handleDislike}
+                        isLoading={preferenceLoading}
+                    />
                 </HeaderSection>
 
                 <TabsContainer>

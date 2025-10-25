@@ -131,7 +131,7 @@ const App: React.FC = () => {
         <ImageGeneratorProvider>
             <div className="bg-primary text-white min-h-screen font-sans">
                 <AIGlow status={aiStatus} />
-                <Header view={view} setView={setView} onSettingsClick={() => setIsSettingsOpen(true)} isMediaDetailView={!!selectedItem} />
+                {!selectedItem && <Header view={view} setView={setView} onSettingsClick={() => setIsSettingsOpen(true)} />}
 
                 <MainContainer>
                     {renderView()}

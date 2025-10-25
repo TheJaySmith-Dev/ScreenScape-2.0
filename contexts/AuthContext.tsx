@@ -3,11 +3,19 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '../utils/supabase';
 import syncManager from '../utils/syncOffline';
 
+interface UserPreference {
+  media_id: number;
+  media_type: string;
+  preference: 'like' | 'dislike';
+  timestamp: string;
+}
+
 interface UserSettings {
   tmdb_api_key?: string;
   theme_preferences?: any;
   streaming_preferences?: any;
   voice_preferences?: any;
+  content_preferences?: UserPreference[];
   updated_at?: string;
 }
 
@@ -46,10 +54,15 @@ interface AuthContextType {
   removeFromWatchlist: (mediaId: string, mediaType: string) => Promise<void>;
   addSearchHistory: (query: string) => Promise<void>;
   updateGameProgress: (gameType: string, progress: any) => Promise<void>;
+  addContentPreference: (mediaId: number, mediaType: string, preference: 'like' | 'dislike') => Promise<void>;
+  removeContentPreference: (mediaId: number, mediaType: string) => Promise<void>;
+  getContentPreference: (mediaId: number, mediaType: string) => 'like' | 'dislike' | null;
   syncData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export type { UserPreference };
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -309,6 +322,67 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const addContentPreference = async (mediaId: number, mediaType: string, preference: 'like' | 'dislike') => {
+    if (!user) return;
+
+    // Check if preference already exists and update it
+    const currentPreferences = userSettings?.content_preferences || [];
+    const existingIndex = currentPreferences.findIndex(
+      p => p.media_id === mediaId && p.media_type === mediaType
+    );
+
+    let newPreferences;
+    if (existingIndex >= 0) {
+      // Update existing preference
+      newPreferences = [...currentPreferences];
+      newPreferences[existingIndex] = {
+        media_id: mediaId,
+        media_type: mediaType,
+        preference,
+        timestamp: new Date().toISOString(),
+      };
+    } else {
+      // Add new preference
+      newPreferences = [...currentPreferences, {
+        media_id: mediaId,
+        media_type: mediaType,
+        preference,
+        timestamp: new Date().toISOString(),
+      }];
+    }
+
+    try {
+      await updateUserSettings({ content_preferences: newPreferences });
+    } catch (error) {
+      console.error('Error updating content preferences:', error);
+      throw error;
+    }
+  };
+
+  const removeContentPreference = async (mediaId: number, mediaType: string) => {
+    if (!user) return;
+
+    const currentPreferences = userSettings?.content_preferences || [];
+    const newPreferences = currentPreferences.filter(
+      p => !(p.media_id === mediaId && p.media_type === mediaType)
+    );
+
+    try {
+      await updateUserSettings({ content_preferences: newPreferences });
+    } catch (error) {
+      console.error('Error removing content preference:', error);
+      throw error;
+    }
+  };
+
+  const getContentPreference = (mediaId: number, mediaType: string): 'like' | 'dislike' | null => {
+    const preferences = userSettings?.content_preferences || [];
+    const preference = preferences.find(
+      p => p.media_id === mediaId && p.media_type === mediaType
+    );
+    return preference ? preference.preference : null;
+  };
+
   const value = {
     user,
     loading,
@@ -325,6 +399,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     removeFromWatchlist,
     addSearchHistory,
     updateGameProgress,
+    addContentPreference,
+    removeContentPreference,
+    getContentPreference,
     syncData,
   };
 
