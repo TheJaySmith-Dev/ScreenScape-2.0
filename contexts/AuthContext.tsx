@@ -343,7 +343,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const addContentPreference = async (mediaId: number, mediaType: string, preference: 'like' | 'dislike') => {
-    if (!user) return;
+    if (!user) {
+      console.error('addContentPreference: No user logged in');
+      return;
+    }
+
+    console.log('addContentPreference: Adding preference for', { mediaId, mediaType, preference, userId: user.id });
 
     try {
       // Upsert to user_content_preferences table
@@ -359,7 +364,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('addContentPreference: Database error:', error);
+        throw error;
+      }
+
+      console.log('addContentPreference: Successfully added/updated preference:', data);
 
       // Update the local userSettings to reflect the change
       const currentPreferences = userSettings?.content_preferences || [];
