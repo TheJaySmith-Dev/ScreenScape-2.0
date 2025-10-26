@@ -34,9 +34,87 @@ export const useDeviceSync = () => {
 
   const stopPollingRef = useRef(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
 
   // API base URL for Vercel deployment
   const API_BASE = '/api';
+
+  // Set up BroadcastChannel for real-time tab-to-tab communication
+  useEffect(() => {
+    if (deviceInfo?.guestId) {
+      broadcastChannelRef.current = new BroadcastChannel(`sync_${deviceInfo.guestId}`);
+
+      const handleBroadcast = (event: MessageEvent) => {
+        const { type, data } = event.data;
+
+        if (type === 'preferences_updated') {
+          console.log('📡 Received preferences update from another tab');
+          setLocalPreferences(data.preferences);
+          setSyncState(prev => ({
+            ...prev,
+            lastSyncTime: data.timestamp
+          }));
+
+          // Also update localStorage
+          if (data.preferences.userSettings) {
+            localStorage.setItem('userSettings', JSON.stringify(data.preferences.userSettings));
+          }
+          if (data.preferences.watchlist) {
+            localStorage.setItem('userWatchlist', JSON.stringify(data.preferences.watchlist));
+          }
+          if (data.preferences.searchHistory) {
+            localStorage.setItem('userSearchHistory', JSON.stringify(data.preferences.searchHistory));
+          }
+          if (data.preferences.gameProgress) {
+            localStorage.setItem('userGameProgress', JSON.stringify(data.preferences.gameProgress));
+          }
+        }
+      };
+
+      broadcastChannelRef.current.addEventListener('message', handleBroadcast);
+
+      return () => {
+        broadcastChannelRef.current?.removeEventListener('message', handleBroadcast);
+        broadcastChannelRef.current?.close();
+      };
+    }
+  }, [deviceInfo?.guestId]);
+
+  // Load persistent device info on mount
+  useEffect(() => {
+    const savedGuestId = localStorage.getItem('guestId');
+    const savedSessionToken = localStorage.getItem('sessionToken');
+    const savedDeviceName = localStorage.getItem('deviceName');
+
+    if (savedGuestId && savedSessionToken) {
+      console.log('🔄 Restoring device session:', savedGuestId);
+      setDeviceInfo({
+        guestId: savedGuestId,
+        sessionToken: savedSessionToken,
+        deviceName: savedDeviceName || 'Device'
+      });
+      setSyncState(prev => ({
+        ...prev,
+        isConnected: true,
+        deviceCount: 2
+      }));
+
+      // Load existing preferences
+      const savedSettings = localStorage.getItem('userSettings');
+      const savedWatchlist = localStorage.getItem('userWatchlist');
+      const savedSearchHistory = localStorage.getItem('userSearchHistory');
+      const savedGameProgress = localStorage.getItem('userGameProgress');
+
+      if (savedSettings || savedWatchlist || savedSearchHistory || savedGameProgress) {
+        setLocalPreferences({
+          userSettings: savedSettings ? JSON.parse(savedSettings) : {},
+          watchlist: savedWatchlist ? JSON.parse(savedWatchlist) : [],
+          searchHistory: savedSearchHistory ? JSON.parse(savedSearchHistory) : [],
+          gameProgress: savedGameProgress ? JSON.parse(savedGameProgress) : {}
+        });
+      }
+    }
+  }, []);
 
   // Clean up on unmount
   useEffect(() => {
@@ -45,6 +123,7 @@ export const useDeviceSync = () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
       }
+      broadcastChannelRef.current?.close();
     };
   }, []);
 
@@ -116,6 +195,11 @@ export const useDeviceSync = () => {
           deviceName
         });
 
+        // Persist device info in localStorage
+        localStorage.setItem('guestId', guestId);
+        localStorage.setItem('sessionToken', sessionToken);
+        localStorage.setItem('deviceName', deviceName);
+
         // Load initial preferences from other device
         if (userData) {
           setLocalPreferences({
@@ -133,9 +217,6 @@ export const useDeviceSync = () => {
           lastSyncTime: lastUpdated,
           deviceCount: 2
         }));
-
-        // Start polling for updates
-        startPollingSync();
 
         console.log(`Linked to device, guest ID: ${guestId}`);
         return true;
@@ -155,54 +236,11 @@ export const useDeviceSync = () => {
     }
   }, [API_BASE]);
 
+  // For BroadcastChannel sync, we don't need server polling
   const fetchState = useCallback(async () => {
-    if (!deviceInfo) return null;
-
-    try {
-      const response = await fetch(
-        `${API_BASE}/fetchState?syncToken=${deviceInfo.syncToken}&deviceToken=${deviceInfo.deviceToken}&lastKnownUpdate=${syncState.lastSyncTime || 0}`
-      );
-
-      if (response.ok) {
-        const { preferences, lastUpdated } = await response.json();
-
-        if (preferences) {
-          console.log('Received sync update:', preferences);
-          setLocalPreferences(preferences);
-          setSyncState(prev => ({
-            ...prev,
-            lastSyncTime: lastUpdated
-          }));
-
-          // Also update localStorage from the synced data
-          if (preferences.userSettings) {
-            localStorage.setItem('userSettings', JSON.stringify(preferences.userSettings));
-          }
-          if (preferences.watchlist) {
-            localStorage.setItem('userWatchlist', JSON.stringify(preferences.watchlist));
-          }
-          if (preferences.searchHistory) {
-            localStorage.setItem('userSearchHistory', JSON.stringify(preferences.searchHistory));
-          }
-          if (preferences.gameProgress) {
-            localStorage.setItem('userGameProgress', JSON.stringify(preferences.gameProgress));
-          }
-        }
-
-        return preferences;
-      } else if (response.status === 204) {
-        // 204 = No Content, meaning no updates
-        return null;
-      } else {
-        console.error('Error fetching sync state:', response.status);
-        return null;
-      }
-
-    } catch (error) {
-      console.error('Error fetching sync state:', error);
-      return null;
-    }
-  }, [deviceInfo, syncState.lastSyncTime, API_BASE]);
+    // BroadcastChannel handles real-time sync, no server polling needed
+    return null;
+  }, []);
 
   const sendUpdate = useCallback(async (preferences: SyncPreferences): Promise<boolean> => {
     if (!deviceInfo) {
@@ -211,46 +249,39 @@ export const useDeviceSync = () => {
     }
 
     try {
-      setSyncState(prev => ({ ...prev, isSyncing: true }));
-
-      const response = await fetch(`${API_BASE}/sendUpdate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          syncToken: deviceInfo.syncToken,
-          deviceToken: deviceInfo.deviceToken,
-          preferences
-        }),
-      });
-
-      if (response.ok) {
-        const { lastUpdated } = await response.json();
-
-        setSyncState(prev => ({
-          ...prev,
-          isSyncing: false,
-          lastSyncTime: lastUpdated
-        }));
-
-        return true;
-      } else {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to send update' }));
-        console.error('Error sending update:', errorData.error || 'Unknown error');
-        return false;
+      // Broadcast the preferences update to other tabs
+      if (broadcastChannelRef.current) {
+        broadcastChannelRef.current.postMessage({
+          type: 'preferences_updated',
+          data: {
+            preferences,
+            timestamp: Date.now()
+          }
+        });
       }
 
+      // Also update localStorage
+      if (preferences.userSettings) {
+        localStorage.setItem('userSettings', JSON.stringify(preferences.userSettings));
+      }
+      if (preferences.watchlist) {
+        localStorage.setItem('userWatchlist', JSON.stringify(preferences.watchlist));
+      }
+      if (preferences.searchHistory) {
+        localStorage.setItem('userSearchHistory', JSON.stringify(preferences.searchHistory));
+      }
+      if (preferences.gameProgress) {
+        localStorage.setItem('userGameProgress', JSON.stringify(preferences.gameProgress));
+      }
+
+      console.log('📡 Broadcasted preferences update to other tabs');
+      return true;
+
     } catch (error) {
-      console.error('Error sending update:', error);
-      setSyncState(prev => ({
-        ...prev,
-        isSyncing: false,
-        error: error instanceof Error ? error.message : 'Failed to send update'
-      }));
+      console.error('Error broadcasting update:', error);
       return false;
     }
-  }, [deviceInfo, API_BASE]);
+  }, [deviceInfo]);
 
   const startPollingSync = useCallback(() => {
     stopPollingRef.current = false;

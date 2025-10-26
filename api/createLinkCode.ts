@@ -1,12 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { put, del, list } from '@vercel/blob';
 
 // Generate secure link code
 function generateLinkCode(): string {
-  // 8-character alphanumeric code (excluding confusing chars)
+  // 6-character alphanumeric code (excluding confusing chars)
   const chars = 'ABCDEFGHJKMNPQRSTWXYZ23456789';
   let code = '';
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 6; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
@@ -18,32 +17,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    console.log('🛠️ Environment check:', {
-      blobStoreId: process.env.BLOB_STORE_ID ? '✅ Set' : '❌ Missing',
-      hasBlobReadWrite: process.env.BLOB_READ_WRITE_TOKEN ? '✅ Set' : '❌ Missing'
-    });
-
     const { deviceName = 'Device A' } = req.body;
-    console.log('📤 Creating link code for:', deviceName);
 
-    // Generate unique 6-character link code (shorter for better UX)
+    // Generate unique 6-character link code
     let linkCode: string;
     let attempts = 0;
 
     do {
-      linkCode = generateLinkCode().substring(0, 6); // 6 chars instead of 8
+      linkCode = generateLinkCode();
       attempts++;
-      if (attempts > 15) {
+      if (attempts > 50) {
         throw new Error('Unable to generate unique link code');
       }
 
-      // Check if link code already exists in Blob storage (linkcodes directory)
-      try {
-        const existing = await fetch(`${process.env.BLOB_READ_WRITE_TOKEN ? 'https://' : ''}${process.env.BLOB_STORE_ID}.public.blob.vercel-storage.com/linkcodes/${linkCode}.json`);
-        if (existing.status !== 200) break; // Code is available
-      } catch (blobError) {
-        // If file doesn't exist, code is available
-        break;
+      // Check if link code is used (simple randomness check)
+      // In production, you might want a centralized registry
+      const existingCodes = JSON.parse(sessionStorage.getItem('linkCodes') || '{}');
+      if (!existingCodes[linkCode] || Date.now() - existingCodes[linkCode].createdAt > 15 * 60 * 1000) {
+        break; // Code is available
       }
 
     } while (true);
@@ -51,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Generate guest ID for this device
     const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Create session data for temporary link (link code -> guestId lookup)
+    // Store link code mapping (temporary - expires in 15 minutes)
     const linkSession = {
       guestId,
       deviceName,
@@ -59,45 +50,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       expiresAt: Date.now() + (15 * 60 * 1000), // 15 minutes
     };
 
-    // Store link code in Blob (temporary link table)
-    try {
-      await put(`linkcodes/${linkCode}.json`, JSON.stringify(linkSession), {
-        access: 'public',
-      });
-    } catch (blobError) {
-      console.error('Failed to store link code in Blob:', blobError);
-      throw new Error('Failed to create link session');
-    }
+    // Store link code in global session memory (simple approach)
+    // In production with multiple server instances, you'd need shared storage
+    if (!global.linkCodes) global.linkCodes = {};
+    global.linkCodes[linkCode] = linkSession;
 
-    // Create initial user data in Blob storage
-    const initialUserData = {
-      guestId,
-      deviceName,
-      createdAt: Date.now(),
-      lastUpdated: Date.now(),
-      preferences: {},
-      gameProgress: {},
-      userSettings: {},
-      watchlist: [],
-      searchHistory: [],
-    };
-
-    try {
-      await put(`users/${guestId}/data.json`, JSON.stringify(initialUserData), {
-        access: 'public',
-      });
-    } catch (blobError) {
-      console.error('Failed to create user data in Blob:', blobError);
-      // Clean up linkcode since user data creation failed
-      try {
-        await del(`linkcodes/${linkCode}.json`);
-      } catch (cleanupError) {
-        console.error('Failed to cleanup linkcode after blob error:', cleanupError);
-      }
-      throw new Error('Failed to initialize user storage');
-    }
-
-    console.log(`✅ Created link: ${linkCode} for guest: ${guestId}`);
+    console.log(`✅ Created link code: ${linkCode} for guest: ${guestId}`);
 
     return res.status(200).json({
       linkCode,
