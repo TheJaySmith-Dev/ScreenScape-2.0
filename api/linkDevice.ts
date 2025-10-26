@@ -1,15 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Redis } from '@upstash/redis';
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
-
-// Basic Redis connection check
-if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-  console.error('❌ Missing Upstash Redis environment variables');
-}
+import { head, get, put } from '@vercel/blob';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -26,43 +16,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('🧹 Cleaned linkCode:', { original: linkCode, cleaned: cleanLinkCode, length: cleanLinkCode.length });
 
-    if (!cleanLinkCode || cleanLinkCode.length !== 8) {
-      console.log('❌ Link code validation failed');
+    if (!cleanLinkCode || cleanLinkCode.length !== 6) { // Updated to 6 chars to match createLinkCode
+      console.log('❌ Link code validation failed: length !== 6');
       return res.status(400).json({ error: 'Invalid link code format' });
     }
 
-    // Get the sync session from Redis
-    const sessionData = await redis.get(`sync_session_${cleanLinkCode}`);
-    if (!sessionData) {
-      return res.status(404).json({ error: 'Link code not found or expired' });
+    // Construct Blob URL for the link code file
+    const linkCodeUrl = `https://${process.env.BLOB_STORE_ID}.public.blob.vercel-storage.com/linkcodes/${cleanLinkCode}.json`;
+
+    // Fetch the link session from Blob storage
+    const sessionResponse = await fetch(linkCodeUrl);
+    if (!sessionResponse.ok) {
+      if (sessionResponse.status === 404) {
+        console.log('❌ Link code not found in Blob');
+        return res.status(404).json({ error: 'Link code not found or expired' });
+      }
+      throw new Error(`Blob fetch failed: ${sessionResponse.status}`);
     }
 
     // Parse session data
-    const session = JSON.parse(sessionData as string);
+    const linkSession = await sessionResponse.json();
+    console.log('📄 Retrieved link session:', linkSession);
 
-    // Check if session expired (15 minutes) - though Redis TTL should handle this
-    if (Date.now() - session.createdAt > 15 * 60 * 1000) {
-      await redis.del(`sync_session_${cleanLinkCode}`);
+    // Check if link expired
+    if (Date.now() > linkSession.expiresAt) {
+      console.log('⏰ Link code expired');
+      // Optionally clean up expired links, but for now just return error
       return res.status(404).json({ error: 'Link code expired' });
     }
 
-    // Generate new device token for the second device
-    const deviceToken = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const { guestId } = linkSession;
 
-    // Update session with linked device info and mark as active
-    session.lastUpdated = Date.now();
-    session.deviceCount = 2;
+    // Fetch the current user data from Blob storage
+    const userDataUrl = `https://${process.env.BLOB_STORE_ID}.public.blob.vercel-storage.com/users/${guestId}/data.json`;
+    const userDataResponse = await fetch(userDataUrl);
 
-    // Store updated session back in Redis
-    await redis.setex(`sync_session_${cleanLinkCode}`, 15 * 60, JSON.stringify(session));
+    if (!userDataResponse.ok) {
+      console.error('❌ Failed to fetch user data:', userDataResponse.status);
+      return res.status(500).json({ error: 'Failed to retrieve user data' });
+    }
 
-    console.log(`Device ${deviceName} linked to session: ${cleanLinkCode}`);
+    const userData = await userDataResponse.json();
+    console.log('📊 Retrieved user data for guest:', guestId);
+
+    // Generate session token for the second device
+    const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    console.log(`✅ Linked device ${deviceName} to guest ${guestId}`);
 
     return res.status(200).json({
-      deviceToken,
-      syncToken: session.id, // Use session ID as sync token
-      preferences: session.preferences, // Current preferences from first device
-      lastUpdated: session.lastUpdated
+      guestId,
+      sessionToken,
+      deviceName,
+      userData,
+      lastUpdated: userData.lastUpdated
     });
 
   } catch (error) {

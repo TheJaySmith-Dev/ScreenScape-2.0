@@ -16,8 +16,8 @@ interface SyncState {
 }
 
 interface DeviceInfo {
-  deviceToken: string;
-  syncToken: string;
+  guestId: string;
+  sessionToken: string;
   deviceName: string;
 }
 
@@ -61,12 +61,12 @@ export const useDeviceSync = () => {
       });
 
       if (response.ok) {
-        const { linkCode, deviceToken } = await response.json();
+        const { linkCode, guestId } = await response.json();
 
-        // Store device tokens for this device
+        // Store guest info for this device
         setDeviceInfo({
-          deviceToken,
-          syncToken: linkCode, // First device uses link code as sync token
+          guestId,
+          sessionToken: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           deviceName
         });
 
@@ -107,18 +107,23 @@ export const useDeviceSync = () => {
       });
 
       if (response.ok) {
-        const { deviceToken, syncToken, preferences, lastUpdated } = await response.json();
+        const { guestId, sessionToken, userData, lastUpdated } = await response.json();
 
-        // Store device tokens
+        // Store guest info for this device
         setDeviceInfo({
-          deviceToken,
-          syncToken,
+          guestId,
+          sessionToken,
           deviceName
         });
 
         // Load initial preferences from other device
-        if (preferences) {
-          setLocalPreferences(preferences);
+        if (userData) {
+          setLocalPreferences({
+            userSettings: userData.userSettings,
+            watchlist: userData.watchlist,
+            searchHistory: userData.searchHistory,
+            gameProgress: userData.gameProgress
+          });
         }
 
         setSyncState(prev => ({
@@ -132,7 +137,7 @@ export const useDeviceSync = () => {
         // Start polling for updates
         startPollingSync();
 
-        console.log(`Linked to device, sync token: ${syncToken}`);
+        console.log(`Linked to device, guest ID: ${guestId}`);
         return true;
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Failed to link device' }));
