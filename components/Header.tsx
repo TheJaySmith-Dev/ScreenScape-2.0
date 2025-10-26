@@ -190,35 +190,33 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
 
     return (
         <>
-            {/* User Button - Desktop Version */}
-            {isDesktop && (
-                <motion.button
-                    onClick={handleUserMenuToggle}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    style={{
-                        position: 'fixed',
-                        top: 24,
-                        right: 24,
-                        zIndex: 60,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: 12,
-                        borderRadius: 16,
-                        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)',
-                        backdropFilter: 'blur(24px)',
-                        border: '1px solid rgba(51, 65, 85, 0.3)',
-                        color: 'white',
-                        fontSize: 18,
-                        cursor: 'pointer',
-                        transition: 'all 0.3s ease',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
-                    }}
-                >
-                    <FaUser />
-                </motion.button>
-            )}
+            {/* User Button - Desktop and Mobile */}
+            <motion.button
+                onClick={handleUserMenuToggle}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                style={{
+                    position: 'fixed',
+                    top: isDesktop ? 24 : 16,
+                    right: isDesktop ? 24 : 16,
+                    zIndex: 60,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: isDesktop ? 12 : 10,
+                    borderRadius: 16,
+                    background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)',
+                    backdropFilter: 'blur(24px)',
+                    border: '1px solid rgba(51, 65, 85, 0.3)',
+                    color: 'white',
+                    fontSize: isDesktop ? 18 : 16,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
+                }}
+            >
+                <FaUser />
+            </motion.button>
 
             <NavContainer isDesktop={isDesktop}>
                 {currentNavItems.map((item) => (
@@ -289,22 +287,7 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                     </NavButton>
                 ))}
 
-                {/* User Button for Mobile */}
-                {!isDesktop && (
-                    <NavButton
-                        active={false}
-                        onClick={handleUserMenuToggle}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                    >
-                        <NavIcon view="screenSearch" currentView="screenSearch" style={{ opacity: 1 }}>
-                            <FaUser />
-                        </NavIcon>
-                        <div style={{ fontSize: '11px', textAlign: 'center' }}>
-                            Account
-                        </div>
-                    </NavButton>
-                )}
+
             </NavContainer>
 
             {/* More Menu for Mobile */}
