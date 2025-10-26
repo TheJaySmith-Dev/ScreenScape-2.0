@@ -223,8 +223,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Supabase sign out error:', error);
+        // Continue with local sign out even if Supabase fails
+      }
+
+      // Force clear local state regardless of Supabase response
+      setUser(null);
+      setUserSettings(null);
+      setWatchlist([]);
+      setSearchHistory([]);
+      setGameProgress({});
+      localStorage.removeItem('screenScapeStreamingProviders');
+
+      console.log('Sign out completed');
+    } catch (error) {
+      console.error('Unexpected sign out error:', error);
+      // Still clear local state on error
+      setUser(null);
+      setUserSettings(null);
+      setWatchlist([]);
+      setSearchHistory([]);
+      setGameProgress({});
+      localStorage.removeItem('screenScapeStreamingProviders');
+    }
   };
 
   const updateUserSettings = async (settings: Partial<UserSettings>) => {
