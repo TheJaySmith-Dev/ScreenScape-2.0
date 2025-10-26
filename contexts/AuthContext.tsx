@@ -1,7 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase } from '../utils/supabase';
-import syncManager from '../utils/syncOffline';
 
 interface UserPreference {
   media_id: number;
@@ -39,16 +36,10 @@ interface GameProgress {
 }
 
 interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  syncLoading: boolean;
   userSettings: UserSettings | null;
   watchlist: WatchlistItem[];
   searchHistory: SearchHistoryItem[];
   gameProgress: GameProgress;
-  signUp: (email: string, password: string) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
   updateUserSettings: (settings: Partial<UserSettings>) => Promise<void>;
   addToWatchlist: (mediaId: string, mediaType: string, mediaData?: any) => Promise<void>;
   removeFromWatchlist: (mediaId: string, mediaType: string) => Promise<void>;
@@ -57,7 +48,6 @@ interface AuthContextType {
   addContentPreference: (mediaId: number, mediaType: string, preference: 'like' | 'dislike') => Promise<void>;
   removeContentPreference: (mediaId: number, mediaType: string) => Promise<void>;
   getContentPreference: (mediaId: number, mediaType: string) => 'like' | 'dislike' | null;
-  syncData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -77,305 +67,121 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [syncLoading, setSyncLoading] = useState(false);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [gameProgress, setGameProgress] = useState<GameProgress>({});
 
-  // Sync data from database
-  const syncData = async () => {
-    if (!user) return;
-
-    setSyncLoading(true);
-    try {
-      // Sync user settings
-      const { data: settings } = await supabase
-        .from('user_settings')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      setUserSettings(settings);
-
-      // Sync content preferences
-      const { data: contentPrefs } = await supabase
-        .from('user_content_preferences')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false });
-
-      // Convert content preferences to the expected format for userSettings
-      const preferencesForSettings = (contentPrefs || []).map(pref => ({
-        media_id: pref.media_id,
-        media_type: pref.media_type,
-        preference: pref.preference,
-        timestamp: pref.updated_at
-      }));
-
-      setUserSettings(currentSettings => ({
-        ...currentSettings,
-        content_preferences: preferencesForSettings
-      }));
-
-      // Sync watchlist
-      const { data: watchlistData } = await supabase
-        .from('user_watchlist')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('added_at', { ascending: false });
-      setWatchlist(watchlistData || []);
-
-      // Sync search history (last 50 items)
-      const { data: history } = await supabase
-        .from('user_search_history')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('searched_at', { ascending: false })
-        .limit(50);
-      setSearchHistory(history || []);
-
-      // Sync game progress
-      const { data: games } = await supabase
-        .from('user_game_progress')
-        .select('*')
-        .eq('user_id', user.id);
-      const progressMap: GameProgress = {};
-      games?.forEach(game => {
-        progressMap[game.game_type] = game.game_data;
-      });
-      setGameProgress(progressMap);
-
-    } catch (error) {
-      console.error('Error syncing data:', error);
-    } finally {
-      setSyncLoading(false);
-    }
-  };
-
+  // Load data from localStorage on mount
   useEffect(() => {
-    // Check active session
-    const getSession = async () => {
-      // Set a timeout to force loading false after 5 seconds to prevent stuck loading
-      const timeoutId = setTimeout(() => {
-        console.warn('Auth loading timeout - forcing no user state');
-        setUser(null);
-        setLoading(false);
-      }, 5000);
-
+    // Load user settings
+    const savedSettings = localStorage.getItem('userSettings');
+    if (savedSettings) {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('Session error:', error);
-        }
-        setUser(session?.user ?? null);
-      } catch (err) {
-        console.error('Failed to get session:', err);
-        // Set user to null for guest mode if Supabase fails
-        setUser(null);
-      } finally {
-        clearTimeout(timeoutId);
-        setLoading(false);
+        setUserSettings(JSON.parse(savedSettings));
+      } catch (error) {
+        console.error('Error loading user settings:', error);
       }
-    };
+    }
 
-    getSession();
-
-    // Listen for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-
-      if (event === 'SIGNED_IN' && session?.user) {
-        // Sync data when user signs in
-        await syncData();
-      } else if (event === 'SIGNED_OUT') {
-        // Clear synced data on sign out
-        setUserSettings(null);
-        setWatchlist([]);
-        setSearchHistory([]);
-        setGameProgress({});
-        // Clear local streaming preferences from user data
-        localStorage.removeItem('screenScapeStreamingProviders');
+    // Load watchlist
+    const savedWatchlist = localStorage.getItem('userWatchlist');
+    if (savedWatchlist) {
+      try {
+        setWatchlist(JSON.parse(savedWatchlist));
+      } catch (error) {
+        console.error('Error loading watchlist:', error);
       }
-    });
+    }
 
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    // Load search history
+    const savedSearchHistory = localStorage.getItem('userSearchHistory');
+    if (savedSearchHistory) {
+      try {
+        setSearchHistory(JSON.parse(savedSearchHistory));
+      } catch (error) {
+        console.error('Error loading search history:', error);
+      }
+    }
+
+    // Load game progress
+    const savedGameProgress = localStorage.getItem('userGameProgress');
+    if (savedGameProgress) {
+      try {
+        setGameProgress(JSON.parse(savedGameProgress));
+      } catch (error) {
+        console.error('Error loading game progress:', error);
+      }
+    }
   }, []);
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    if (error) throw error;
-  };
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
-  };
-
-  const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Supabase sign out error:', error);
-        // Continue with local sign out even if Supabase fails
-      }
-
-      // Force clear local state regardless of Supabase response
-      setUser(null);
-      setUserSettings(null);
-      setWatchlist([]);
-      setSearchHistory([]);
-      setGameProgress({});
-      localStorage.removeItem('screenScapeStreamingProviders');
-
-      console.log('Sign out completed');
-    } catch (error) {
-      console.error('Unexpected sign out error:', error);
-      // Still clear local state on error
-      setUser(null);
-      setUserSettings(null);
-      setWatchlist([]);
-      setSearchHistory([]);
-      setGameProgress({});
-      localStorage.removeItem('screenScapeStreamingProviders');
-    }
-  };
-
   const updateUserSettings = async (settings: Partial<UserSettings>) => {
-    if (!user) return;
+    const newSettings = {
+      ...userSettings,
+      ...settings,
+      updated_at: new Date().toISOString(),
+    };
 
-    try {
-      const { data, error } = await supabase
-        .from('user_settings')
-        .upsert({
-          id: user.id,
-          ...settings,
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      setUserSettings(data);
-    } catch (error) {
-      console.error('Error updating user settings:', error);
-      throw error;
-    }
+    setUserSettings(newSettings);
+    localStorage.setItem('userSettings', JSON.stringify(newSettings));
   };
 
   const addToWatchlist = async (mediaId: string, mediaType: string, mediaData?: any) => {
-    if (!user) return;
+    const newItem: WatchlistItem = {
+      id: Date.now().toString(),
+      media_id: mediaId,
+      media_type: mediaType,
+      media_data: mediaData,
+      added_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
 
-    try {
-      const { data, error } = await supabase
-        .from('user_watchlist')
-        .upsert({
-          user_id: user.id,
-          media_id: mediaId,
-          media_type: mediaType,
-          media_data: mediaData,
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+    const updatedWatchlist = [
+      newItem,
+      ...watchlist.filter(item => !(item.media_id === mediaId && item.media_type === mediaType))
+    ];
 
-      if (error) throw error;
-      setWatchlist(prev => {
-        const filtered = prev.filter(item => !(item.media_id === mediaId && item.media_type === mediaType));
-        return [data, ...filtered];
-      });
-    } catch (error) {
-      console.error('Error adding to watchlist:', error);
-      throw error;
-    }
+    setWatchlist(updatedWatchlist);
+    localStorage.setItem('userWatchlist', JSON.stringify(updatedWatchlist));
   };
 
   const removeFromWatchlist = async (mediaId: string, mediaType: string) => {
-    if (!user) return;
-
-    try {
-      const { error } = await supabase
-        .from('user_watchlist')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('media_id', mediaId)
-        .eq('media_type', mediaType);
-
-      if (error) throw error;
-      setWatchlist(prev => prev.filter(item => !(item.media_id === mediaId && item.media_type === mediaType)));
-    } catch (error) {
-      console.error('Error removing from watchlist:', error);
-      throw error;
-    }
+    const updatedWatchlist = watchlist.filter(item => !(item.media_id === mediaId && item.media_type === mediaType));
+    setWatchlist(updatedWatchlist);
+    localStorage.setItem('userWatchlist', JSON.stringify(updatedWatchlist));
   };
 
   const addSearchHistory = async (query: string) => {
-    if (!user || !query.trim()) return;
+    if (!query.trim()) return;
 
-    try {
-      const { data, error } = await supabase
-        .from('user_search_history')
-        .insert({
-          user_id: user.id,
-          query: query.trim(),
-        })
-        .select()
-        .single();
+    const newSearch: SearchHistoryItem = {
+      id: Date.now().toString(),
+      query: query.trim(),
+      searched_at: new Date().toISOString(),
+    };
 
-      if (error) throw error;
-      setSearchHistory(prev => [data, ...prev.slice(0, 49)]); // Keep only latest 50
-    } catch (error) {
-      console.error('Error adding search history:', error);
-      throw error;
-    }
+    const updatedHistory = [newSearch, ...searchHistory.slice(0, 49)]; // Keep last 50
+    setSearchHistory(updatedHistory);
+    localStorage.setItem('userSearchHistory', JSON.stringify(updatedHistory));
   };
 
   const updateGameProgress = async (gameType: string, progress: any) => {
-    if (!user) return;
+    const updatedProgress = {
+      ...gameProgress,
+      [gameType]: progress,
+    };
 
-    try {
-      const { data, error } = await supabase
-        .from('user_game_progress')
-        .upsert({
-          user_id: user.id,
-          game_type: gameType,
-          game_data: progress,
-          last_updated: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      setGameProgress(prev => ({
-        ...prev,
-        [gameType]: progress,
-      }));
-    } catch (error) {
-      console.error('Error updating game progress:', error);
-      throw error;
-    }
+    setGameProgress(updatedProgress);
+    localStorage.setItem('userGameProgress', JSON.stringify(updatedProgress));
   };
 
   const addContentPreference = async (mediaId: number, mediaType: string, preference: 'like' | 'dislike') => {
-    if (!user) return;
-
-    // Always update local state immediately for smooth UX
     const currentPreferences = userSettings?.content_preferences || [];
     const existingIndex = currentPreferences.findIndex(
       p => p.media_id === mediaId && p.media_type === mediaType
     );
 
-    let newPreferences;
+    let newPreferences: UserPreference[];
     if (existingIndex >= 0) {
       // Update existing preference
       newPreferences = [...currentPreferences];
@@ -395,84 +201,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }];
     }
 
-    // Update local state immediately
-    setUserSettings(currentSettings => ({
-      ...currentSettings,
-      content_preferences: newPreferences
-    }));
+    // Update userSettings
+    const updatedSettings = {
+      ...userSettings,
+      content_preferences: newPreferences,
+      updated_at: new Date().toISOString(),
+    };
 
-    // Store in localStorage as backup
-    const localPrefs = JSON.parse(localStorage.getItem('user_content_preferences') || '[]');
-    const existingLocalIndex = localPrefs.findIndex(
-      (p: any) => p.media_id === mediaId && p.media_type === mediaType
-    );
+    setUserSettings(updatedSettings);
+    localStorage.setItem('userSettings', JSON.stringify(updatedSettings));
 
-    if (existingLocalIndex >= 0) {
-      localPrefs[existingLocalIndex] = {
-        media_id: mediaId,
-        media_type: mediaType,
-        preference,
-        timestamp: new Date().toISOString(),
-      };
-    } else {
-      localPrefs.push({
-        media_id: mediaId,
-        media_type: mediaType,
-        preference,
-        timestamp: new Date().toISOString(),
-      });
-    }
-    localStorage.setItem('user_content_preferences', JSON.stringify(localPrefs));
-
-    // Try to sync with database (but don't fail if it's not available)
-    try {
-      const { error } = await supabase
-        .from('user_content_preferences')
-        .upsert({
-          user_id: user.id,
-          media_id: mediaId,
-          media_type: mediaType,
-          preference: preference,
-          updated_at: new Date().toISOString(),
-        });
-
-      if (error) {
-        console.warn('Database sync failed, but local storage works:', error.message);
-      }
-    } catch (syncError) {
-      console.warn('Failed to sync to database, but preference saved locally');
-    }
+    // Also store separately for quick access
+    localStorage.setItem('user_content_preferences', JSON.stringify(newPreferences));
   };
 
   const removeContentPreference = async (mediaId: number, mediaType: string) => {
-    if (!user) return;
+    const currentPreferences = userSettings?.content_preferences || [];
+    const newPreferences = currentPreferences.filter(
+      p => !(p.media_id === mediaId && p.media_type === mediaType)
+    );
 
-    try {
-      // Delete from user_content_preferences table
-      const { error } = await supabase
-        .from('user_content_preferences')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('media_id', mediaId)
-        .eq('media_type', mediaType);
+    const updatedSettings = {
+      ...userSettings,
+      content_preferences: newPreferences,
+      updated_at: new Date().toISOString(),
+    };
 
-      if (error) throw error;
-
-      // Update the local userSettings to reflect the removal
-      const currentPreferences = userSettings?.content_preferences || [];
-      const newPreferences = currentPreferences.filter(
-        p => !(p.media_id === mediaId && p.media_type === mediaType)
-      );
-
-      setUserSettings(currentSettings => ({
-        ...currentSettings,
-        content_preferences: newPreferences
-      }));
-
-    } catch (error) {
-      console.error('Error removing content preference:', error);
-      throw error;
-    }
+    setUserSettings(updatedSettings);
+    localStorage.setItem('userSettings', JSON.stringify(updatedSettings));
+    localStorage.setItem('user_content_preferences', JSON.stringify(newPreferences));
   };
 
   const getContentPreference = (mediaId: number, mediaType: string): 'like' | 'dislike' | null => {
@@ -484,16 +241,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const value = {
-    user,
-    loading,
-    syncLoading,
     userSettings,
     watchlist,
     searchHistory,
     gameProgress,
-    signUp,
-    signIn,
-    signOut,
     updateUserSettings,
     addToWatchlist,
     removeFromWatchlist,
@@ -502,7 +253,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     addContentPreference,
     removeContentPreference,
     getContentPreference,
-    syncData,
   };
 
   return (

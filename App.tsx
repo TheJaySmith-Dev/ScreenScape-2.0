@@ -15,7 +15,7 @@ import AIGlow from './components/AIGlow';
 import QuickJump from './components/QuickJump';
 import LiveView from './components/LiveView.tsx';
 import SportsView from './components/SportsView';
-import Auth from './components/Auth';
+
 
 import { useAuth } from './contexts/AuthContext';
 import { ImageGeneratorProvider } from './contexts/ImageGeneratorContext';
@@ -32,7 +32,7 @@ const MainContainer = styled.main`
 `;
 
 const App: React.FC = () => {
-    const { user, loading, userSettings, updateUserSettings, syncLoading } = useAuth();
+    const { userSettings, updateUserSettings } = useAuth();
     const [apiKey, setApiKey] = useState<string | null>('09b97a49759876f2fde9eadb163edc44');
     const [isKeyInvalid, setIsKeyInvalid] = useState(false);
     const [view, setView] = useState<ViewType>('screenSearch');
@@ -106,22 +106,6 @@ const App: React.FC = () => {
                 return <ScreenSearch apiKey={apiKey!} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
         }
     };
-
-    // Show authentication screen if not authenticated
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-primary text-white flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-                    <p>Loading ScreenScape...</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!user) {
-        return <Auth />;
-    }
 
     if (!apiKey) {
         return <ApiKeySetup isKeyInvalid={isKeyInvalid} />;
