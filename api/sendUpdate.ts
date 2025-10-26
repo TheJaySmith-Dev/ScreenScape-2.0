@@ -1,16 +1,10 @@
-// Vercel serverless function: Send preference updates to sync session
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Redis } from '@upstash/redis';
 
-// Shared in-memory storage (same as other endpoints)
-global.syncSessions = global.syncSessions || {};
-
-const syncSessions = global.syncSessions as Record<string, {
-  id: string;
-  createdAt: number;
-  deviceToken: string;
-  preferences?: any;
-  lastUpdated: number;
-}>;
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 // Timestamp-based merge algorithm
 function mergePreferences(existingPrefs: any = {}, newPrefs: any = {}) {
@@ -172,11 +166,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing required parameters: syncToken, deviceToken, preferences' });
     }
 
-    // Find the sync session
-    const session = syncSessions[syncToken];
-    if (!session) {
+    // Get the sync session from Redis
+    const sessionData = await redis.get(`sync_session_${syncToken}`);
+    if (!sessionData) {
       return res.status(404).json({ error: 'Sync session not found' });
     }
+
+    // Parse session data
+    const session = JSON.parse(sessionData as string);
 
     // Validate device token (any device in the sync session can send updates)
     // In production, you might want stricter validation
@@ -185,6 +182,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const existingPrefs = session.preferences || {};
     session.preferences = mergePreferences(existingPrefs, preferences);
     session.lastUpdated = Date.now();
+
+    // Store updated session back in Redis
+    await redis.setex(`sync_session_${syncToken}`, 15 * 60, JSON.stringify(session));
 
     console.log(`Updated sync session: ${syncToken} by device: ${deviceToken}`);
 

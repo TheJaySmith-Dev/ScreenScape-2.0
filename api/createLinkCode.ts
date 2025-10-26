@@ -1,14 +1,10 @@
-// Vercel serverless function: Generate link code and create sync session
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Redis } from '@upstash/redis';
 
-// In-memory storage for development (replace with Redis/memory cache in production)
-let syncSessions: Record<string, {
-  id: string;
-  createdAt: number;
-  deviceToken: string;
-  preferences?: any;
-  lastUpdated: number;
-}> = {};
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 // Generate secure link code
 function generateLinkCode(): string {
@@ -30,32 +26,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Generate unique link code
     let linkCode: string;
     let attempts = 0;
+
     do {
       linkCode = generateLinkCode();
       attempts++;
       if (attempts > 10) {
         throw new Error('Unable to generate unique link code');
       }
-    } while (syncSessions[linkCode]);
+
+      // Check if link code already exists in Redis
+      const exists = await redis.exists(`sync_session_${linkCode}`);
+      if (!exists) break; // Code is available
+
+    } while (true);
 
     // Create device token for the initiating device
     const deviceToken = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Store sync session (expires in 15 minutes)
-    syncSessions[linkCode] = {
+    // Create sync session data
+    const sessionData = {
       id: linkCode,
       createdAt: Date.now(),
       deviceToken,
       lastUpdated: Date.now(),
     };
 
-    // Clean up expired sessions (older than 15 minutes)
-    Object.keys(syncSessions).forEach(code => {
-      const session = syncSessions[code];
-      if (Date.now() - session.createdAt > 15 * 60 * 1000) {
-        delete syncSessions[code];
-      }
-    });
+    // Store in Redis with 15-minute expiration
+    await redis.setex(`sync_session_${linkCode}`, 15 * 60, JSON.stringify(sessionData));
 
     console.log(`Created sync session: ${linkCode} for device: ${deviceToken}`);
 

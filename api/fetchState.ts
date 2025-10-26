@@ -1,16 +1,10 @@
-// Vercel serverless function: Fetch current sync state/preferences
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Redis } from '@upstash/redis';
 
-// Shared in-memory storage (same as other endpoints)
-global.syncSessions = global.syncSessions || {};
-
-const syncSessions = global.syncSessions as Record<string, {
-  id: string;
-  createdAt: number;
-  deviceToken: string;
-  preferences?: any;
-  lastUpdated: number;
-}>;
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -28,15 +22,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing required parameters: syncToken, deviceToken' });
     }
 
-    // Find the sync session
-    const session = syncSessions[syncToken];
-    if (!session) {
+    // Get the sync session from Redis
+    const sessionData = await redis.get(`sync_session_${syncToken}`);
+    if (!sessionData) {
       return res.status(404).json({ error: 'Sync session not found or expired' });
     }
 
-    // Check if session expired (15 minutes)
+    // Parse session data
+    const session = JSON.parse(sessionData as string);
+
+    // Check if session expired (15 minutes) - though Redis TTL should handle this
     if (Date.now() - session.createdAt > 15 * 60 * 1000) {
-      delete syncSessions[syncToken];
+      await redis.del(`sync_session_${syncToken}`);
       return res.status(404).json({ error: 'Sync session expired' });
     }
 

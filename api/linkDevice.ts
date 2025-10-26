@@ -1,17 +1,10 @@
-// Vercel serverless function: Link second device to sync session
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Redis } from '@upstash/redis';
 
-// Shared in-memory storage (same as createLinkCode.ts)
-// In production, this would be Redis or a proper data store
-global.syncSessions = global.syncSessions || {};
-
-const syncSessions = global.syncSessions as Record<string, {
-  id: string;
-  createdAt: number;
-  deviceToken: string;
-  preferences?: any;
-  lastUpdated: number;
-}>;
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -25,15 +18,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Invalid link code format' });
     }
 
-    // Find the sync session
-    const session = syncSessions[linkCode];
-    if (!session) {
+    // Get the sync session from Redis
+    const sessionData = await redis.get(`sync_session_${linkCode}`);
+    if (!sessionData) {
       return res.status(404).json({ error: 'Link code not found or expired' });
     }
 
-    // Check if session expired (15 minutes)
+    // Parse session data
+    const session = JSON.parse(sessionData as string);
+
+    // Check if session expired (15 minutes) - though Redis TTL should handle this
     if (Date.now() - session.createdAt > 15 * 60 * 1000) {
-      delete syncSessions[linkCode];
+      await redis.del(`sync_session_${linkCode}`);
       return res.status(404).json({ error: 'Link code expired' });
     }
 
@@ -42,6 +38,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Update session with linked device info and mark as active
     session.lastUpdated = Date.now();
+    session.deviceCount = 2;
+
+    // Store updated session back in Redis
+    await redis.setex(`sync_session_${linkCode}`, 15 * 60, JSON.stringify(session));
 
     console.log(`Device ${deviceName} linked to session: ${linkCode}`);
 
