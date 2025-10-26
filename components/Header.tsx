@@ -362,27 +362,26 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
 
             {/* User Menu - Desktop */}
             {showUserMenu && isDesktop && (
-                <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    onClick={handleUserMenuClose}
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'transparent',
-                        zIndex: 70,
-                    }}
-                >
-                    <motion.div
-                        onClick={(e) => e.stopPropagation()}
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
+                <>
+                    {/* Click outside to close */}
+                    <div
+                        onClick={handleUserMenuClose}
                         style={{
-                            position: 'absolute',
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            zIndex: 65,
+                        }}
+                    />
+                    <motion.div
+                        initial={{ scale: 0.9, opacity: 0, y: -10 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.9, opacity: 0, y: -10 }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
                             top: 80,
                             right: 24,
                             background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)',
@@ -393,6 +392,7 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                             minWidth: 200,
                             boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
                             zIndex: 80,
+                            cursor: 'default',
                         }}
                     >
                         {/* User Info Section */}
@@ -453,7 +453,7 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                             </motion.button>
                         </div>
                     </motion.div>
-                </motion.div>
+                </>
             )}
 
             {/* User Menu - Mobile */}
