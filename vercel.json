@@ -6,12 +6,7 @@
   "env": {
     "NODE_ENV": "production"
   },
-  "functions": {
-    "api/createLinkCode.ts": {},
-    "api/linkDevice.ts": {},
-    "api/sendUpdate.ts": {},
-    "api/fetchState.ts": {}
-  },
+
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
