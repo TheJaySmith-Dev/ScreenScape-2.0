@@ -17,6 +17,7 @@ import LiveView from './components/LiveView.tsx';
 import SportsView from './components/SportsView';
 import GenerateLinkCode from './components/GenerateLinkCode';
 import EnterLinkCode from './components/EnterLinkCode';
+import DeviceSyncSelector from './components/DeviceSyncSelector';
 
 
 import { useAuth } from './contexts/AuthContext';
@@ -33,7 +34,7 @@ const MainContainer = styled.main`
     }
 `;
 
-type SyncViewType = 'none' | 'generate' | 'enter';
+type SyncViewType = 'none' | 'selector' | 'generate' | 'enter';
 
 const App: React.FC = () => {
     const { userSettings, updateUserSettings } = useAuth();
@@ -124,7 +125,7 @@ const App: React.FC = () => {
                     view={view}
                     setView={setView}
                     onSettingsClick={() => setIsSettingsOpen(true)}
-                    onSyncClick={() => setSyncView(current => current === 'none' ? 'generate' : 'none')}
+                    onSyncClick={() => setSyncView(current => current === 'none' ? 'selector' : 'none')}
                 />}
 
                 <MainContainer>
@@ -134,15 +135,22 @@ const App: React.FC = () => {
                 {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} />}
 
                 {/* Sync Components */}
+                {syncView === 'selector' && (
+                    <DeviceSyncSelector
+                        onGenerateClick={() => setSyncView('generate')}
+                        onEnterClick={() => setSyncView('enter')}
+                        onBack={() => setSyncView('none')}
+                    />
+                )}
                 {syncView === 'generate' && (
                     <GenerateLinkCode
-                        onBack={() => setSyncView('none')}
+                        onBack={() => setSyncView('selector')}
                         deviceName="Device A"
                     />
                 )}
                 {syncView === 'enter' && (
                     <EnterLinkCode
-                        onBack={() => setSyncView('none')}
+                        onBack={() => setSyncView('selector')}
                         onConnected={() => setSyncView('none')}
                         deviceName="Device B"
                     />
