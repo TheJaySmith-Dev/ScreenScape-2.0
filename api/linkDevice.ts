@@ -6,6 +6,11 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
+// Basic Redis connection check
+if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+  console.error('❌ Missing Upstash Redis environment variables');
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -14,10 +19,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { linkCode, deviceName } = req.body;
 
+    console.log('🔗 Received linkCode request:', { linkCode, deviceName });
+
     // Clean the link code by removing spaces and converting to uppercase
     const cleanLinkCode = linkCode.replace(/\s/g, '').toUpperCase();
 
+    console.log('🧹 Cleaned linkCode:', { original: linkCode, cleaned: cleanLinkCode, length: cleanLinkCode.length });
+
     if (!cleanLinkCode || cleanLinkCode.length !== 8) {
+      console.log('❌ Link code validation failed');
       return res.status(400).json({ error: 'Invalid link code format' });
     }
 
