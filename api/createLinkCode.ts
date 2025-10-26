@@ -18,7 +18,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    console.log('🛠️ Environment check:', {
+      blobStoreId: process.env.BLOB_STORE_ID ? '✅ Set' : '❌ Missing',
+      hasBlobReadWrite: process.env.BLOB_READ_WRITE_TOKEN ? '✅ Set' : '❌ Missing'
+    });
+
     const { deviceName = 'Device A' } = req.body;
+    console.log('📤 Creating link code for:', deviceName);
 
     // Generate unique 6-character link code (shorter for better UX)
     let linkCode: string;
