@@ -7,18 +7,10 @@
     "NODE_ENV": "production"
   },
   "functions": {
-    "api/createLinkCode.ts": {
-      "runtime": "@vercel/node"
-    },
-    "api/linkDevice.ts": {
-      "runtime": "@vercel/node"
-    },
-    "api/sendUpdate.ts": {
-      "runtime": "@vercel/node"
-    },
-    "api/fetchState.ts": {
-      "runtime": "@vercel/node"
-    }
+    "api/createLinkCode.ts": {},
+    "api/linkDevice.ts": {},
+    "api/sendUpdate.ts": {},
+    "api/fetchState.ts": {}
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
