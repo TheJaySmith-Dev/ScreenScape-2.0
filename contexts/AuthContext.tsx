@@ -99,6 +99,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .single();
       setUserSettings(settings);
 
+      // Sync content preferences
+      const { data: contentPrefs } = await supabase
+        .from('user_content_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+
+      // Convert content preferences to the expected format for userSettings
+      const preferencesForSettings = (contentPrefs || []).map(pref => ({
+        media_id: pref.media_id,
+        media_type: pref.media_type,
+        preference: pref.preference,
+        timestamp: pref.updated_at
+      }));
+
+      setUserSettings(currentSettings => ({
+        ...currentSettings,
+        content_preferences: preferencesForSettings
+      }));
+
       // Sync watchlist
       const { data: watchlistData } = await supabase
         .from('user_watchlist')
@@ -325,34 +345,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const addContentPreference = async (mediaId: number, mediaType: string, preference: 'like' | 'dislike') => {
     if (!user) return;
 
-    // Check if preference already exists and update it
-    const currentPreferences = userSettings?.content_preferences || [];
-    const existingIndex = currentPreferences.findIndex(
-      p => p.media_id === mediaId && p.media_type === mediaType
-    );
-
-    let newPreferences;
-    if (existingIndex >= 0) {
-      // Update existing preference
-      newPreferences = [...currentPreferences];
-      newPreferences[existingIndex] = {
-        media_id: mediaId,
-        media_type: mediaType,
-        preference,
-        timestamp: new Date().toISOString(),
-      };
-    } else {
-      // Add new preference
-      newPreferences = [...currentPreferences, {
-        media_id: mediaId,
-        media_type: mediaType,
-        preference,
-        timestamp: new Date().toISOString(),
-      }];
-    }
-
     try {
-      await updateUserSettings({ content_preferences: newPreferences });
+      // Upsert to user_content_preferences table
+      const { data, error } = await supabase
+        .from('user_content_preferences')
+        .upsert({
+          user_id: user.id,
+          media_id: mediaId,
+          media_type: mediaType,
+          preference: preference,
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update the local userSettings to reflect the change
+      const currentPreferences = userSettings?.content_preferences || [];
+      const existingIndex = currentPreferences.findIndex(
+        p => p.media_id === mediaId && p.media_type === mediaType
+      );
+
+      let newPreferences;
+      if (existingIndex >= 0) {
+        // Update existing preference
+        newPreferences = [...currentPreferences];
+        newPreferences[existingIndex] = {
+          media_id: mediaId,
+          media_type: mediaType,
+          preference,
+          timestamp: data.updated_at,
+        };
+      } else {
+        // Add new preference
+        newPreferences = [...currentPreferences, {
+          media_id: mediaId,
+          media_type: mediaType,
+          preference,
+          timestamp: data.updated_at,
+        }];
+      }
+
+      setUserSettings(currentSettings => ({
+        ...currentSettings,
+        content_preferences: newPreferences
+      }));
+
     } catch (error) {
       console.error('Error updating content preferences:', error);
       throw error;
@@ -362,13 +401,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const removeContentPreference = async (mediaId: number, mediaType: string) => {
     if (!user) return;
 
-    const currentPreferences = userSettings?.content_preferences || [];
-    const newPreferences = currentPreferences.filter(
-      p => !(p.media_id === mediaId && p.media_type === mediaType)
-    );
-
     try {
-      await updateUserSettings({ content_preferences: newPreferences });
+      // Delete from user_content_preferences table
+      const { error } = await supabase
+        .from('user_content_preferences')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('media_id', mediaId)
+        .eq('media_type', mediaType);
+
+      if (error) throw error;
+
+      // Update the local userSettings to reflect the removal
+      const currentPreferences = userSettings?.content_preferences || [];
+      const newPreferences = currentPreferences.filter(
+        p => !(p.media_id === mediaId && p.media_type === mediaType)
+      );
+
+      setUserSettings(currentSettings => ({
+        ...currentSettings,
+        content_preferences: newPreferences
+      }));
+
     } catch (error) {
       console.error('Error removing content preference:', error);
       throw error;
