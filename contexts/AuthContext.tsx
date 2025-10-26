@@ -343,16 +343,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const addContentPreference = async (mediaId: number, mediaType: string, preference: 'like' | 'dislike') => {
-    if (!user) {
-      console.error('addContentPreference: No user logged in');
-      return;
+    if (!user) return;
+
+    // Always update local state immediately for smooth UX
+    const currentPreferences = userSettings?.content_preferences || [];
+    const existingIndex = currentPreferences.findIndex(
+      p => p.media_id === mediaId && p.media_type === mediaType
+    );
+
+    let newPreferences;
+    if (existingIndex >= 0) {
+      // Update existing preference
+      newPreferences = [...currentPreferences];
+      newPreferences[existingIndex] = {
+        media_id: mediaId,
+        media_type: mediaType,
+        preference,
+        timestamp: new Date().toISOString(),
+      };
+    } else {
+      // Add new preference
+      newPreferences = [...currentPreferences, {
+        media_id: mediaId,
+        media_type: mediaType,
+        preference,
+        timestamp: new Date().toISOString(),
+      }];
     }
 
-    console.log('addContentPreference: Adding preference for', { mediaId, mediaType, preference, userId: user.id });
+    // Update local state immediately
+    setUserSettings(currentSettings => ({
+      ...currentSettings,
+      content_preferences: newPreferences
+    }));
 
+    // Store in localStorage as backup
+    const localPrefs = JSON.parse(localStorage.getItem('user_content_preferences') || '[]');
+    const existingLocalIndex = localPrefs.findIndex(
+      (p: any) => p.media_id === mediaId && p.media_type === mediaType
+    );
+
+    if (existingLocalIndex >= 0) {
+      localPrefs[existingLocalIndex] = {
+        media_id: mediaId,
+        media_type: mediaType,
+        preference,
+        timestamp: new Date().toISOString(),
+      };
+    } else {
+      localPrefs.push({
+        media_id: mediaId,
+        media_type: mediaType,
+        preference,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    localStorage.setItem('user_content_preferences', JSON.stringify(localPrefs));
+
+    // Try to sync with database (but don't fail if it's not available)
     try {
-      // Upsert to user_content_preferences table
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('user_content_preferences')
         .upsert({
           user_id: user.id,
@@ -360,51 +410,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           media_type: mediaType,
           preference: preference,
           updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+        });
 
       if (error) {
-        console.error('addContentPreference: Database error:', error);
-        throw error;
+        console.warn('Database sync failed, but local storage works:', error.message);
       }
-
-      console.log('addContentPreference: Successfully added/updated preference:', data);
-
-      // Update the local userSettings to reflect the change
-      const currentPreferences = userSettings?.content_preferences || [];
-      const existingIndex = currentPreferences.findIndex(
-        p => p.media_id === mediaId && p.media_type === mediaType
-      );
-
-      let newPreferences;
-      if (existingIndex >= 0) {
-        // Update existing preference
-        newPreferences = [...currentPreferences];
-        newPreferences[existingIndex] = {
-          media_id: mediaId,
-          media_type: mediaType,
-          preference,
-          timestamp: data.updated_at,
-        };
-      } else {
-        // Add new preference
-        newPreferences = [...currentPreferences, {
-          media_id: mediaId,
-          media_type: mediaType,
-          preference,
-          timestamp: data.updated_at,
-        }];
-      }
-
-      setUserSettings(currentSettings => ({
-        ...currentSettings,
-        content_preferences: newPreferences
-      }));
-
-    } catch (error) {
-      console.error('Error updating content preferences:', error);
-      throw error;
+    } catch (syncError) {
+      console.warn('Failed to sync to database, but preference saved locally');
     }
   };
 

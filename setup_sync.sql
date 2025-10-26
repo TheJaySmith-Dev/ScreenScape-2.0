@@ -74,6 +74,11 @@ CREATE POLICY "Users can update own settings" ON public.user_settings
   FOR UPDATE USING (auth.uid() = id);
 
 -- Create RLS policies for user_content_preferences
+DROP POLICY IF EXISTS "Users can view own content preferences" ON public.user_content_preferences;
+DROP POLICY IF EXISTS "Users can insert own content preferences" ON public.user_content_preferences;
+DROP POLICY IF EXISTS "Users can update own content preferences" ON public.user_content_preferences;
+DROP POLICY IF EXISTS "Users can delete own content preferences" ON public.user_content_preferences;
+
 CREATE POLICY "Users can view own content preferences" ON public.user_content_preferences
   FOR SELECT USING (auth.uid() = user_id);
 
