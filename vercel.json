@@ -8,16 +8,16 @@
   },
   "functions": {
     "api/createLinkCode.ts": {
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node"
     },
     "api/linkDevice.ts": {
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node"
     },
     "api/sendUpdate.ts": {
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node"
     },
     "api/fetchState.ts": {
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node"
     }
   },
   "rewrites": [
