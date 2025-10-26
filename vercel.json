@@ -6,7 +6,22 @@
   "env": {
     "NODE_ENV": "production"
   },
+  "functions": {
+    "api/createLinkCode.ts": {
+      "runtime": "nodejs18.x"
+    },
+    "api/linkDevice.ts": {
+      "runtime": "nodejs18.x"
+    },
+    "api/sendUpdate.ts": {
+      "runtime": "nodejs18.x"
+    },
+    "api/fetchState.ts": {
+      "runtime": "nodejs18.x"
+    }
+  },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

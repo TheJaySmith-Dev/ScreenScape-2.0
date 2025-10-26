@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useDeviceSync } from '../hooks/useDeviceSync';
 
 interface UserPreference {
   media_id: number;
@@ -71,6 +72,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [gameProgress, setGameProgress] = useState<GameProgress>({});
+
+  // Sync hook for device-to-device sync
+  const { syncState, sendUpdate, preferences: syncPreferences } = useDeviceSync();
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -239,6 +243,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     );
     return preference ? preference.preference : null;
   };
+
+  // Auto-sync when data changes (only for connected devices)
+  useEffect(() => {
+    const syncData = async () => {
+      if (syncState.isConnected && !syncState.isSyncing) {
+        const preferences = {
+          userSettings,
+          watchlist,
+          searchHistory,
+          gameProgress
+        };
+
+        // Include current timestamp for last write wins merging
+        preferences.userSettings = {
+          ...userSettings,
+          updated_at: new Date().toISOString()
+        };
+
+        await sendUpdate(preferences);
+      }
+    };
+
+    if (userSettings || watchlist.length || searchHistory.length || Object.keys(gameProgress).length) {
+      const timeoutId = setTimeout(syncData, 1000); // Debounce syncs
+      return () => clearTimeout(timeoutId);
+    }
+  }, [userSettings, watchlist, searchHistory, gameProgress, syncState.isConnected, syncState.isSyncing, sendUpdate]);
+
+  // Handle incoming sync data - apply synced preferences to local state
+  useEffect(() => {
+    if (syncState.isConnected && syncPreferences) {
+      console.log('Applying synced preferences to local state:', syncPreferences);
+
+      if (syncPreferences.userSettings) {
+        setUserSettings(syncPreferences.userSettings);
+      }
+      if (syncPreferences.watchlist) {
+        setWatchlist(syncPreferences.watchlist);
+      }
+      if (syncPreferences.searchHistory) {
+        setSearchHistory(syncPreferences.searchHistory);
+      }
+      if (syncPreferences.gameProgress) {
+        setGameProgress(syncPreferences.gameProgress);
+      }
+    }
+  }, [syncPreferences, syncState.isConnected]);
 
   const value = {
     userSettings,

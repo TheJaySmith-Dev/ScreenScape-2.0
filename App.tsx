@@ -15,6 +15,8 @@ import AIGlow from './components/AIGlow';
 import QuickJump from './components/QuickJump';
 import LiveView from './components/LiveView.tsx';
 import SportsView from './components/SportsView';
+import GenerateLinkCode from './components/GenerateLinkCode';
+import EnterLinkCode from './components/EnterLinkCode';
 
 
 import { useAuth } from './contexts/AuthContext';
@@ -31,6 +33,8 @@ const MainContainer = styled.main`
     }
 `;
 
+type SyncViewType = 'none' | 'generate' | 'enter';
+
 const App: React.FC = () => {
     const { userSettings, updateUserSettings } = useAuth();
     const [apiKey, setApiKey] = useState<string | null>('09b97a49759876f2fde9eadb163edc44');
@@ -41,6 +45,7 @@ const App: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
+    const [syncView, setSyncView] = useState<SyncViewType>('none');
 
     const handleInvalidApiKey = useCallback(() => {
         localStorage.removeItem('tmdb_api_key');
@@ -115,13 +120,33 @@ const App: React.FC = () => {
         <ImageGeneratorProvider>
             <div className="bg-primary text-white min-h-screen font-sans">
                 <AIGlow status={aiStatus} />
-                {!selectedItem && <Header view={view} setView={setView} onSettingsClick={() => setIsSettingsOpen(true)} />}
+                {!selectedItem && <Header
+                    view={view}
+                    setView={setView}
+                    onSettingsClick={() => setIsSettingsOpen(true)}
+                    onSyncClick={() => setSyncView(current => current === 'none' ? 'generate' : 'none')}
+                />}
 
                 <MainContainer>
                     {renderView()}
                 </MainContainer>
 
                 {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} />}
+
+                {/* Sync Components */}
+                {syncView === 'generate' && (
+                    <GenerateLinkCode
+                        onBack={() => setSyncView('none')}
+                        deviceName="Device A"
+                    />
+                )}
+                {syncView === 'enter' && (
+                    <EnterLinkCode
+                        onBack={() => setSyncView('none')}
+                        onConnected={() => setSyncView('none')}
+                        deviceName="Device B"
+                    />
+                )}
 
                 <AIAssistant tmdbApiKey={apiKey} setAiStatus={setAiStatus} />
                 <TypeToAssist tmdbApiKey={apiKey} />

@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
-import { FaHome, FaSearch, FaCog, FaGamepad, FaPlay, FaListUl } from 'react-icons/fa';
+import { FaHome, FaSearch, FaCog, FaGamepad, FaPlay, FaListUl, FaSync } from 'react-icons/fa';
 import { ViewType } from '../App';
 import { useImageGenerator } from '../contexts/ImageGeneratorContext';
+import { useDeviceSync } from '../hooks/useDeviceSync';
 
 interface HeaderProps {
     view: ViewType;
     setView: (view: ViewType) => void;
     onSettingsClick: () => void;
+    onSyncClick?: () => void;
 }
 
 interface NavItem {
@@ -103,9 +105,10 @@ const NavIcon = styled.div<{ view: ViewType; currentView: ViewType }>`
     }
 `;
 
-const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
+const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncClick }) => {
     const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
     const { selectedModel } = useImageGenerator();
+    const { syncState, disconnect } = useDeviceSync();
 
     useEffect(() => {
         const handleResize = () => {
@@ -146,6 +149,72 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
 
     return (
         <>
+            {/* Sync Status Indicator */}
+            <motion.div
+                style={{
+                    position: 'fixed',
+                    top: 20,
+                    right: 20,
+                    zIndex: 60,
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+            >
+                <div
+                    style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '16px',
+                        background: syncState.isConnected
+                            ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1))'
+                            : 'rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(12px)',
+                        border: syncState.isConnected
+                            ? '1px solid rgba(34, 197, 94, 0.3)'
+                            : '1px solid rgba(148, 163, 184, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                    }}
+                    onClick={() => {
+                        if (onSyncClick) {
+                            onSyncClick();
+                        }
+                    }}
+                    title={syncState.isConnected ? `Synced (${syncState.deviceCount} devices)` : 'Not synced'}
+                >
+                    <motion.div
+                        animate={syncState.isSyncing ? { rotate: 360 } : {}}
+                        transition={syncState.isSyncing ? { duration: 1, repeat: Infinity, ease: 'linear' } : {}}
+                        style={{
+                            color: syncState.isConnected ? '#22c55e' : '#94a3b8',
+                            fontSize: '18px',
+                        }}
+                    >
+                        <FaSync />
+                    </motion.div>
+                    {syncState.isConnected && (
+                        <motion.div
+                            style={{
+                                position: 'absolute',
+                                top: 2,
+                                right: 2,
+                                width: 12,
+                                height: 12,
+                                backgroundColor: '#22c55e',
+                                borderRadius: '50%',
+                                border: '2px solid rgba(15, 23, 42, 0.8)',
+                            }}
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+                        />
+                    )}
+                </div>
+            </motion.div>
+
             <NavContainer isDesktop={isDesktop}>
                 {currentNavItems.map((item) => (
                     <NavButton
