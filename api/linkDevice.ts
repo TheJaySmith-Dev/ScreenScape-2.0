@@ -14,12 +14,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { linkCode, deviceName } = req.body;
 
-    if (!linkCode || linkCode.length !== 8) {
+    // Clean the link code by removing spaces and converting to uppercase
+    const cleanLinkCode = linkCode.replace(/\s/g, '').toUpperCase();
+
+    if (!cleanLinkCode || cleanLinkCode.length !== 8) {
       return res.status(400).json({ error: 'Invalid link code format' });
     }
 
     // Get the sync session from Redis
-    const sessionData = await redis.get(`sync_session_${linkCode}`);
+    const sessionData = await redis.get(`sync_session_${cleanLinkCode}`);
     if (!sessionData) {
       return res.status(404).json({ error: 'Link code not found or expired' });
     }
@@ -29,7 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Check if session expired (15 minutes) - though Redis TTL should handle this
     if (Date.now() - session.createdAt > 15 * 60 * 1000) {
-      await redis.del(`sync_session_${linkCode}`);
+      await redis.del(`sync_session_${cleanLinkCode}`);
       return res.status(404).json({ error: 'Link code expired' });
     }
 
@@ -41,9 +44,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     session.deviceCount = 2;
 
     // Store updated session back in Redis
-    await redis.setex(`sync_session_${linkCode}`, 15 * 60, JSON.stringify(session));
+    await redis.setex(`sync_session_${cleanLinkCode}`, 15 * 60, JSON.stringify(session));
 
-    console.log(`Device ${deviceName} linked to session: ${linkCode}`);
+    console.log(`Device ${deviceName} linked to session: ${cleanLinkCode}`);
 
     return res.status(200).json({
       deviceToken,
