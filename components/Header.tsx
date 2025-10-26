@@ -360,12 +360,12 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                 </motion.div>
             )}
 
-            {/* User Menu */}
-            {showUserMenu && (
+            {/* User Menu - Desktop */}
+            {showUserMenu && isDesktop && (
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
                     onClick={handleUserMenuClose}
                     style={{
                         position: 'fixed',
@@ -373,20 +373,18 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        background: 'rgba(0, 0, 0, 0.5)',
-                        backdropFilter: 'blur(4px)',
-                        display: 'flex',
-                        alignItems: isDesktop ? 'flex-start' : 'flex-end',
-                        justifyContent: 'center',
+                        background: 'transparent',
                         zIndex: 70,
-                        padding: isDesktop ? '80px 24px 0 0' : '0 20px 120px 20px',
                     }}
                 >
                     <motion.div
                         onClick={(e) => e.stopPropagation()}
-                        initial={{ y: -20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
                         style={{
+                            position: 'absolute',
+                            top: 80,
+                            right: 24,
                             background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)',
                             backdropFilter: 'blur(24px)',
                             borderRadius: 16,
@@ -394,7 +392,7 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                             padding: 16,
                             minWidth: 200,
                             boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
-                            position: 'relative',
+                            zIndex: 80,
                         }}
                     >
                         {/* User Info Section */}
@@ -436,6 +434,106 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick }) => {
                             <motion.button
                                 onClick={handleSignOut}
                                 whileHover={{ backgroundColor: 'rgba(239, 68, 68, 0.2)' }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    padding: 12,
+                                    borderRadius: 8,
+                                    background: 'transparent',
+                                    color: '#ef4444',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: 14,
+                                    justifyContent: 'flex-start',
+                                    gap: 12,
+                                }}
+                            >
+                                <FaSignOutAlt style={{ fontSize: 16 }} />
+                                Sign Out
+                            </motion.button>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )}
+
+            {/* User Menu - Mobile */}
+            {showUserMenu && !isDesktop && (
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    onClick={handleUserMenuClose}
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0, 0, 0, 0.5)',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'flex-end',
+                        justifyContent: 'center',
+                        zIndex: 70,
+                        padding: '0 20px 120px 20px',
+                    }}
+                >
+                    <motion.div
+                        onClick={(e) => e.stopPropagation()}
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)',
+                            backdropFilter: 'blur(24px)',
+                            borderRadius: 16,
+                            border: '1px solid rgba(51, 65, 85, 0.3)',
+                            padding: 16,
+                            width: '100%',
+                            maxWidth: 320,
+                            boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+                        }}
+                    >
+                        {/* User Info Section */}
+                        <div style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: 12 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 4 }}>
+                                {user?.email || 'User'}
+                            </div>
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+                                Signed in
+                            </div>
+                        </div>
+
+                        {/* Menu Items */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <motion.button
+                                onClick={() => {
+                                    onSettingsClick();
+                                    handleUserMenuClose();
+                                }}
+                                whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
+                                whileTap={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    padding: 12,
+                                    borderRadius: 8,
+                                    background: 'transparent',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: 14,
+                                    justifyContent: 'flex-start',
+                                    gap: 12,
+                                }}
+                            >
+                                <FaCog style={{ fontSize: 16 }} />
+                                Settings
+                            </motion.button>
+
+                            <motion.button
+                                onClick={handleSignOut}
+                                whileHover={{ backgroundColor: 'rgba(239, 68, 68, 0.2)' }}
+                                whileTap={{ backgroundColor: 'rgba(239, 68, 68, 0.3)' }}
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',
