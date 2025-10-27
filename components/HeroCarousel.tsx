@@ -140,9 +140,36 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
             <div className="relative h-full flex flex-col justify-end container mx-auto px-4 sm:px-6 lg:px-8 pb-32 sm:pb-28 md:pb-40 z-10">
                 {activeItem && (
                     <div className="w-full md:w-1/2 lg:w-2/5 max-w-2xl animate-fade-in-up space-y-4 mt-16 sm:mt-0">
-                        <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold drop-shadow-lg leading-tight">
-                            {activeItem.media_type === 'movie' ? activeItem.title : (activeItem as TVShow).name}
-                        </h2>
+                        {showAvailability && activeAvailability && activeAvailability.flatrate && activeAvailability.flatrate.length > 0 ? (
+                            <div className="space-y-2">
+                                <div className="flex flex-wrap gap-3 items-center">
+                                    {activeAvailability.flatrate.slice(0, 4).map(provider => (
+                                        <div
+                                            key={`main-provider-${provider.provider_id}`}
+                                            className="relative group"
+                                            title={`${provider.provider_name}: Shows available to stream`}
+                                        >
+                                            <img
+                                                src={`https://image.tmdb.org/t/p/original${provider.logo_path}`}
+                                                alt={provider.provider_name}
+                                                className="h-12 sm:h-14 md:h-16 w-auto object-contain rounded-lg shadow-lg"
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = 'none';
+                                                }}
+                                            />
+                                            <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                        </div>
+                                    ))}
+                                </div>
+                                <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold drop-shadow-lg leading-tight">
+                                    {activeItem.media_type === 'movie' ? activeItem.title : (activeItem as TVShow).name}
+                                </h2>
+                            </div>
+                        ) : (
+                            <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold drop-shadow-lg leading-tight">
+                                {activeItem.media_type === 'movie' ? activeItem.title : (activeItem as TVShow).name}
+                            </h2>
+                        )}
                         <p className="text-base sm:text-lg text-slate-200 line-clamp-4 sm:line-clamp-3 drop-shadow-md">
                             {activeItem.overview}
                         </p>
