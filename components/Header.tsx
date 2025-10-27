@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
-import { FaHome, FaSearch, FaCog, FaGamepad, FaPlay, FaListUl, FaSync, FaHeart, FaRobot } from 'react-icons/fa';
+import { FaHome, FaSearch, FaCog, FaGamepad, FaPlay, FaListUl, FaSync, FaHeart, FaRobot, FaUser } from 'react-icons/fa';
 import { ViewType } from '../App';
 import { useImageGenerator } from '../contexts/ImageGeneratorContext';
 import { useDeviceSync } from '../hooks/useDeviceSync';
@@ -136,14 +136,16 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncC
         { viewName: 'game', icon: FaGamepad, label: 'Games' },
     ];
 
-    // For mobile, collapse less-used items
-    const mobileItems: NavItem[] = [...navItems.slice(0, 5), {
-        viewName: 'more',
-        icon: FaCog,
-        label: 'More',
-    }];
+    // For mobile, show only 4 items: Home, Explore, Live, Likes
+    const mobileItems: NavItem[] = [
+        { viewName: 'screenSearch', icon: FaHome, label: 'Home' },
+        { viewName: 'explore', icon: FaSearch, label: 'Explore' },
+        { viewName: 'live', icon: FaPlay, label: 'Live', pulse: true },
+        { viewName: 'likes', icon: FaHeart, label: 'Likes' },
+    ];
 
     const [showMore, setShowMore] = useState(false);
+    const [showUserPanel, setShowUserPanel] = useState(false);
 
     const handleNavClick = (viewName: ViewType | 'more') => {
         if (viewName === 'more') {
@@ -157,71 +159,73 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncC
 
     return (
         <>
-            {/* Sync Status Indicator */}
-            <motion.div
-                style={{
-                    position: 'fixed',
-                    top: 20,
-                    right: 20,
-                    zIndex: 60,
-                }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-            >
-                <div
+            {/* Sync Status Indicator - Desktop Only */}
+            {isDesktop && (
+                <motion.div
                     style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: '16px',
-                        background: syncState.isConnected
-                            ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1))'
-                            : 'rgba(255, 255, 255, 0.1)',
-                        backdropFilter: 'blur(12px)',
-                        border: syncState.isConnected
-                            ? '1px solid rgba(34, 197, 94, 0.3)'
-                            : '1px solid rgba(148, 163, 184, 0.2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                        position: 'fixed',
+                        top: 20,
+                        right: 20,
+                        zIndex: 60,
                     }}
-                    onClick={() => {
-                        if (onSyncClick) {
-                            onSyncClick();
-                        }
-                    }}
-                    title={syncState.isConnected ? `Synced (${syncState.deviceCount} devices)` : 'Not synced'}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                 >
-                    <motion.div
-                        animate={syncState.isSyncing ? { rotate: 360 } : {}}
-                        transition={syncState.isSyncing ? { duration: 1, repeat: Infinity, ease: 'linear' } : {}}
+                    <div
                         style={{
-                            color: syncState.isConnected ? '#22c55e' : '#94a3b8',
-                            fontSize: '18px',
+                            width: 48,
+                            height: 48,
+                            borderRadius: '16px',
+                            background: syncState.isConnected
+                                ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1))'
+                                : 'rgba(255, 255, 255, 0.1)',
+                            backdropFilter: 'blur(12px)',
+                            border: syncState.isConnected
+                                ? '1px solid rgba(34, 197, 94, 0.3)'
+                                : '1px solid rgba(148, 163, 184, 0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
                         }}
+                        onClick={() => {
+                            if (onSyncClick) {
+                                onSyncClick();
+                            }
+                        }}
+                        title={syncState.isConnected ? `Synced (${syncState.deviceCount} devices)` : 'Not synced'}
                     >
-                        <FaSync />
-                    </motion.div>
-                    {syncState.isConnected && (
                         <motion.div
+                            animate={syncState.isSyncing ? { rotate: 360 } : {}}
+                            transition={syncState.isSyncing ? { duration: 1, repeat: Infinity, ease: 'linear' } : {}}
                             style={{
-                                position: 'absolute',
-                                top: 2,
-                                right: 2,
-                                width: 12,
-                                height: 12,
-                                backgroundColor: '#22c55e',
-                                borderRadius: '50%',
-                                border: '2px solid rgba(15, 23, 42, 0.8)',
+                                color: syncState.isConnected ? '#22c55e' : '#94a3b8',
+                                fontSize: '18px',
                             }}
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-                        />
-                    )}
-                </div>
-            </motion.div>
+                        >
+                            <FaSync />
+                        </motion.div>
+                        {syncState.isConnected && (
+                            <motion.div
+                                style={{
+                                    position: 'absolute',
+                                    top: 2,
+                                    right: 2,
+                                    width: 12,
+                                    height: 12,
+                                    backgroundColor: '#22c55e',
+                                    borderRadius: '50%',
+                                    border: '2px solid rgba(15, 23, 42, 0.8)',
+                                }}
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+                            />
+                        )}
+                    </div>
+                </motion.div>
+            )}
 
             <NavContainer isDesktop={isDesktop}>
                 {currentNavItems.map((item) => (
@@ -404,6 +408,116 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncC
                     </motion.div>
                 )}
             </motion.div>
+
+            {/* User Button for Mobile */}
+            {!isDesktop && (
+                <motion.div style={{ position: 'relative' }}>
+                    <motion.button
+                        style={{
+                            position: 'fixed',
+                            top: 20,
+                            right: 20,
+                            zIndex: 60,
+                            width: 48,
+                            height: 48,
+                            borderRadius: '16px',
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            backdropFilter: 'blur(12px)',
+                            border: '1px solid rgba(148, 163, 184, 0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                            color: 'white',
+                        }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowUserPanel(!showUserPanel)}
+                        title="User Menu"
+                    >
+                        <FaUser style={{ fontSize: '18px' }} />
+                    </motion.button>
+
+                    {showUserPanel && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                            style={{
+                                position: 'fixed',
+                                top: 80,
+                                right: 20,
+                                zIndex: 65,
+                                width: 180,
+                                background: 'rgba(255, 255, 255, 0.15)',
+                                backdropFilter: 'blur(24px)',
+                                borderRadius: 16,
+                                border: '1px solid rgba(148, 163, 184, 0.3)',
+                                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
+                            }}
+                        >
+                            <div style={{ padding: '16px' }}>
+                                <div style={{ fontSize: '14px', fontWeight: '600', color: 'white', marginBottom: '12px' }}>
+                                    User Menu
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <button
+                                        onClick={() => {
+                                            onSettingsClick();
+                                            setShowUserPanel(false);
+                                        }}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 16px',
+                                            borderRadius: '8px',
+                                            background: 'rgba(139, 69, 19, 0.2)',
+                                            border: '1px solid rgba(139, 69, 19, 0.3)',
+                                            color: 'white',
+                                            fontSize: '14px',
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'rgba(139, 69, 19, 0.3)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(139, 69, 19, 0.2)';
+                                        }}
+                                    >
+                                        ⚙️ Settings
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (onSyncClick) onSyncClick();
+                                            setShowUserPanel(false);
+                                        }}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 16px',
+                                            borderRadius: '8px',
+                                            background: 'rgba(34, 197, 94, 0.2)',
+                                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                                            color: 'white',
+                                            fontSize: '14px',
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'rgba(34, 197, 94, 0.3)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(34, 197, 94, 0.2)';
+                                        }}
+                                    >
+                                        📡 Sync Devices
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </motion.div>
+            )}
 
             {/* Desktop Settings Button */}
             {isDesktop && (
