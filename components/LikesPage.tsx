@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { MediaItem, Movie } from '../types';
 import { FaHeart, FaThumbsDown } from 'react-icons/fa';
-import { useDeviceSync } from '../hooks/useDeviceSync';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LikesPageProps {
   apiKey: string;
@@ -10,14 +10,21 @@ interface LikesPageProps {
 }
 
 const LikesPage: React.FC<LikesPageProps> = ({ apiKey, onSelectItem, onInvalidApiKey }) => {
-  const { preferences } = useDeviceSync();
+  const { userSettings } = useAuth();
   const [likedMovies, setLikedMovies] = useState<MediaItem[]>([]);
   const [dislikedMovies, setDislikedMovies] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Get movie IDs from sync preferences
-  const likedMovieIds = useMemo(() => preferences.likedMovies || [], [preferences.likedMovies]);
-  const dislikedMovieIds = useMemo(() => preferences.dislikedMovies || [], [preferences.dislikedMovies]);
+  // Get movie IDs from content preferences
+  const contentPrefs = userSettings?.content_preferences || [];
+  const likedMovieIds = useMemo(() =>
+    contentPrefs.filter(p => p.preference === 'like').map(p => p.media_id),
+    [contentPrefs]
+  );
+  const dislikedMovieIds = useMemo(() =>
+    contentPrefs.filter(p => p.preference === 'dislike').map(p => p.media_id),
+    [contentPrefs]
+  );
 
   useEffect(() => {
     const fetchLikedMoviesData = async () => {
