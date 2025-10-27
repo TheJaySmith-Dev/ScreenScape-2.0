@@ -137,9 +137,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                 style={{ backdropFilter: 'blur(2px)' }}
             />
 
-            <div className="relative h-full flex flex-col justify-end container mx-auto px-4 sm:px-6 lg:px-8 pb-16 sm:pb-20 md:pb-60 lg:pb-80 z-10">
+            <div className="relative h-full flex flex-col justify-end container mx-auto px-4 sm:px-6 lg:px-8 pb-20 sm:pb-28 md:pb-40 z-10">
                 {activeItem && (
-                    <div className="w-full md:w-3/5 lg:w-1/2 xl:w-2/5 max-w-3xl mx-auto md:ml-0 animate-fade-in-up space-y-4">
+                    <div className="w-full md:w-1/2 lg:w-2/5 max-w-2xl animate-fade-in-up space-y-4">
                         <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold drop-shadow-lg leading-tight">
                             {activeItem.media_type === 'movie' ? activeItem.title : (activeItem as TVShow).name}
                         </h2>
