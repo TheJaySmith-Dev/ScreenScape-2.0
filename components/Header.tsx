@@ -25,7 +25,7 @@ interface NavItem {
 
 const NavContainer = styled.nav<{ isDesktop: boolean }>`
     position: fixed;
-    bottom: ${({ isDesktop }) => (isDesktop ? 'auto' : '20px')}; /* Float at bottom with safe area */
+    bottom: ${({ isDesktop }) => (isDesktop ? 'auto' : 'max(20px, env(safe-area-inset-bottom, 0px) + 8px)')}; /* Float at bottom with safe area */
     left: ${({ isDesktop }) => (isDesktop ? '0' : '50%')};
     top: ${({ isDesktop }) => (isDesktop ? '50%' : 'auto')};
     transform: ${({ isDesktop }) => (isDesktop ? 'translateY(-50%)' : 'translateX(-50%)')};
@@ -53,9 +53,11 @@ const NavContainer = styled.nav<{ isDesktop: boolean }>`
     }
     background: ${({ isDesktop }) => isDesktop
         ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)'
-        : 'rgba(255, 255, 255, 0.1)'
+        : 'rgba(255, 255, 255, 0.15)'
     };
     backdrop-filter: ${({ isDesktop }) => isDesktop ? 'blur(24px)' : 'blur(12px)'};
+    /* Fallback for browsers that don't support backdrop-filter */
+    -webkit-backdrop-filter: ${({ isDesktop }) => isDesktop ? 'blur(24px)' : 'blur(12px)'};
     border-radius: ${({ isDesktop }) => (isDesktop ? '24px' : '40px')};
     border: ${({ isDesktop }) => isDesktop
         ? '1px solid rgba(51, 65, 85, 0.3)'
