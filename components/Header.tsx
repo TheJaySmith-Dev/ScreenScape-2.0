@@ -285,6 +285,36 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncC
                 ))}
             </NavContainer>
 
+            {/* Desktop Settings Button */}
+            {isDesktop && (
+                <motion.button
+                    style={{
+                        position: 'fixed',
+                        top: 20,
+                        right: 80, // Next to the sync button
+                        zIndex: 60,
+                        width: 48,
+                        height: 48,
+                        borderRadius: '16px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                        color: 'white',
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={onSettingsClick}
+                    title="Settings"
+                >
+                    <FaCog style={{ fontSize: '18px' }} />
+                </motion.button>
+            )}
+
             {/* More Menu for Mobile */}
             {showMore && !isDesktop && (
                 <motion.div
