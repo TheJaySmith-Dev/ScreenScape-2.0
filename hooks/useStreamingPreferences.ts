@@ -48,6 +48,31 @@ export const useStreamingPreferences = () => {
     }
   }, [user, userSettings, updateUserSettings]);
 
+  // Listen for import events to refresh streaming preferences
+  useEffect(() => {
+    const handlePreferencesChanged = () => {
+      console.log('🎬 Streaming preferences changed, reloading from localStorage');
+      setProviderIds(getStoredSet());
+    };
+
+    window.addEventListener('streamingPreferencesChanged', handlePreferencesChanged);
+
+    // Also listen for storage changes from other tabs
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === PREFERENCES_KEY) {
+        console.log('📱 Storage change detected for streaming preferences');
+        setProviderIds(getStoredSet());
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('streamingPreferencesChanged', handlePreferencesChanged);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
   const toggleProvider = useCallback(async (providerId: number) => {
     setProviderIds(prev => {
       const newSet = new Set(prev);
