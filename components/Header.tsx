@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
-import { FaHome, FaSearch, FaCog, FaGamepad, FaPlay, FaListUl, FaSync, FaHeart } from 'react-icons/fa';
+import { FaHome, FaSearch, FaCog, FaGamepad, FaPlay, FaListUl, FaSync, FaHeart, FaRobot } from 'react-icons/fa';
 import { ViewType } from '../App';
 import { useImageGenerator } from '../contexts/ImageGeneratorContext';
 import { useDeviceSync } from '../hooks/useDeviceSync';
@@ -115,6 +115,7 @@ const NavIcon = styled.div<{ view: ViewType; currentView: ViewType }>`
 
 const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncClick }) => {
     const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+    const [showAIPanel, setShowAIPanel] = useState(false);
     const { selectedModel } = useImageGenerator();
     const { syncState, disconnect } = useDeviceSync();
 
@@ -133,7 +134,6 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncC
         { viewName: 'live', icon: FaPlay, label: 'Live', pulse: true },
         { viewName: 'likes', icon: FaHeart, label: 'Likes' },
         { viewName: 'game', icon: FaGamepad, label: 'Games' },
-        { viewName: 'sports', icon: FaPlay, label: 'Sports' },
     ];
 
     // For mobile, collapse less-used items
@@ -292,6 +292,120 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncC
                     </NavButton>
                 ))}
             </NavContainer>
+
+            {/* AI Button with Panel */}
+            {isDesktop && (
+                <motion.div style={{ position: 'relative' }}>
+                    <motion.button
+                        style={{
+                            position: 'fixed',
+                            top: 20,
+                            right: 140,
+                            zIndex: 60,
+                            width: 48,
+                            height: 48,
+                            borderRadius: '16px',
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            backdropFilter: 'blur(12px)',
+                            border: '1px solid rgba(148, 163, 184, 0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                            color: 'white',
+                        }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowAIPanel(!showAIPanel)}
+                        title="AI Assistant"
+                    >
+                        <FaRobot style={{ fontSize: '18px' }} />
+                    </motion.button>
+
+                    {showAIPanel && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                            style={{
+                                position: 'fixed',
+                                top: 80,
+                                right: 20,
+                                zIndex: 65,
+                                width: 200,
+                                background: 'rgba(255, 255, 255, 0.15)',
+                                backdropFilter: 'blur(24px)',
+                                borderRadius: 16,
+                                border: '1px solid rgba(148, 163, 184, 0.3)',
+                                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
+                            }}
+                        >
+                            <div style={{ padding: '16px' }}>
+                                <div style={{ fontSize: '14px', fontWeight: '600', color: 'white', marginBottom: '12px' }}>
+                                    AI Assistant
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <button
+                                        onClick={() => {
+                                            // Trigger Type to AI
+                                            const event = new CustomEvent('openTypeToAI');
+                                            window.dispatchEvent(event);
+                                            setShowAIPanel(false);
+                                        }}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 16px',
+                                            borderRadius: '8px',
+                                            background: 'rgba(34, 197, 94, 0.2)',
+                                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                                            color: 'white',
+                                            fontSize: '14px',
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'rgba(34, 197, 94, 0.3)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(34, 197, 94, 0.2)';
+                                        }}
+                                    >
+                                        ✍️ Type to AI
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            // Trigger Voice AI
+                                            const event = new CustomEvent('openVoiceAI');
+                                            window.dispatchEvent(event);
+                                            setShowAIPanel(false);
+                                        }}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 16px',
+                                            borderRadius: '8px',
+                                            background: 'rgba(59, 130, 246, 0.2)',
+                                            border: '1px solid rgba(59, 130, 246, 0.3)',
+                                            color: 'white',
+                                            fontSize: '14px',
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
+                                        }}
+                                    >
+                                        🎤 Voice AI
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </motion.div>
+            )}
 
             {/* Desktop Settings Button */}
             {isDesktop && (
