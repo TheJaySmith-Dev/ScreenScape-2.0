@@ -130,7 +130,7 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncC
     ];
 
     // For mobile, collapse less-used items
-    const mobileItems: NavItem[] = [...navItems.slice(0, 4), {
+    const mobileItems: NavItem[] = [...navItems.slice(0, 5), {
         viewName: 'more',
         icon: FaCog,
         label: 'More',
