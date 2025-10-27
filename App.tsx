@@ -186,8 +186,6 @@ const App: React.FC = () => {
                     />
                 )}
 
-                <AIAssistant tmdbApiKey={apiKey} setAiStatus={setAiStatus} />
-                <TypeToAssist tmdbApiKey={apiKey} />
                 <QuickJump apiKey={apiKey} />
             </div>
         </ImageGeneratorProvider>

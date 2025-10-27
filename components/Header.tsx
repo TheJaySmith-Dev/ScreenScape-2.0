@@ -25,7 +25,7 @@ interface NavItem {
 
 const NavContainer = styled.nav<{ isDesktop: boolean }>`
     position: fixed;
-    bottom: ${({ isDesktop }) => (isDesktop ? 'auto' : '100px')}; /* Hover above AI buttons */
+    bottom: ${({ isDesktop }) => (isDesktop ? 'auto' : '20px')}; /* Float at bottom with safe area */
     left: ${({ isDesktop }) => (isDesktop ? '0' : '50%')};
     top: ${({ isDesktop }) => (isDesktop ? '50%' : 'auto')};
     transform: ${({ isDesktop }) => (isDesktop ? 'translateY(-50%)' : 'translateX(-50%)')};
@@ -51,15 +51,19 @@ const NavContainer = styled.nav<{ isDesktop: boolean }>`
                 box-sizing: border-box;
               `
     }
-    background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
-    backdrop-filter: blur(24px);
+    background: ${({ isDesktop }) => isDesktop
+        ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)'
+        : 'rgba(255, 255, 255, 0.1)'
+    };
+    backdrop-filter: ${({ isDesktop }) => isDesktop ? 'blur(24px)' : 'blur(12px)'};
     border-radius: ${({ isDesktop }) => (isDesktop ? '24px' : '40px')};
-    border: ${({ isDesktop }) => (isDesktop ? '1px solid rgba(51, 65, 85, 0.3)' : '1px solid rgba(148, 163, 184, 0.3)')};
+    border: ${({ isDesktop }) => isDesktop
+        ? '1px solid rgba(51, 65, 85, 0.3)'
+        : '1px solid rgba(148, 163, 184, 0.2)'
+    };
     min-height: ${({ isDesktop }) => (isDesktop ? 'auto' : 'auto')};
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: ${({ isDesktop }) => (isDesktop
-        ? '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
-        : '0 8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(148, 163, 184, 0.2)')};
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 `;
 
