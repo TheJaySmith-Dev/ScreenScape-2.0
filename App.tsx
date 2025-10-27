@@ -15,10 +15,9 @@ import AIGlow from './components/AIGlow';
 import QuickJump from './components/QuickJump';
 import LiveView from './components/LiveView.tsx';
 import SportsView from './components/SportsView';
-import GenerateLinkCode from './components/GenerateLinkCode';
-import EnterLinkCode from './components/EnterLinkCode';
-import DeviceSyncSelector from './components/DeviceSyncSelector';
-
+import ExportSettings from './components/ExportSettings';
+import ImportSettings from './components/ImportSettings';
+import SyncSelector from './components/SyncSelector';
 
 import { useAuth } from './contexts/AuthContext';
 import { ImageGeneratorProvider } from './contexts/ImageGeneratorContext';
@@ -34,7 +33,7 @@ const MainContainer = styled.main`
     }
 `;
 
-type SyncViewType = 'none' | 'selector' | 'generate' | 'enter';
+type SyncViewType = 'none' | 'selector' | 'export' | 'import';
 
 const App: React.FC = () => {
     const { userSettings, updateUserSettings } = useAuth();
@@ -47,6 +46,26 @@ const App: React.FC = () => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
     const [syncView, setSyncView] = useState<SyncViewType>('none');
+
+    // Get user data for export
+    const getUserData = () => ({
+      userSettings,
+      watchlist: [], // TODO: Add watchlist from state/context
+      searchHistory: [], // TODO: Add search history from state/context
+      gameProgress: {}, // TODO: Add game progress from state/context
+      exportTimestamp: Date.now()
+    });
+
+    // Handle importing data
+    const handleImportData = (importedData: any) => {
+      if (importedData.userSettings) {
+        updateUserSettings(importedData.userSettings);
+      }
+      // TODO: Update other data stores (watchlist, searchHistory, gameProgress)
+
+      // Store synced timestamp
+      localStorage.setItem('lastSyncTime', Date.now().toString());
+    };
 
     const handleInvalidApiKey = useCallback(() => {
         localStorage.removeItem('tmdb_api_key');
@@ -134,25 +153,24 @@ const App: React.FC = () => {
 
                 {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} />}
 
-                {/* Sync Components */}
+                {/* Sync Components - Simple Export/Import */}
                 {syncView === 'selector' && (
-                    <DeviceSyncSelector
-                        onGenerateClick={() => setSyncView('generate')}
-                        onEnterClick={() => setSyncView('enter')}
+                    <SyncSelector
+                        onExportClick={() => setSyncView('export')}
+                        onImportClick={() => setSyncView('import')}
                         onBack={() => setSyncView('none')}
                     />
                 )}
-                {syncView === 'generate' && (
-                    <GenerateLinkCode
-                        onBack={() => setSyncView('selector')}
-                        deviceName="Device A"
+                {syncView === 'export' && (
+                    <ExportSettings
+                        onClose={() => setSyncView('none')}
+                        userData={getUserData()}
                     />
                 )}
-                {syncView === 'enter' && (
-                    <EnterLinkCode
-                        onBack={() => setSyncView('selector')}
-                        onConnected={() => setSyncView('none')}
-                        deviceName="Device B"
+                {syncView === 'import' && (
+                    <ImportSettings
+                        onClose={() => setSyncView('none')}
+                        onImportData={handleImportData}
                     />
                 )}
 
