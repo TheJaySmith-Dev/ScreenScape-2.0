@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
-import { FaHome, FaSearch, FaCog, FaGamepad, FaPlay, FaListUl, FaSync } from 'react-icons/fa';
+import { FaHome, FaSearch, FaCog, FaGamepad, FaPlay, FaListUl, FaSync, FaHeart } from 'react-icons/fa';
 import { ViewType } from '../App';
 import { useImageGenerator } from '../contexts/ImageGeneratorContext';
 import { useDeviceSync } from '../hooks/useDeviceSync';
