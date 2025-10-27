@@ -9,9 +9,7 @@ import MediaDetail from './components/MediaDetail';
 import ApiKeySetup from './components/ApiKeySetup';
 import Settings from './components/Settings';
 import ImageGenerator from './components/ImageGenerator';
-import AIAssistant, { AIStatus } from './components/AIAssistant';
-import TypeToAssist from './components/TypeToAssist';
-import AIGlow from './components/AIGlow';
+
 import QuickJump from './components/QuickJump';
 import LiveView from './components/LiveView.tsx';
 import SportsView from './components/SportsView';
@@ -45,7 +43,7 @@ const App: React.FC = () => {
     const [selectedGame, setSelectedGame] = useState<Game | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
+
     const [syncView, setSyncView] = useState<SyncViewType>('none');
 
     // Get user data for export
@@ -151,7 +149,6 @@ const App: React.FC = () => {
     return (
         <ImageGeneratorProvider>
             <div className="bg-primary text-white min-h-screen font-sans">
-                <AIGlow status={aiStatus} />
                 {!selectedItem && <Header
                     view={view}
                     setView={setView}
@@ -186,8 +183,6 @@ const App: React.FC = () => {
                     />
                 )}
 
-                <AIAssistant tmdbApiKey={apiKey} setAiStatus={setAiStatus} />
-                <TypeToAssist tmdbApiKey={apiKey} />
                 <QuickJump apiKey={apiKey} />
             </div>
         </ImageGeneratorProvider>
