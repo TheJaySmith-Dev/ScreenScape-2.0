@@ -5,6 +5,8 @@ interface SyncPreferences {
   watchlist?: any[];
   searchHistory?: any[];
   gameProgress?: any;
+  likedMovies?: number[];
+  dislikedMovies?: number[];
 }
 
 interface SyncState {
@@ -68,6 +70,12 @@ export const useDeviceSync = () => {
           if (data.preferences.gameProgress) {
             localStorage.setItem('userGameProgress', JSON.stringify(data.preferences.gameProgress));
           }
+          if (data.preferences.likedMovies) {
+            localStorage.setItem('likedMovies', JSON.stringify(data.preferences.likedMovies));
+          }
+          if (data.preferences.dislikedMovies) {
+            localStorage.setItem('dislikedMovies', JSON.stringify(data.preferences.dislikedMovies));
+          }
         }
       };
 
@@ -104,13 +112,17 @@ export const useDeviceSync = () => {
       const savedWatchlist = localStorage.getItem('userWatchlist');
       const savedSearchHistory = localStorage.getItem('userSearchHistory');
       const savedGameProgress = localStorage.getItem('userGameProgress');
+      const savedLikedMovies = localStorage.getItem('likedMovies');
+      const savedDislikedMovies = localStorage.getItem('dislikedMovies');
 
-      if (savedSettings || savedWatchlist || savedSearchHistory || savedGameProgress) {
+      if (savedSettings || savedWatchlist || savedSearchHistory || savedGameProgress || savedLikedMovies || savedDislikedMovies) {
         setLocalPreferences({
           userSettings: savedSettings ? JSON.parse(savedSettings) : {},
           watchlist: savedWatchlist ? JSON.parse(savedWatchlist) : [],
           searchHistory: savedSearchHistory ? JSON.parse(savedSearchHistory) : [],
-          gameProgress: savedGameProgress ? JSON.parse(savedGameProgress) : {}
+          gameProgress: savedGameProgress ? JSON.parse(savedGameProgress) : {},
+          likedMovies: savedLikedMovies ? JSON.parse(savedLikedMovies) : [],
+          dislikedMovies: savedDislikedMovies ? JSON.parse(savedDislikedMovies) : []
         });
       }
     }
@@ -206,7 +218,9 @@ export const useDeviceSync = () => {
             userSettings: userData.userSettings,
             watchlist: userData.watchlist,
             searchHistory: userData.searchHistory,
-            gameProgress: userData.gameProgress
+            gameProgress: userData.gameProgress,
+            likedMovies: userData.likedMovies,
+            dislikedMovies: userData.dislikedMovies
           });
         }
 
@@ -272,6 +286,12 @@ export const useDeviceSync = () => {
       }
       if (preferences.gameProgress) {
         localStorage.setItem('userGameProgress', JSON.stringify(preferences.gameProgress));
+      }
+      if (preferences.likedMovies) {
+        localStorage.setItem('likedMovies', JSON.stringify(preferences.likedMovies));
+      }
+      if (preferences.dislikedMovies) {
+        localStorage.setItem('dislikedMovies', JSON.stringify(preferences.dislikedMovies));
       }
 
       console.log('📡 Broadcasted preferences update to other tabs');

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { MediaItem } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { MediaItem, Movie } from '../types';
 import { FaHeart, FaThumbsDown } from 'react-icons/fa';
+import { useDeviceSync } from '../hooks/useDeviceSync';
 
 interface LikesPageProps {
   apiKey: string;
@@ -9,58 +10,85 @@ interface LikesPageProps {
 }
 
 const LikesPage: React.FC<LikesPageProps> = ({ apiKey, onSelectItem, onInvalidApiKey }) => {
+  const { preferences } = useDeviceSync();
   const [likedMovies, setLikedMovies] = useState<MediaItem[]>([]);
   const [dislikedMovies, setDislikedMovies] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Get movie IDs from sync preferences
+  const likedMovieIds = useMemo(() => preferences.likedMovies || [], [preferences.likedMovies]);
+  const dislikedMovieIds = useMemo(() => preferences.dislikedMovies || [], [preferences.dislikedMovies]);
+
   useEffect(() => {
-    const loadLikesDislikes = async () => {
+    const fetchLikedMoviesData = async () => {
+      if (!likedMovieIds.length && !dislikedMovieIds.length) {
+        setLikedMovies([]);
+        setDislikedMovies([]);
+        setLoading(false);
+        return;
+      }
+
       try {
-        // Load from localStorage
-        const storedLikes = localStorage.getItem('likedMovies');
-        const storedDislikes = localStorage.getItem('dislikedMovies');
+        setLoading(true);
+        const likedMovieData: MediaItem[] = [];
+        const dislikedMovieData: MediaItem[] = [];
 
-        if (storedLikes) {
-          const likedIds = JSON.parse(storedLikes) as number[];
-          // In a real app, you'd fetch full movie details here
-          // For now, just store the IDs
-          console.log('Liked movie IDs:', likedIds);
-        }
-
-        if (storedDislikes) {
-          const dislikedIds = JSON.parse(storedDislikes) as number[];
-          console.log('Disliked movie IDs:', dislikedIds);
-        }
-
-        // For demo purposes, create some sample movies
-        const sampleLiked: MediaItem[] = [
-          {
-            id: 1,
-            title: 'The Shawshank Redemption',
-            poster_path: '/9cqNxx0GxF0bflZmeSMuL5tnGzr.jpg',
-            backdrop_path: '/kXfqcdQKsToO0OUXHcrrNCHDuH.jpg',
-            overview: 'Two imprisoned men bond...',
-            vote_average: 9.3,
-            release_date: '1994-09-23',
-            genre_ids: [18, 80],
-            media_type: 'movie'
+        // Fetch details for liked movies
+        for (const movieId of likedMovieIds) {
+          try {
+            // You would need to implement a getMovieDetails function
+            // For now, we'll create placeholder items with proper IDs
+            const placeholder: MediaItem = {
+              id: movieId,
+              title: `Movie ${movieId}`, // Would be replaced with actual title from API
+              poster_path: null,
+              backdrop_path: null,
+              overview: 'Loading...',
+              vote_average: 0,
+              popularity: 0,
+              release_date: '',
+              genre_ids: [],
+              media_type: 'movie'
+            };
+            likedMovieData.push(placeholder);
+          } catch (error) {
+            console.error(`Error fetching movie ${movieId}:`, error);
           }
-        ];
+        }
 
-        const sampleDisliked: MediaItem[] = [];
+        // Fetch details for disliked movies
+        for (const movieId of dislikedMovieIds) {
+          try {
+            const placeholder: MediaItem = {
+              id: movieId,
+              title: `Movie ${movieId}`,
+              poster_path: null,
+              backdrop_path: null,
+              overview: 'Loading...',
+              vote_average: 0,
+              popularity: 0,
+              release_date: '',
+              genre_ids: [],
+              media_type: 'movie'
+            };
+            dislikedMovieData.push(placeholder);
+          } catch (error) {
+            console.error(`Error fetching movie ${movieId}:`, error);
+          }
+        }
 
-        setLikedMovies(sampleLiked);
-        setDislikedMovies(sampleDisliked);
+        setLikedMovies(likedMovieData);
+        setDislikedMovies(dislikedMovieData);
         setLoading(false);
 
       } catch (error) {
-        console.error('Error loading likes/dislikes:', error);
+        console.error('Error loading likes/dislikes data:', error);
         setLoading(false);
       }
     };
 
-    loadLikesDislikes();
-  }, []);
+    fetchLikedMoviesData();
+  }, [likedMovieIds, dislikedMovieIds]);
 
   if (loading) {
     return (
@@ -98,7 +126,7 @@ const LikesPage: React.FC<LikesPageProps> = ({ apiKey, onSelectItem, onInvalidAp
                 <div className="aspect-[2/3] mb-3 rounded-lg overflow-hidden">
                   <img
                     src={movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '/placeholder-movie.jpg'}
-                    alt={movie.title || movie.name}
+                    alt={movie.title}
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
@@ -140,7 +168,7 @@ const LikesPage: React.FC<LikesPageProps> = ({ apiKey, onSelectItem, onInvalidAp
                 <div className="aspect-[2/3] mb-3 rounded-lg overflow-hidden opacity-50">
                   <img
                     src={movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '/placeholder-movie.jpg'}
-                    alt={movie.title || movie.name}
+                    alt={movie.title}
                     className="w-full h-full object-cover grayscale"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
