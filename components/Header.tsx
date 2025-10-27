@@ -25,10 +25,10 @@ interface NavItem {
 
 const NavContainer = styled.nav<{ isDesktop: boolean }>`
     position: fixed;
-    bottom: ${({ isDesktop }) => (isDesktop ? 'auto' : '0')};
-    left: ${({ isDesktop }) => (isDesktop ? '0' : '0')};
+    bottom: ${({ isDesktop }) => (isDesktop ? 'auto' : '100px')}; /* Hover above AI buttons */
+    left: ${({ isDesktop }) => (isDesktop ? '0' : '50%')};
     top: ${({ isDesktop }) => (isDesktop ? '50%' : 'auto')};
-    transform: ${({ isDesktop }) => (isDesktop ? 'translateY(-50%)' : 'none')};
+    transform: ${({ isDesktop }) => (isDesktop ? 'translateY(-50%)' : 'translateX(-50%)')};
     z-index: 50;
     display: flex;
     flex-direction: ${({ isDesktop }) => (isDesktop ? 'column' : 'row')};
@@ -41,17 +41,25 @@ const NavContainer = styled.nav<{ isDesktop: boolean }>`
                 padding: 10px;
                 gap: 4px;
               `
-            : 'width: 100vw; padding: 0 20px 34px 20px; height: auto;'
+            : `
+                width: auto;
+                padding: 12px 24px;
+                gap: 16px;
+                border-radius: 40px;
+                max-width: 90vw;
+                justify-content: center;
+                box-sizing: border-box;
+              `
     }
     background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
     backdrop-filter: blur(24px);
-    border-radius: ${({ isDesktop }) => (isDesktop ? '24px' : '32px 32px 0 0')};
-    border: ${({ isDesktop }) => (isDesktop ? '1px solid rgba(51, 65, 85, 0.3)' : '1px solid rgba(148, 163, 184, 0.2)')};
-    min-height: ${({ isDesktop }) => (isDesktop ? 'auto' : '88px')};
+    border-radius: ${({ isDesktop }) => (isDesktop ? '24px' : '40px')};
+    border: ${({ isDesktop }) => (isDesktop ? '1px solid rgba(51, 65, 85, 0.3)' : '1px solid rgba(148, 163, 184, 0.3)')};
+    min-height: ${({ isDesktop }) => (isDesktop ? 'auto' : 'auto')};
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: ${({ isDesktop }) => (isDesktop
         ? '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
-        : '0 -8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(148, 163, 184, 0.1)')};
+        : '0 8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(148, 163, 184, 0.2)')};
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 `;
 
@@ -123,7 +131,6 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncC
         { viewName: 'explore', icon: FaSearch, label: 'Explore' },
         { viewName: 'imageGenerator', icon: FaPlay, label: 'ScreenGenAI', unique: true },
         { viewName: 'live', icon: FaPlay, label: 'Live', pulse: true },
-        { viewName: 'watchlist', icon: FaListUl, label: 'Watchlist' },
         { viewName: 'likes', icon: FaHeart, label: 'Likes' },
         { viewName: 'game', icon: FaGamepad, label: 'Games' },
         { viewName: 'sports', icon: FaPlay, label: 'Sports' },
