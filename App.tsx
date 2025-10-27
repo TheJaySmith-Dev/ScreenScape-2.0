@@ -50,6 +50,7 @@ const App: React.FC = () => {
     // Get user data for export
     const getUserData = () => ({
       userSettings,
+      streamingPreferences: JSON.parse(localStorage.getItem('screenScapeStreamingProviders') || '[]'),
       watchlist: [], // TODO: Add watchlist from state/context
       searchHistory: [], // TODO: Add search history from state/context
       gameProgress: {}, // TODO: Add game progress from state/context
@@ -61,7 +62,15 @@ const App: React.FC = () => {
       if (importedData.userSettings) {
         updateUserSettings(importedData.userSettings);
       }
+
+      // Restore streaming preferences
+      if (importedData.streamingPreferences && Array.isArray(importedData.streamingPreferences)) {
+        localStorage.setItem('screenScapeStreamingProviders', JSON.stringify(importedData.streamingPreferences));
+      }
+
       // TODO: Update other data stores (watchlist, searchHistory, gameProgress)
+      // Force refresh of streaming preferences by dispatching a custom event
+      window.dispatchEvent(new CustomEvent('streamingPreferencesChanged'));
 
       // Store synced timestamp
       localStorage.setItem('lastSyncTime', Date.now().toString());
