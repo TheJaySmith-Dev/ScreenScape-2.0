@@ -23,47 +23,26 @@ interface NavItem {
     isMore?: boolean;
 }
 
-const NavContainer = styled.nav<{ isDesktop: boolean }>`
+const NavContainer = styled.nav`
     position: fixed;
-    bottom: ${({ isDesktop }) => (isDesktop ? 'auto' : 'max(20px, env(safe-area-inset-bottom, 0px) + 8px)')}; /* Float at bottom with safe area */
-    left: ${({ isDesktop }) => (isDesktop ? '0' : '50%')};
-    top: ${({ isDesktop }) => (isDesktop ? '50%' : 'auto')};
-    transform: ${({ isDesktop }) => (isDesktop ? 'translateY(-50%)' : 'translateX(-50%)')};
+    bottom: max(20px, env(safe-area-inset-bottom, 0px) + 8px); /* Float at bottom with safe area */
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 50;
     display: flex;
-    flex-direction: ${({ isDesktop }) => (isDesktop ? 'column' : 'row')};
-    ${({ isDesktop }) =>
-        isDesktop
-            ? `
-                left: 24px;
-                width: 78px;
-                height: auto;
-                padding: 10px;
-                gap: 4px;
-              `
-            : `
-                width: auto;
-                padding: 8px 24px;
-                gap: 16px;
-                border-radius: 40px;
-                max-width: 90vw;
-                justify-content: center;
-                box-sizing: border-box;
-              `
-    }
-    background: ${({ isDesktop }) => isDesktop
-        ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)'
-        : 'rgba(255, 255, 255, 0.15)'
-    };
-    backdrop-filter: ${({ isDesktop }) => isDesktop ? 'blur(24px)' : 'blur(12px)'};
+    flex-direction: row;
+    width: auto;
+    padding: 8px 24px;
+    gap: 16px;
+    border-radius: 40px;
+    max-width: 90vw;
+    justify-content: center;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(12px);
     /* Fallback for browsers that don't support backdrop-filter */
-    -webkit-backdrop-filter: ${({ isDesktop }) => isDesktop ? 'blur(24px)' : 'blur(12px)'};
-    border-radius: ${({ isDesktop }) => (isDesktop ? '24px' : '40px')};
-    border: ${({ isDesktop }) => isDesktop
-        ? '1px solid rgba(51, 65, 85, 0.3)'
-        : '1px solid rgba(148, 163, 184, 0.2)'
-    };
-    min-height: ${({ isDesktop }) => (isDesktop ? 'auto' : 'auto')};
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(148, 163, 184, 0.2);
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -142,12 +121,13 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncC
         { viewName: 'game', icon: FaGamepad, label: 'Games' },
     ];
 
-    // For mobile, show only 4 items: Home, Explore, Live, Likes
+    // For mobile, show core items: Home, Explore, Live, Likes, Games
     const mobileItems: NavItem[] = [
         { viewName: 'screenSearch', icon: FaHome, label: 'Home' },
         { viewName: 'explore', icon: FaSearch, label: 'Explore' },
         { viewName: 'live', icon: FaPlay, label: 'Live', pulse: true },
         { viewName: 'likes', icon: FaHeart, label: 'Likes' },
+        { viewName: 'game', icon: FaGamepad, label: 'Games' },
     ];
 
     const [showMore, setShowMore] = useState(false);
@@ -233,7 +213,7 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncC
                 </motion.div>
             )}
 
-            <NavContainer isDesktop={isDesktop}>
+            <NavContainer>
                 {currentNavItems.map((item) => (
                     <NavButton
                         key={item.viewName}
