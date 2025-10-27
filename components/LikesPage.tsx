@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { MediaItem, Movie } from '../types';
 import { FaHeart, FaThumbsDown } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
+import { getMovieDetails } from '../services/tmdbService';
 
 interface LikesPageProps {
   apiKey: string;
@@ -43,14 +44,28 @@ const LikesPage: React.FC<LikesPageProps> = ({ apiKey, onSelectItem, onInvalidAp
         // Fetch details for liked movies
         for (const movieId of likedMovieIds) {
           try {
-            // You would need to implement a getMovieDetails function
-            // For now, we'll create placeholder items with proper IDs
+            const movieDetails = await getMovieDetails(apiKey, movieId);
+            likedMovieData.push({
+              id: movieDetails.id,
+              title: movieDetails.title,
+              poster_path: movieDetails.poster_path,
+              backdrop_path: movieDetails.backdrop_path,
+              overview: movieDetails.overview,
+              vote_average: movieDetails.vote_average,
+              popularity: movieDetails.popularity,
+              release_date: movieDetails.release_date,
+              genre_ids: movieDetails.genres?.map(g => g.id) || [],
+              media_type: 'movie'
+            });
+          } catch (error) {
+            console.error(`Error fetching movie ${movieId}:`, error);
+            // Create a placeholder item if fetching fails
             const placeholder: MediaItem = {
               id: movieId,
-              title: `Movie ${movieId}`, // Would be replaced with actual title from API
+              title: `Movie ${movieId}`,
               poster_path: null,
               backdrop_path: null,
-              overview: 'Loading...',
+              overview: 'Failed to load movie details',
               vote_average: 0,
               popularity: 0,
               release_date: '',
@@ -58,20 +73,34 @@ const LikesPage: React.FC<LikesPageProps> = ({ apiKey, onSelectItem, onInvalidAp
               media_type: 'movie'
             };
             likedMovieData.push(placeholder);
-          } catch (error) {
-            console.error(`Error fetching movie ${movieId}:`, error);
           }
         }
 
         // Fetch details for disliked movies
         for (const movieId of dislikedMovieIds) {
           try {
+            const movieDetails = await getMovieDetails(apiKey, movieId);
+            dislikedMovieData.push({
+              id: movieDetails.id,
+              title: movieDetails.title,
+              poster_path: movieDetails.poster_path,
+              backdrop_path: movieDetails.backdrop_path,
+              overview: movieDetails.overview,
+              vote_average: movieDetails.vote_average,
+              popularity: movieDetails.popularity,
+              release_date: movieDetails.release_date,
+              genre_ids: movieDetails.genres?.map(g => g.id) || [],
+              media_type: 'movie'
+            });
+          } catch (error) {
+            console.error(`Error fetching movie ${movieId}:`, error);
+            // Create a placeholder item if fetching fails
             const placeholder: MediaItem = {
               id: movieId,
               title: `Movie ${movieId}`,
               poster_path: null,
               backdrop_path: null,
-              overview: 'Loading...',
+              overview: 'Failed to load movie details',
               vote_average: 0,
               popularity: 0,
               release_date: '',
@@ -79,8 +108,6 @@ const LikesPage: React.FC<LikesPageProps> = ({ apiKey, onSelectItem, onInvalidAp
               media_type: 'movie'
             };
             dislikedMovieData.push(placeholder);
-          } catch (error) {
-            console.error(`Error fetching movie ${movieId}:`, error);
           }
         }
 
