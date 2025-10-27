@@ -124,6 +124,7 @@ const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncC
         { viewName: 'imageGenerator', icon: FaPlay, label: 'ScreenGenAI', unique: true },
         { viewName: 'live', icon: FaPlay, label: 'Live', pulse: true },
         { viewName: 'watchlist', icon: FaListUl, label: 'Watchlist' },
+        { viewName: 'likes', icon: FaHeart, label: 'Likes' },
         { viewName: 'game', icon: FaGamepad, label: 'Games' },
         { viewName: 'sports', icon: FaPlay, label: 'Sports' },
     ];

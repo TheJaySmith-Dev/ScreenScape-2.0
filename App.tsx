@@ -18,11 +18,12 @@ import SportsView from './components/SportsView';
 import ExportSettings from './components/ExportSettings';
 import ImportSettings from './components/ImportSettings';
 import SyncSelector from './components/SyncSelector';
+import LikesPage from './components/LikesPage';
 
 import { useAuth } from './contexts/AuthContext';
 import { ImageGeneratorProvider } from './contexts/ImageGeneratorContext';
 
-export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'game' | 'imageGenerator' | 'live' | 'sports';
+export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'likes' | 'game' | 'imageGenerator' | 'live' | 'sports';
 
 const MainContainer = styled.main`
     @media (min-width: 768px) {
@@ -136,6 +137,8 @@ const App: React.FC = () => {
                 return <SportsView />;
             case 'watchlist':
                  return <div className="container mx-auto px-4 py-8 text-center"><h1 className="text-3xl font-bold">Watchlist</h1><p className="text-slate-400 mt-4">This feature is coming soon!</p></div>;
+            case 'likes':
+                 return <LikesPage apiKey={apiKey!} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
             default:
                 return <ScreenSearch apiKey={apiKey!} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
         }
