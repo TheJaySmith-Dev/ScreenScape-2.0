@@ -137,26 +137,64 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                 style={{ backdropFilter: 'blur(2px)' }}
             />
 
-            <div className="relative h-full flex flex-col justify-end container mx-auto px-4 sm:px-6 lg:px-8 pb-20 sm:pb-28 md:pb-40 z-10">
+            <div className="relative h-full flex flex-col justify-end container mx-auto px-4 sm:px-6 lg:px-8 pb-16 sm:pb-20 md:pb-60 lg:pb-80 z-10">
                 {activeItem && (
-                    <div className="w-full md:w-1/2 lg:w-2/5 max-w-2xl animate-fade-in-up space-y-4">
+                    <div className="w-full md:w-3/5 lg:w-1/2 xl:w-2/5 max-w-3xl mx-auto md:ml-0 animate-fade-in-up space-y-4">
                         <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold drop-shadow-lg leading-tight">
                             {activeItem.media_type === 'movie' ? activeItem.title : (activeItem as TVShow).name}
                         </h2>
                         <p className="text-base sm:text-lg text-slate-200 line-clamp-4 sm:line-clamp-3 drop-shadow-md">
                             {activeItem.overview}
                         </p>
-                        {showAvailability && (
-                            <div className="flex flex-wrap gap-2 text-xs sm:text-sm text-slate-200">
-                                {availabilityDescriptors.map(descriptor => (
-                                    <span
-                                        key={descriptor.type}
-                                        className="bg-black/40 border border-white/10 px-3 py-1 rounded-full backdrop-blur-sm"
+                        {showAvailability && activeAvailability && (
+                            <div className="flex flex-wrap gap-2 items-center">
+                                {/* Show actual provider logos */}
+                                {activeAvailability.flatrate?.slice(0, 5).map(provider => (
+                                    <div
+                                        key={`flatrate-${provider.provider_id}`}
+                                        className="relative group"
+                                        title={`Stream on ${provider.provider_name}`}
                                     >
-                                        <span className="font-semibold text-white mr-1">{descriptor.type}:</span>
-                                        {descriptor.text}
-                                    </span>
+                                        <img
+                                            src={`https://image.tmdb.org/t/p/original${provider.logo_path}`}
+                                            alt={provider.provider_name}
+                                            className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20"
+                                            onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                            }}
+                                        />
+                                    </div>
                                 ))}
+                                {activeAvailability.rent?.slice(0, 3).map(provider => (
+                                    <div
+                                        key={`rent-${provider.provider_id}`}
+                                        className="relative group"
+                                        title={`Rent on ${provider.provider_name}`}
+                                    >
+                                        <img
+                                            src={`https://image.tmdb.org/t/p/original${provider.logo_path}`}
+                                            alt={provider.provider_name}
+                                            className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 opacity-75"
+                                            onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                            }}
+                                        />
+                                    </div>
+                                ))}
+                                {/* Fallback text if no logos */}
+                                {(!activeAvailability.flatrate || activeAvailability.flatrate.length === 0) && availabilityDescriptors.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 text-xs sm:text-sm text-slate-200">
+                                        {availabilityDescriptors.slice(0, 2).map(descriptor => (
+                                            <span
+                                                key={descriptor.type}
+                                                className="bg-black/40 border border-white/10 px-3 py-1 rounded-full backdrop-blur-sm"
+                                            >
+                                                <span className="font-semibold text-white mr-1">{descriptor.type}:</span>
+                                                {descriptor.text}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-2">
@@ -173,7 +211,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
             </div>
 
             {/* Progress Indicators */}
-            <div className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+            <div className="absolute bottom-8 sm:bottom-12 md:bottom-16 left-1/2 -translate-x-1/2 z-10 flex gap-2">
                 {items.map((_, index) => (
                     <button key={index} onClick={() => setCurrentIndex(index)} className="w-8 sm:w-12 h-1 bg-white/20 rounded-full overflow-hidden">
                         <div className={`h-full bg-white ${index === currentIndex ? 'animate-progress' : ''} ${index > currentIndex ? 'w-0' : 'w-full'}`} />
