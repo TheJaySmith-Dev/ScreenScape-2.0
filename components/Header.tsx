@@ -43,7 +43,7 @@ const NavContainer = styled.nav<{ isDesktop: boolean }>`
               `
             : `
                 width: auto;
-                padding: 12px 24px;
+                padding: 8px 24px;
                 gap: 16px;
                 border-radius: 40px;
                 max-width: 90vw;
