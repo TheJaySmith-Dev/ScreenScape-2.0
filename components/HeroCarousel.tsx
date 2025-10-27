@@ -23,6 +23,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
     const [availabilityMap, setAvailabilityMap] = useState<Record<number, WatchProviderCountry | null>>({});
+    const [movieDetailsMap, setMovieDetailsMap] = useState<Record<number, any>>({});
     const intervalRef = useRef<number | null>(null);
     const { country } = useGeolocation();
     const { providerIds } = useStreamingPreferences();
@@ -57,7 +58,22 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
         let isMounted = true;
         const currentItem = items[currentIndex];
 
-        // Only fetch watch providers since we don't need trailers anymore
+        // Fetch detailed movie/TV info for production company logos
+        const fetchDetails = async () => {
+            if (movieDetailsMap[currentItem.id]) return; // Already fetched
+
+            try {
+                const response = await fetch(`https://api.themoviedb.org/3/${currentItem.media_type}/${currentItem.id}?api_key=${apiKey}&append_to_response=images`);
+                if (isMounted && response.ok) {
+                    const details = await response.json();
+                    setMovieDetailsMap(prev => ({ ...prev, [currentItem.id]: details }));
+                }
+            } catch (error) {
+                console.error("Failed to fetch movie details:", error);
+            }
+        };
+
+        // Fetch watch providers
         const fetchProviders = async () => {
             try {
                 const providersResponse = currentItem.media_type === 'movie'
@@ -75,10 +91,12 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                 }
             }
         };
+
+        fetchDetails();
         fetchProviders();
 
         return () => { isMounted = false; };
-    }, [currentIndex, items, apiKey, country.code]);
+    }, [currentIndex, items, apiKey, country.code, movieDetailsMap]);
 
     const goToNext = useCallback(() => {
         setCurrentIndex(prevIndex => (prevIndex + 1) % (items.length || 1));
@@ -140,36 +158,38 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
             <div className="relative h-full flex flex-col justify-end container mx-auto px-4 sm:px-6 lg:px-8 pb-32 sm:pb-28 md:pb-40 z-10">
                 {activeItem && (
                     <div className="w-full md:w-1/2 lg:w-2/5 max-w-2xl animate-fade-in-up space-y-4 mt-16 sm:mt-0">
-                        {showAvailability && activeAvailability && activeAvailability.flatrate && activeAvailability.flatrate.length > 0 ? (
-                            <div className="space-y-2">
-                                <div className="flex flex-wrap gap-3 items-center">
-                                    {activeAvailability.flatrate.slice(0, 4).map(provider => (
-                                        <div
-                                            key={`main-provider-${provider.provider_id}`}
-                                            className="relative group"
-                                            title={`${provider.provider_name}: Shows available to stream`}
-                                        >
+                        <div className="space-y-2">
+                            {/* Production Company Logos (Movie/TV Logos) */}
+                            {movieDetailsMap[activeItem.id]?.production_companies && movieDetailsMap[activeItem.id].production_companies.some((company: any) => company.logo_path) && (
+                                <div className="flex items-center justify-center md:justify-start gap-4">
+                                    {movieDetailsMap[activeItem.id].production_companies
+                                        .filter((company: any) => company.logo_path)
+                                        .slice(0, 3)
+                                        .map((company: any) => (
                                             <img
-                                                src={`https://image.tmdb.org/t/p/original${provider.logo_path}`}
-                                                alt={provider.provider_name}
-                                                className="h-12 sm:h-14 md:h-16 w-auto object-contain rounded-lg shadow-lg"
+                                                key={`company-logo-${company.id}`}
+                                                src={`https://image.tmdb.org/t/p/w200${company.logo_path}`}
+                                                alt={`${company.name} logo`}
+                                                className="h-12 sm:h-16 md:h-20 w-auto object-contain drop-shadow-xl"
+                                                style={{
+                                                    filter: 'brightness(0) invert(1)',
+                                                    mixBlendMode: 'screen'
+                                                }}
                                                 onError={(e) => {
                                                     e.currentTarget.style.display = 'none';
                                                 }}
                                             />
-                                            <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                        </div>
-                                    ))}
+                                        ))}
                                 </div>
-                                <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold drop-shadow-lg leading-tight">
+                            )}
+
+                            {/* Fallback to Title if no company logos */}
+                            {(!movieDetailsMap[activeItem.id]?.production_companies || !movieDetailsMap[activeItem.id].production_companies.some((company: any) => company.logo_path)) && (
+                                <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold drop-shadow-lg leading-tight">
                                     {activeItem.media_type === 'movie' ? activeItem.title : (activeItem as TVShow).name}
                                 </h2>
-                            </div>
-                        ) : (
-                            <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold drop-shadow-lg leading-tight">
-                                {activeItem.media_type === 'movie' ? activeItem.title : (activeItem as TVShow).name}
-                            </h2>
-                        )}
+                            )}
+                        </div>
                         <p className="text-base sm:text-lg text-slate-200 line-clamp-4 sm:line-clamp-3 drop-shadow-md">
                             {activeItem.overview}
                         </p>
