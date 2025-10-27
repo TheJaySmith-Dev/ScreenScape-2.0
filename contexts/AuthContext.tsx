@@ -248,11 +248,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const syncData = async () => {
       if (syncState.isConnected && !syncState.isSyncing) {
+        const contentPrefs = userSettings?.content_preferences || [];
+        const likedMovieIds = contentPrefs.filter(p => p.preference === 'like').map(p => p.media_id);
+        const dislikedMovieIds = contentPrefs.filter(p => p.preference === 'dislike').map(p => p.media_id);
+
         const preferences = {
           userSettings,
           watchlist,
           searchHistory,
-          gameProgress
+          gameProgress,
+          likedMovies: likedMovieIds,
+          dislikedMovies: dislikedMovieIds
         };
 
         // Include current timestamp for last write wins merging
@@ -288,8 +294,51 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (syncPreferences.gameProgress) {
         setGameProgress(syncPreferences.gameProgress);
       }
+
+      // Merge synced likes/dislikes into content preferences
+      if (syncPreferences.likedMovies || syncPreferences.dislikedMovies) {
+        const currentPrefs = userSettings?.content_preferences || [];
+        const newPrefs: UserPreference[] = [...currentPrefs];
+
+        // Add liked movies
+        if (syncPreferences.likedMovies) {
+          syncPreferences.likedMovies.forEach(mediaId => {
+            if (!newPrefs.some(p => p.media_id === mediaId && p.preference === 'like')) {
+              newPrefs.push({
+                media_id: mediaId,
+                media_type: 'movie', // Assuming movies for now, could be extended
+                preference: 'like',
+                timestamp: new Date().toISOString()
+              });
+            }
+          });
+        }
+
+        // Add disliked movies
+        if (syncPreferences.dislikedMovies) {
+          syncPreferences.dislikedMovies.forEach(mediaId => {
+            if (!newPrefs.some(p => p.media_id === mediaId && p.preference === 'dislike')) {
+              newPrefs.push({
+                media_id: mediaId,
+                media_type: 'movie', // Assuming movies for now, could be extended
+                preference: 'dislike',
+                timestamp: new Date().toISOString()
+              });
+            }
+          });
+        }
+
+        const updatedSettings = {
+          ...userSettings,
+          content_preferences: newPrefs,
+          updated_at: new Date().toISOString()
+        };
+
+        setUserSettings(updatedSettings);
+        localStorage.setItem('userSettings', JSON.stringify(updatedSettings));
+      }
     }
-  }, [syncPreferences, syncState.isConnected]);
+  }, [syncPreferences, syncState.isConnected, userSettings]);
 
   const value = {
     userSettings,
