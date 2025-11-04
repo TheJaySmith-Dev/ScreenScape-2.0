@@ -1,5 +1,29 @@
 # ScreenScape-2.0 Changes Log
 
+## November 4, 2025 - Liquid Glass UI Enhancements
+
+### Summary
+Integrated progressive liquid-glass effects inspired by the open-source repository `https://github.com/callstack/liquid-glass`. Improvements focus on responsiveness, accessibility, and theme cohesion while maintaining existing component APIs.
+
+### Changes
+- Extended `components/LiquidGlassWrapper.tsx` with `effect` and `tintColor` props.
+  - Fixed support detection using `backdrop-filter` and WebGL.
+  - Aligned config field mapping (`displacementScale`, `blurAmount`) to component props.
+  - Added clear/regular effect modes and tint merging into styles.
+- Updated `components/LiquidGlassPillButton.tsx` to pass `effect` and `tintColor` based on material and theme tokens.
+- Updated `components/LiquidGlassCard.tsx` to pass `effect` based on material.
+- Added `components/LiquidGlassContainer.tsx` to group nearby liquid-glass elements with a unified frosted fallback.
+
+### Accessibility & Responsiveness
+- Respects `prefers-reduced-motion` and `prefers-reduced-transparency` media queries.
+- Uses theme tokens from `AppleThemeProvider` for consistent styling across breakpoints.
+- Provides graceful fallbacks when effects are disabled or unsupported.
+
+### Reference
+- Source inspiration: `callstack/liquid-glass` (GitHub).
+
+---
+
 ## October 22, 2025 - Feature Enhancement
 
 ### Summary
