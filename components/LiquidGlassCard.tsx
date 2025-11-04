@@ -8,6 +8,7 @@ import React, { useCallback } from 'react';
 import styled from 'styled-components';
 import { GlassCard } from './GlassCard';
 import { LiquidGlassWrapper } from './LiquidGlassWrapper';
+import { defaultLiquidVisualTuning } from '../utils/liquidGlassUserTuning';
 import { useAppleTheme } from './AppleThemeProvider';
 
 export interface LiquidGlassCardProps {
@@ -26,7 +27,7 @@ export interface LiquidGlassCardProps {
   liquidIntensity?: 'subtle' | 'medium' | 'prominent';
   refractionMode?: 'standard' | 'polar' | 'prominent' | 'shader';
   enableLiquidEffects?: boolean;
-  mouseContainer?: React.RefObject<HTMLElement>;
+  mouseContainer?: React.RefObject<HTMLDivElement>;
   chromaticAberration?: number;
 }
 
@@ -124,8 +125,27 @@ export const LiquidGlassCard: React.FC<LiquidGlassCardProps> = ({
     aspectRatio === 'square' ? 'polar' : 'prominent'
   );
 
+  // Derive physical refraction parameters from material and layout
+  const refractionParams = {
+    indexOfRefraction: material === 'prominent' || material === 'thick' ? 1.52 :
+                       material === 'regular' ? 1.5 :
+                       material === 'thin' ? 1.48 : 1.47,
+    surfaceSmoothness: material === 'ultraThin' || material === 'thin' ? 0.9 :
+                       material === 'regular' ? 0.85 : 0.8,
+    lightIntensity: 0.65,
+    lightAngleDeg: effectiveMode === 'polar' ? 35 : 25,
+    lightColorTemperatureK: 6500,
+    mediumDensity: 1.0,
+    surroundingComplexity: 0.6,
+    cameraAngleDeg: aspectRatio === 'portrait' ? 25 : 20,
+    cameraDistance: size === 'large' ? 0.35 : 0.45,
+  };
+
+  const refractionQuality = effectiveIntensity === 'prominent' ? 'high' : 'balanced';
+  const artifactReduction = 'mild' as const;
+
   // Handle click with enhanced feedback
-  const handleClick = useCallback((event: React.MouseEvent) => {
+  const handleClick = useCallback(() => {
     if (loading || disabled) return;
     
     // Add haptic feedback for supported devices
@@ -150,6 +170,10 @@ export const LiquidGlassCard: React.FC<LiquidGlassCardProps> = ({
         className={className}
         effect={material === 'ultraThin' || material === 'thin' ? 'clear' : 'regular'}
         tintColor={undefined}
+        visualTuning={defaultLiquidVisualTuning}
+        refractionParams={refractionParams}
+        refractionQuality={refractionQuality}
+        artifactReduction={artifactReduction}
         onClick={handleClick}
       >
         <CardContent

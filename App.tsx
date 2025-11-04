@@ -1,51 +1,41 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import styled from 'styled-components';
+import { AnimatePresence } from 'framer-motion';
 import { MediaItem } from './types';
-import Header from './components/Header';
-import ScreenSearch from './components/ScreenSearch';
+import { LiquidPillNavigation } from './components/LiquidPillNavigation';
+import IOS26Prototype from './components/IOS26Prototype';
+import TopNavigation from './components/TopNavigation';
 import NetflixView from './components/NetflixView';
 import GameView, { Game } from './components/GameView';
 import MediaDetail from './components/MediaDetail';
 import ApiKeySetup from './components/ApiKeySetup';
 import Settings from './components/Settings';
-import ImageGenerator from './components/ImageGenerator';
-import AIAssistant, { AIStatus } from './components/AIAssistant';
-import TypeToAssist from './components/TypeToAssist';
-
 import QuickJump from './components/QuickJump';
 import LiveView from './components/LiveView.tsx';
-import SportsView from './components/SportsView';
 import ExportSettings from './components/ExportSettings';
 import ImportSettings from './components/ImportSettings';
 import SyncSelector from './components/SyncSelector';
 import LikesPage from './components/LikesPage';
+import SearchModal from './components/SearchModal';
 
 import { useAuth } from './contexts/AuthContext';
 import { ImageGeneratorProvider } from './contexts/ImageGeneratorContext';
+import { AppleThemeProvider, useAppleTheme } from './components/AppleThemeProvider';
+// ScrollLiquidPanel demo removed; effect now lives in pill navigation
 
-export type ViewType = 'screenSearch' | 'explore' | 'watchlist' | 'likes' | 'game' | 'imageGenerator' | 'live' | 'sports';
-
-const MainContainer = styled.main`
-    @media (min-width: 768px) {
-        padding-top: 0;
-    }
-    @media (max-width: 767px) {
-        padding-bottom: 88px;
-    }
-`;
+export type ViewType = 'screenSearch' | 'live' | 'likes' | 'game' | 'settings' | 'sync' | 'prototype';
 
 type SyncViewType = 'none' | 'selector' | 'export' | 'import';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
     const { userSettings, updateUserSettings } = useAuth();
+    const { tokens } = useAppleTheme();
     const [apiKey, setApiKey] = useState<string | null>('09b97a49759876f2fde9eadb163edc44');
     const [isKeyInvalid, setIsKeyInvalid] = useState(false);
     const [view, setView] = useState<ViewType>('screenSearch');
     const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
     const [selectedGame, setSelectedGame] = useState<Game | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [aiStatus, setAiStatus] = useState<AIStatus>('idle');
+    const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
     const [syncView, setSyncView] = useState<SyncViewType>('none');
 
@@ -97,6 +87,14 @@ const App: React.FC = () => {
         setSelectedItem(null);
     }, []);
 
+    const handleOpenSearchModal = useCallback(() => {
+        setIsSearchModalOpen(true);
+    }, []);
+
+    const handleCloseSearchModal = useCallback(() => {
+        setIsSearchModalOpen(false);
+    }, []);
+
     useEffect(() => {
         const selectMediaItemHandler = (event: Event) => {
             const customEvent = event as CustomEvent<MediaItem>;
@@ -105,7 +103,7 @@ const App: React.FC = () => {
 
         const setSearchViewHandler = (event: Event) => {
             const customEvent = event as CustomEvent<{ query: string }>;
-            setView('explore');
+            setView('screenSearch');
             setSearchQuery(customEvent.detail.query);
         }
 
@@ -119,29 +117,29 @@ const App: React.FC = () => {
     }, [handleSelectItem]);
 
     const renderView = () => {
-        if (selectedItem) {
-            return <MediaDetail key={selectedItem.id} item={selectedItem} apiKey={apiKey!} onClose={handleCloseDetail} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
-        }
-
         switch (view) {
             case 'screenSearch':
-                return <ScreenSearch apiKey={apiKey!} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
-            case 'explore':
-                return <NetflixView apiKey={apiKey!} searchQuery={searchQuery} onSelectItem={handleSelectItem} onSelectGame={handleSelectGame} onInvalidApiKey={handleInvalidApiKey} view={view} />;
-            case 'game':
-                return <GameView apiKey={apiKey!} onInvalidApiKey={handleInvalidApiKey} initialGame={selectedGame} />;
-            case 'imageGenerator':
-                return <ImageGenerator />;
+                return <NetflixView apiKey={apiKey!} searchQuery={searchQuery} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} onNavigateProvider={() => {}} />;
             case 'live':
                 return <LiveView />;
-            case 'sports':
-                return <SportsView />;
-            case 'watchlist':
-                 return <div className="container mx-auto px-4 py-8 text-center"><h1 className="text-3xl font-bold">Watchlist</h1><p className="text-slate-400 mt-4">This feature is coming soon!</p></div>;
+            case 'game':
+                return <GameView apiKey={apiKey!} onInvalidApiKey={handleInvalidApiKey} initialGame={selectedGame} />;
             case 'likes':
                  return <LikesPage apiKey={apiKey!} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
+            case 'settings':
+                return <Settings onClose={() => setView('screenSearch')} />;
+            case 'sync':
+                return (
+                    <SyncSelector
+                        onExportClick={() => setSyncView('export')}
+                        onImportClick={() => setSyncView('import')}
+                        onBack={() => setView('screenSearch')}
+                    />
+                );
+            case 'prototype':
+                return <IOS26Prototype />;
             default:
-                return <ScreenSearch apiKey={apiKey!} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
+                return <NetflixView apiKey={apiKey!} searchQuery={searchQuery} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} onNavigateProvider={() => {}} />;
         }
     };
 
@@ -151,19 +149,79 @@ const App: React.FC = () => {
 
     return (
         <ImageGeneratorProvider>
-            <div className="bg-primary text-white min-h-screen font-sans">
-                {!selectedItem && <Header
-                    view={view}
-                    setView={setView}
-                    onSettingsClick={() => setIsSettingsOpen(true)}
-                    onSyncClick={() => setSyncView(current => current === 'none' ? 'selector' : 'none')}
-                />}
+            <div 
+                style={{
+                    minHeight: '100vh',
+                    fontFamily: tokens.typography.families.text,
+                    fontSize: `${tokens.typography.sizes.body}px`,
+                    fontWeight: tokens.typography.weights.regular,
+                    lineHeight: tokens.typography.lineHeights.body,
+                    color: tokens.colors.label.primary,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    transition: 'background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
+            >
+                {/* Background Image */}
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundImage: 'url(https://i.postimg.cc/RF9HdRB4/4655BF78-0300-403B-BC19-5ED83796642D.png)',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundAttachment: 'fixed',
+                        zIndex: -1
+                    }}
+                />
+                
+                {/* Liquid panel demo removed per requirement; pill menu drives effect */}
 
-                <MainContainer>
-                    {renderView()}
-                </MainContainer>
 
-                {isSettingsOpen && <Settings onClose={() => setIsSettingsOpen(false)} />}
+
+                <div 
+                    style={{
+                        padding: `${tokens.spacing.standard[1]}px ${tokens.spacing.standard[0]}px`,
+                        paddingTop: `${tokens.spacing.standard[2]}px`,
+                        paddingBottom: `calc(${tokens.spacing.standard[3]}px + 64px + env(safe-area-inset-bottom))`, // Space for pill navigation
+                        maxWidth: '1400px',
+                        margin: '0 auto',
+                        width: '100%',
+                        minHeight: '100vh',
+                        position: 'relative',
+                        zIndex: 1
+                    }}
+                >
+                    {!selectedItem && renderView()}
+                    
+                    <AnimatePresence mode="wait">
+                        {selectedItem && (
+                            <MediaDetail 
+                                key={selectedItem.id} 
+                                item={selectedItem} 
+                                apiKey={apiKey!} 
+                                onClose={handleCloseDetail} 
+                                onSelectItem={handleSelectItem} 
+                                onInvalidApiKey={handleInvalidApiKey} 
+                            />
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Bottom Pill Navigation - Hide when search modal is open or when viewing media details */}
+                {!isSearchModalOpen && !selectedItem && (
+                    <LiquidPillNavigation
+                        view={view}
+                        setView={setView}
+                        onSearchClick={handleOpenSearchModal}
+                    />
+                )}
+
+
 
                 {/* Sync Components - Simple Export/Import */}
                 {syncView === 'selector' && (
@@ -187,8 +245,25 @@ const App: React.FC = () => {
                 )}
 
                 <QuickJump apiKey={apiKey} />
+
+                {/* Search Modal */}
+                <SearchModal
+                    isOpen={isSearchModalOpen}
+                    onClose={handleCloseSearchModal}
+                    apiKey={apiKey!}
+                    onSelectItem={handleSelectItem}
+                    onInvalidApiKey={handleInvalidApiKey}
+                />
             </div>
         </ImageGeneratorProvider>
+    );
+};
+
+const App: React.FC = () => {
+    return (
+        <AppleThemeProvider>
+            <AppContent />
+        </AppleThemeProvider>
     );
 };
 

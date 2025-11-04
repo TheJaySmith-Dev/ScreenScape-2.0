@@ -9,13 +9,13 @@ import { useAppleTheme } from './AppleThemeProvider';
 
 export interface LiquidGlassContainerProps {
   children: React.ReactNode;
-  mergeStrategy?: 'group' | 'isolate';
+  mergeStrategy?: 'group' | 'isolate' | 'blob';
   className?: string;
   style?: React.CSSProperties;
 }
 
 const Container = styled.div<{
-  $strategy: 'group' | 'isolate';
+  $strategy: 'group' | 'isolate' | 'blob';
   $tokens: any;
 }>`
   position: relative;
@@ -27,6 +27,11 @@ const Container = styled.div<{
     backdrop-filter: blur(10px) saturate(140%);
     -webkit-backdrop-filter: blur(10px) saturate(140%);
     border-radius: ${$tokens.spacing.radius.large}px;
+  `}
+
+  ${({ $strategy }) => $strategy === 'blob' && `
+    /* Gooey blob merging filter (requires inline SVG filter definition) */
+    filter: url(#gooeyEffect);
   `}
 
   /* Accessibility: respect reduced-transparency */
@@ -46,9 +51,21 @@ export const LiquidGlassContainer: React.FC<LiquidGlassContainerProps> = ({
   const { tokens } = useAppleTheme();
 
   return (
-    <Container $strategy={mergeStrategy} $tokens={tokens} className={className} style={style}>
-      {children}
-    </Container>
+    <>
+      {/* Inline SVG filter definition for gooey effect used by blob merge strategy */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+        <defs>
+          <filter id="gooeyEffect">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
+            <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="gooey" />
+            <feBlend in="SourceGraphic" in2="gooey" />
+          </filter>
+        </defs>
+      </svg>
+      <Container $strategy={mergeStrategy} $tokens={tokens} className={className} style={style}>
+        {children}
+      </Container>
+    </>
   );
 };
 

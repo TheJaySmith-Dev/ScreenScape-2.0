@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { searchMulti, normalizeMovie, normalizeTVShow } from '../services/tmdbService';
 import { MediaItem, Person, Movie, TVShow } from '../types';
 import { SearchIcon } from './Icons';
+import { useAppleTheme } from './AppleThemeProvider';
 import Loader from './Loader';
 
 type SearchResult = Movie | TVShow | Person;
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w92';
 
 const ResultItem: React.FC<{ item: SearchResult, isActive: boolean, onSelect: () => void }> = ({ item, isActive, onSelect }) => {
+    const { tokens } = useAppleTheme();
     const getTitle = (item: SearchResult) => 'title' in item ? item.title : item.name;
     const getImagePath = (item: SearchResult) => 'profile_path' in item ? item.profile_path : item.poster_path;
     
@@ -19,26 +22,70 @@ const ResultItem: React.FC<{ item: SearchResult, isActive: boolean, onSelect: ()
     };
 
     return (
-        <li
-            className={`quick-jump-result-item ${isActive ? 'active' : ''}`}
+        <motion.li
             onClick={onSelect}
             role="option"
             aria-selected={isActive}
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: `${tokens.spacing.micro[2]}px`,
+                padding: `${tokens.spacing.micro[2]}px`,
+                borderRadius: '12px',
+                cursor: 'pointer',
+                background: isActive ? tokens.colors.fill.secondary : 'transparent',
+                transition: 'background-color 0.2s ease'
+            }}
+            whileHover={{ 
+                backgroundColor: tokens.colors.fill.secondary,
+                scale: 1.01
+            }}
+            whileTap={{ scale: 0.99 }}
         >
             <img 
                 src={getImagePath(item) ? `${IMAGE_BASE_URL}${getImagePath(item)}` : 'https://via.placeholder.com/64x96?text=N/A'}
                 alt={getTitle(item)}
                 loading="lazy"
+                style={{
+                    width: '48px',
+                    height: '72px',
+                    objectFit: 'cover',
+                    borderRadius: '8px',
+                    flexShrink: 0
+                }}
             />
-            <div className="quick-jump-result-item-info">
-                <strong>{getTitle(item)}</strong>
-                <small>{getMeta(item)}</small>
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <div 
+                    className="apple-callout"
+                    style={{ 
+                        color: tokens.colors.label.primary,
+                        fontWeight: tokens.typography.weights.medium,
+                        marginBottom: `${tokens.spacing.micro[0]}px`,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                    }}
+                >
+                    {getTitle(item)}
+                </div>
+                <div 
+                    className="apple-caption1"
+                    style={{ 
+                        color: tokens.colors.label.secondary,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                    }}
+                >
+                    {getMeta(item)}
+                </div>
             </div>
-        </li>
+        </motion.li>
     );
 };
 
 const QuickJump: React.FC<{ apiKey: string }> = ({ apiKey }) => {
+    const { tokens } = useAppleTheme();
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
@@ -143,55 +190,157 @@ const QuickJump: React.FC<{ apiKey: string }> = ({ apiKey }) => {
     }, [query, apiKey]);
 
 
-    if (!isOpen) return null;
-
     return (
-        <>
-            <div className="quick-jump-backdrop" onClick={close}></div>
-            <div className="quick-jump-overlay" role="dialog" aria-modal="true">
-                <div className="quick-jump-container">
-                    <div className="relative flex items-center">
-                        <SearchIcon className="absolute left-6 w-6 h-6 text-slate-400 pointer-events-none" />
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search movies, shows, people..."
-                            className="quick-jump-input"
-                            autoComplete="off"
-                        />
-                    </div>
-                    {isLoading && <Loader />}
-                    {!isLoading && results.length > 0 && (
-                        <>
-                            <ul className="quick-jump-results scrollbar-thin" role="listbox">
-                                {results.slice(0, 8).map((item, index) => (
-                                    <ResultItem
-                                        key={`${item.id}-${item.media_type}`}
-                                        item={item}
-                                        isActive={index === activeIndex}
-                                        onSelect={() => handleSelect(item)}
-                                    />
-                                ))}
-                            </ul>
-                            {results.length > 8 && (
-                                <div className="quick-jump-footer">
-                                    <button onClick={handleSeeAllResults} className="hover:text-white transition-colors">
-                                        See all {results.length} results &rarr;
-                                    </button>
+        <AnimatePresence>
+            {isOpen && (
+                <>
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        onClick={close}
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'rgba(0, 0, 0, 0.5)',
+                            backdropFilter: 'blur(8px)',
+                            zIndex: 9999
+                        }}
+                    />
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95, y: -20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                        transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                        role="dialog" 
+                        aria-modal="true"
+                        style={{
+                            position: 'fixed',
+                            top: '20vh',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            width: '90%',
+                            maxWidth: '600px',
+                            zIndex: 10000
+                        }}
+                    >
+                        <div 
+                            className="apple-glass-regular apple-depth-3"
+                            style={{
+                                borderRadius: '20px',
+                                overflow: 'hidden',
+                                backdropFilter: 'blur(20px)',
+                                border: `1px solid ${tokens.colors.separator.nonOpaque}`
+                            }}
+                        >
+                            <div style={{
+                                position: 'relative',
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.standard[1]}px`
+                            }}>
+                                <SearchIcon style={{ 
+                                    position: 'absolute',
+                                    left: `${tokens.spacing.standard[1]}px`,
+                                    width: '20px',
+                                    height: '20px',
+                                    color: tokens.colors.label.tertiary,
+                                    pointerEvents: 'none'
+                                }} />
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    value={query}
+                                    onChange={(e) => setQuery(e.target.value)}
+                                    placeholder="Search movies, shows, people..."
+                                    autoComplete="off"
+                                    style={{
+                                        width: '100%',
+                                        padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.micro[2]}px ${tokens.spacing.micro[2]}px ${tokens.spacing.standard[2]}px`,
+                                        border: 'none',
+                                        background: 'transparent',
+                                        outline: 'none',
+                                        fontSize: `${tokens.typography.sizes.body}px`,
+                                        fontFamily: tokens.typography.families.text,
+                                        color: tokens.colors.label.primary
+                                    }}
+                                />
+                            </div>
+                            
+                            {isLoading && (
+                                <div style={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'center', 
+                                    padding: `${tokens.spacing.standard[1]}px` 
+                                }}>
+                                    <Loader />
                                 </div>
                             )}
-                        </>
-                    )}
-                     {!isLoading && query.length > 1 && results.length === 0 && (
-                        <div className="quick-jump-footer !text-base">
-                            No results for "{query}"
+                            
+                            {!isLoading && results.length > 0 && (
+                                <>
+                                    <div style={{
+                                        maxHeight: '400px',
+                                        overflowY: 'auto',
+                                        padding: `0 ${tokens.spacing.micro[2]}px`
+                                    }}>
+                                        <ul role="listbox" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                                            {results.slice(0, 8).map((item, index) => (
+                                                <ResultItem
+                                                    key={`${item.id}-${item.media_type}`}
+                                                    item={item}
+                                                    isActive={index === activeIndex}
+                                                    onSelect={() => handleSelect(item)}
+                                                />
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    {results.length > 8 && (
+                                        <div style={{
+                                            padding: `${tokens.spacing.micro[2]}px`,
+                                            borderTop: `1px solid ${tokens.colors.separator.nonOpaque}`,
+                                            textAlign: 'center'
+                                        }}>
+                                            <button 
+                                                onClick={handleSeeAllResults}
+                                                className="apple-callout"
+                                                style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: tokens.colors.system.blue,
+                                                    cursor: 'pointer',
+                                                    transition: 'opacity 0.2s ease'
+                                                }}
+                                            >
+                                                See all {results.length} results →
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            
+                            {!isLoading && query.length > 1 && results.length === 0 && (
+                                <div style={{
+                                    padding: `${tokens.spacing.standard[1]}px`,
+                                    textAlign: 'center'
+                                }}>
+                                    <p 
+                                        className="apple-body"
+                                        style={{ 
+                                            color: tokens.colors.label.secondary,
+                                            margin: 0
+                                        }}
+                                    >
+                                        No results for "{query}"
+                                    </p>
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
-            </div>
-        </>
+                    </motion.div>
+                </>
+            )}
+        </AnimatePresence>
     );
 };
 

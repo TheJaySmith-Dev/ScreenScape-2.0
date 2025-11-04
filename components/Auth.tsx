@@ -38,9 +38,10 @@ const Auth: React.FC = () => {
   return (
     <div className="min-h-screen bg-primary text-white flex items-center justify-center">
       <div className="bg-slate-800 p-8 rounded-lg shadow-lg w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center">
-          ScreenScape
+        <h2 className="text-2xl font-bold mb-2 text-center">
+          ChoiceForReels
         </h2>
+        <p className="text-slate-400 text-sm mb-6 text-center">By @jasonforreels</p>
         <h3 className="text-xl font-semibold mb-6 text-center">
           {isSignUp ? 'Create Account' : 'Welcome Back'}
         </h3>

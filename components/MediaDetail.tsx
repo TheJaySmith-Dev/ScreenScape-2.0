@@ -1,28 +1,197 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import styled, { keyframes } from 'styled-components';
+import React, { useState, useEffect, useMemo, useCallback, useRef, RefObject } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MediaItem, Movie, MovieDetails, TVShowDetails, WatchProvider, WatchProviderCountry } from '../types';
-import { getMovieDetails as getTMDbMovieDetails, getTVShowDetails as getTMDbTVShowDetails, getMovieCredits } from '../services/tmdbService';
+import { getMovieDetails as getTMDbMovieDetails, getTVShowDetails as getTMDbTVShowDetails, getMovieCredits, getTVShowCredits } from '../services/tmdbService';
 import { getMovieRecommendations } from '../services/tmdbService';
-import { getMovieVideos, getTVShowVideos, getMovieWatchProviders, getTVShowWatchProviders } from '../services/tmdbService';
-import { getOMDbFromTMDBDetails, OMDbMovieDetails } from '../services/omdbService';
+import { getMovieWatchProviders, getTVShowWatchProviders, getMovieVideos, getTVShowVideos } from '../services/tmdbService';
+import { getOMDbFromTMDBDetails, OMDbMovieDetails, extractRottenTomatoesRating, extractRottenTomatoesConsensus } from '../services/omdbService';
+import RottenTomatoesRating from '../components/RottenTomatoesRating';
 import { generateFactsAI, generateReviewsAI } from './openrouter.js';
 import { generateStoryScapeSummary } from './storyscape.js';
 import { generatePersonalizedRecommendations } from '../services/recommendationService';
+// TrailerManager is no longer used for main trailer in detail view
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import { useAuth } from '../contexts/AuthContext';
 import VideoPlayer from './VideoPlayer';
 import { isMobileDevice } from '../utils/deviceDetection';
 import Loader from './Loader';
-import * as Icons from './Icons';
+import { useAppleTheme } from './AppleThemeProvider';
+import { useAppleAnimationEffects } from '../hooks/useAppleAnimationEffects';
+import { Star, Heart, ThumbsDown, X, Play } from 'lucide-react';
 import {
     getAvailabilityBuckets,
     buildAvailabilityDescriptors,
     hasAvailability,
 } from '../utils/streamingAvailability';
+import MediaTitleLogo from './MediaTitleLogo';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
+
+// --- Custom Hook for Dynamic Background Adaptation ---
+interface AdaptiveStyles {
+    background: string;
+    backdropFilter: string;
+    WebkitBackdropFilter: string;
+    borderColor: string;
+    boxShadow: string;
+}
+
+const useDynamicBackground = (containerRef: RefObject<HTMLElement>, tokens: any) => {
+    const [adaptiveStyles, setAdaptiveStyles] = useState<AdaptiveStyles>({
+        background: 'rgba(255, 255, 255, 0.1)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+    });
+    const [isDetected, setIsDetected] = useState(false);
+
+    // Helper function to extract RGB values from color string
+    const extractRGB = (colorStr: string): [number, number, number] | null => {
+        if (!colorStr) return null;
+        
+        // Handle rgba format
+        const rgbaMatch = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
+        if (rgbaMatch) {
+            return [parseInt(rgbaMatch[1]), parseInt(rgbaMatch[2]), parseInt(rgbaMatch[3])];
+        }
+        
+        // Handle hex format
+        const hexMatch = colorStr.match(/^#([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+        if (hexMatch) {
+            return [
+                parseInt(hexMatch[1], 16),
+                parseInt(hexMatch[2], 16),
+                parseInt(hexMatch[3], 16)
+            ];
+        }
+        
+        return null;
+    };
+
+    // Calculate brightness of a color
+    const getBrightness = (r: number, g: number, b: number): number => {
+        return (r * 299 + g * 587 + b * 114) / 1000;
+    };
+
+    // Generate adaptive colors based on detected background
+    const generateAdaptiveColors = (bgColor: [number, number, number]): AdaptiveStyles => {
+        const [r, g, b] = bgColor;
+        const brightness = getBrightness(r, g, b);
+        const isDark = brightness < 128;
+        
+        // Calculate complementary colors
+        const baseOpacity = isDark ? 0.15 : 0.08;
+        const borderOpacity = isDark ? 0.3 : 0.15;
+        const shadowOpacity = isDark ? 0.4 : 0.2;
+        
+        // Adjust blur intensity based on brightness
+        const blurIntensity = isDark ? 25 : 20;
+        
+        // Create adaptive background with slight color tinting
+        const adaptiveR = Math.min(255, r + (isDark ? 20 : -10));
+        const adaptiveG = Math.min(255, g + (isDark ? 20 : -10));
+        const adaptiveB = Math.min(255, b + (isDark ? 20 : -10));
+        
+        return {
+            background: `rgba(${adaptiveR}, ${adaptiveG}, ${adaptiveB}, ${baseOpacity})`,
+            backdropFilter: `blur(${blurIntensity}px)`,
+            WebkitBackdropFilter: `blur(${blurIntensity}px)`,
+            borderColor: `rgba(${adaptiveR}, ${adaptiveG}, ${adaptiveB}, ${borderOpacity})`,
+            boxShadow: `0 8px 32px rgba(${Math.max(0, r - 50)}, ${Math.max(0, g - 50)}, ${Math.max(0, b - 50)}, ${shadowOpacity}), inset 0 1px 0 rgba(255, 255, 255, ${isDark ? 0.2 : 0.1})`
+        };
+    };
+
+    useEffect(() => {
+        const detectBackgroundColor = () => {
+            if (!containerRef.current) return;
+            
+            try {
+                const element = containerRef.current;
+                const computedStyle = window.getComputedStyle(element);
+                
+                // Try to get background color from the element or its parents
+                let currentElement: HTMLElement | null = element;
+                let detectedColor: [number, number, number] | null = null;
+                
+                while (currentElement && !detectedColor) {
+                    const style = window.getComputedStyle(currentElement);
+                    const bgColor = style.backgroundColor;
+                    const bgImage = style.backgroundImage;
+                    
+                    // Check for solid background color
+                    if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
+                        detectedColor = extractRGB(bgColor);
+                        if (detectedColor) break;
+                    }
+                    
+                    // Check for gradient background
+                    if (bgImage && bgImage.includes('linear-gradient')) {
+                        // Extract first color from gradient
+                        const gradientMatch = bgImage.match(/rgba?\(\d+,\s*\d+,\s*\d+(?:,\s*[\d.]+)?\)/);
+                        if (gradientMatch) {
+                            detectedColor = extractRGB(gradientMatch[0]);
+                            if (detectedColor) break;
+                        }
+                    }
+                    
+                    currentElement = currentElement.parentElement;
+                }
+                
+                if (detectedColor) {
+                    const newStyles = generateAdaptiveColors(detectedColor);
+                    setAdaptiveStyles(newStyles);
+                    setIsDetected(true);
+                } else {
+                    // Fallback to token-based styling
+                    setAdaptiveStyles({
+                        background: tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.1)',
+                        backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                        WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                        borderColor: tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)',
+                        boxShadow: tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.3)'
+                    });
+                    setIsDetected(false);
+                }
+            } catch (error) {
+                console.warn('Dynamic background detection failed:', error);
+                // Use fallback styling
+                setAdaptiveStyles({
+                    background: tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                    WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                    borderColor: tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)',
+                    boxShadow: tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.3)'
+                });
+                setIsDetected(false);
+            }
+        };
+
+        // Initial detection
+        detectBackgroundColor();
+        
+        // Re-detect on resize or theme changes
+        const handleResize = () => detectBackgroundColor();
+        window.addEventListener('resize', handleResize);
+        
+        // Use ResizeObserver for more precise detection
+        let resizeObserver: ResizeObserver | null = null;
+        if (containerRef.current && window.ResizeObserver) {
+            resizeObserver = new ResizeObserver(detectBackgroundColor);
+            resizeObserver.observe(containerRef.current);
+        }
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+            }
+        };
+    }, [containerRef, tokens]);
+
+    return { adaptiveStyles, isDetected };
+};
 
 // --- Prop Types ---
 interface MediaDetailProps {
@@ -39,6 +208,8 @@ interface WhereToWatchProps {
 }
 
 const WhereToWatch: React.FC<WhereToWatchProps> = ({ providers, providerIds }) => {
+    const { tokens } = useAppleTheme();
+    
     const { stream, rent, buy, link } = useMemo<{
         stream: WatchProvider[];
         rent: WatchProvider[];
@@ -77,7 +248,11 @@ const WhereToWatch: React.FC<WhereToWatchProps> = ({ providers, providerIds }) =
             <img
                 src={`${IMAGE_BASE_URL}w92${provider.logo_path}`}
                 alt={provider.provider_name}
-                className="w-12 h-12 rounded-lg"
+                className="w-12 h-12 rounded-lg transition-transform duration-300 hover:scale-105"
+                style={{
+                    border: `1px solid ${tokens.colors.separator.opaque}`,
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)'
+                }}
             />
         );
 
@@ -85,7 +260,7 @@ const WhereToWatch: React.FC<WhereToWatchProps> = ({ providers, providerIds }) =
             return (
                 <div
                     key={provider.provider_id}
-                    className="transform hover:-translate-y-1 transition-transform"
+                    className="transition-transform duration-300 hover:-translate-y-1 hover:scale-105"
                 >
                     {logo}
                 </div>
@@ -98,7 +273,7 @@ const WhereToWatch: React.FC<WhereToWatchProps> = ({ providers, providerIds }) =
                 href={link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="transform hover:-translate-y-1 transition-transform"
+                className="transition-transform duration-300 hover:-translate-y-1 hover:scale-105"
             >
                 {logo}
             </a>
@@ -106,29 +281,81 @@ const WhereToWatch: React.FC<WhereToWatchProps> = ({ providers, providerIds }) =
     };
 
     return (
-        <section className="my-8 sm:my-12">
-            <h2 className="text-2xl font-bold mb-4">Where to Watch</h2>
-            <div className="glass-panel p-4 sm:p-6 rounded-xl">
+        <section style={{ margin: `${tokens.spacing.macro[0]}px 0` }}>
+            <h2 
+                className="mb-4"
+                style={{
+                    fontFamily: tokens.typography.families.display,
+                    fontSize: `${tokens.typography.sizes.title2}px`,
+                    fontWeight: tokens.typography.weights.bold,
+                    color: tokens.colors.label.primary
+                }}
+            >
+                Where to Watch
+            </h2>
+            
+            <div 
+                className="rounded-xl backdrop-blur-xl border"
+                style={{
+                    padding: `${tokens.spacing.standard[1]}px`,
+                    background: `linear-gradient(135deg, ${tokens.colors.background.secondary}E6, ${tokens.colors.background.primary}E6)`,
+                    borderColor: tokens.colors.separator.opaque,
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)'
+                }}
+            >
                 {hasStream && (
-                    <div className="mb-4">
-                        <h3 className="text-sm font-semibold text-slate-400 mb-2">STREAM</h3>
-                        <div className="flex flex-wrap gap-3">
+                    <div style={{ marginBottom: `${tokens.spacing.standard[0]}px` }}>
+                        <h3 
+                            className="mb-2"
+                            style={{
+                                fontFamily: tokens.typography.families.text,
+                                fontSize: `${tokens.typography.sizes.caption1}px`,
+                                fontWeight: tokens.typography.weights.semibold,
+                                color: tokens.colors.label.tertiary,
+                                letterSpacing: '0.05em'
+                            }}
+                        >
+                            STREAM
+                        </h3>
+                        <div className="flex flex-wrap" style={{ gap: `${tokens.spacing.micro[1]}px` }}>
                             {stream.map(renderProviderLogo)}
                         </div>
                     </div>
                 )}
                 {hasRent && (
-                    <div className="mb-4">
-                        <h3 className="text-sm font-semibold text-slate-400 mb-2">RENT</h3>
-                        <div className="flex flex-wrap gap-3">
+                    <div style={{ marginBottom: `${tokens.spacing.standard[0]}px` }}>
+                        <h3 
+                            className="mb-2"
+                            style={{
+                                fontFamily: tokens.typography.families.text,
+                                fontSize: `${tokens.typography.sizes.caption1}px`,
+                                fontWeight: tokens.typography.weights.semibold,
+                                color: tokens.colors.label.tertiary,
+                                letterSpacing: '0.05em'
+                            }}
+                        >
+                            RENT
+                        </h3>
+                        <div className="flex flex-wrap" style={{ gap: `${tokens.spacing.micro[1]}px` }}>
                             {rent.map(renderProviderLogo)}
                         </div>
                     </div>
                 )}
                 {hasBuy && (
                     <div>
-                        <h3 className="text-sm font-semibold text-slate-400 mb-2">BUY</h3>
-                        <div className="flex flex-wrap gap-3">
+                        <h3 
+                            className="mb-2"
+                            style={{
+                                fontFamily: tokens.typography.families.text,
+                                fontSize: `${tokens.typography.sizes.caption1}px`,
+                                fontWeight: tokens.typography.weights.semibold,
+                                color: tokens.colors.label.tertiary,
+                                letterSpacing: '0.05em'
+                            }}
+                        >
+                            BUY
+                        </h3>
+                        <div className="flex flex-wrap" style={{ gap: `${tokens.spacing.micro[1]}px` }}>
                             {buy.map(renderProviderLogo)}
                         </div>
                     </div>
@@ -139,111 +366,202 @@ const WhereToWatch: React.FC<WhereToWatchProps> = ({ providers, providerIds }) =
 };
 
 
-// --- Styled Components ---
-const Backdrop = styled.div<{ backdropPath: string }>`
-    position: fixed;
-    inset: 0;
-    background-image: url('${props => `${IMAGE_BASE_URL}original${props.backdropPath}`}');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    filter: blur(20px);
-    opacity: 0.6;
-    z-index: 0;
-`;
+// --- Apple Design System Components ---
+const BackgroundHeader: React.FC<{ backdropPath: string }> = ({ backdropPath }) => (
+    <div 
+        className="absolute inset-0 rounded-t-3xl overflow-hidden"
+        style={{
+            backgroundImage: `url('${IMAGE_BASE_URL}original${backdropPath}')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            filter: 'blur(20px)',
+            opacity: 0.3,
+            zIndex: 0
+        }}
+    />
+);
 
-const Overlay = styled.div`
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 1;
-`;
-
-const DetailContainer = styled.div`
-    position: relative;
-    z-index: 2;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    color: white;
-`;
-
-const HeaderSection = styled.div`
-    padding: 2rem 1rem 0;
-    background: linear-gradient(
-        180deg,
-        rgba(0, 0, 0, 0.8) 0%,
-        rgba(0, 0, 0, 0.4) 50%,
-        transparent 100%
+const PanelOverlay: React.FC = () => {
+    const { tokens } = useAppleTheme();
+    return (
+        <div 
+            className="absolute inset-0 rounded-t-3xl"
+            style={{
+                background: tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                zIndex: 1
+            }}
+        />
     );
-`;
+};
 
-const TabsContainer = styled.div`
-    display: flex;
-    justify-content: center;
-    margin-top: 2rem;
-    padding: 0 1rem;
-`;
+const DetailContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { tokens } = useAppleTheme();
+    return (
+        <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+            className="relative flex flex-col rounded-t-3xl overflow-hidden"
+            style={{
+                minHeight: '100vh',
+                maxWidth: '1200px',
+                margin: '0 auto',
+                background: tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                border: `1px solid ${tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)'}`,
+                boxShadow: tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.3)',
+                zIndex: 2,
+                color: tokens.colors.label.primary
+            }}
+        >
+            {children}
+        </motion.div>
+    );
+};
 
-const TabButton = styled.button<{ active: boolean }>`
-    padding: 0.5rem 1.5rem;
-    margin: 0 0.25rem;
-    border-radius: 24px 24px 0 0;
-    background: ${props => props.active ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.1)'};
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: white;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-    font-family: 'Inter', sans-serif;
+const HeaderSection: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { tokens } = useAppleTheme();
+    return (
+        <div 
+            className="relative"
+            style={{
+                paddingTop: tokens.spacing.xlarge,
+                paddingLeft: tokens.spacing.large,
+                paddingRight: tokens.spacing.large,
+                background: `linear-gradient(180deg, rgba(0, 0, 0, ${tokens.materials.glass.prominent.shadowIntensity * 2}) 0%, rgba(0, 0, 0, ${tokens.materials.glass.prominent.shadowIntensity}) 50%, transparent 100%)`,
+                zIndex: 2
+            }}
+        >
+            {children}
+        </div>
+    );
+};
 
-    &:hover {
-        background: rgba(255, 255, 255, 0.2);
-    }
+const TabsContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { tokens } = useAppleTheme();
+    return (
+        <div 
+            className="flex justify-center relative"
+            role="tablist"
+            aria-label="Media information tabs"
+            style={{
+                marginTop: tokens.spacing.large,
+                paddingLeft: tokens.spacing.large,
+                paddingRight: tokens.spacing.large,
+                zIndex: 2
+            }}
+        >
+            {children}
+        </div>
+    );
+};
 
-    @media (max-width: 640px) {
-        padding: 0.375rem 1rem;
-        font-size: 0.75rem;
-    }
-`;
+const TabButton: React.FC<{ 
+    active: boolean; 
+    onClick: () => void; 
+    children: React.ReactNode;
+}> = ({ active, onClick, children }) => {
+    const { tokens } = useAppleTheme();
+    const { applyHoverEffect, applyPressEffect } = useAppleAnimationEffects();
+    
+    return (
+        <motion.button
+            onClick={onClick}
+            onMouseEnter={applyHoverEffect}
+            onMouseDown={applyPressEffect}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="backdrop-blur-xl border border-b-0 relative overflow-hidden"
+            role="tab"
+            aria-selected={active}
+            tabIndex={active ? 0 : -1}
+            style={{
+                padding: `${tokens.spacing.small}px ${tokens.spacing.large}px`,
+                margin: `0 ${tokens.spacing.micro[0]}px`,
+                borderRadius: `${tokens.borderRadius.large}px ${tokens.borderRadius.large}px 0 0`,
+                background: active 
+                    ? tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.15)'
+                    : tokens?.materials?.pill?.secondary?.background || 'rgba(255, 255, 255, 0.08)',
+                backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                borderColor: tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)',
+                color: active ? tokens.colors.text.primary : tokens.colors.text.secondary,
+                fontSize: tokens.typography.sizes.body,
+                fontWeight: active ? tokens.typography.weights.semibold : tokens.typography.weights.medium,
+                fontFamily: tokens.typography.families.text,
+                textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
+                boxShadow: active 
+                    ? tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.3)'
+                    : tokens?.shadows?.medium || '0 4px 16px rgba(0, 0, 0, 0.2)',
+                transition: tokens.interactions.transitions.fast,
+                cursor: 'pointer'
+            }}
+        >
+            {/* Active state ripple effect */}
+            {active && (
+                <motion.div
+                    initial={{ scale: 0, opacity: 0.8 }}
+                    animate={{ scale: 1, opacity: 0.2 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        borderRadius: `${tokens.borderRadius.large}px ${tokens.borderRadius.large}px 0 0`,
+                        background: `radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, transparent 70%)`,
+                        pointerEvents: 'none'
+                    }}
+                />
+            )}
+            {children}
+        </motion.button>
+    );
+};
 
-const ContentPanel = styled(motion.div)`
-    flex: 1;
-    padding: 2rem 1rem;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px 20px 0 0;
-    min-height: calc(100vh - 300px);
-`;
+const ContentPanel = motion.div;
 
-const TrailerModalOverlay = styled.div`
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.8);
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-`;
+const TrailerModalOverlay: React.FC<{ children: React.ReactNode; onClick: () => void }> = ({ children, onClick }) => {
+    const { tokens } = useAppleTheme();
+    return (
+        <div 
+            className="fixed inset-0 flex items-center justify-center"
+            style={{
+                background: `${tokens.colors.background.overlay}CC`,
+                zIndex: 1000,
+                padding: tokens.spacing.xlarge
+            }}
+            onClick={onClick}
+        >
+            {children}
+        </div>
+    );
+};
 
-const TrailerModalContent = styled.div`
-    position: relative;
-    width: 100%;
-    max-width: 900px;
-    background: black;
-    border-radius: 12px;
-    overflow: hidden;
-`;
+const TrailerModalContent: React.FC<{ children: React.ReactNode; onClick: (e: React.MouseEvent) => void }> = ({ children, onClick }) => {
+    const { tokens } = useAppleTheme();
+    return (
+        <div 
+            className="relative w-full max-w-4xl rounded-xl overflow-hidden"
+            style={{
+                background: tokens.colors.background.primary,
+                boxShadow: tokens.shadows.large
+            }}
+            onClick={onClick}
+        >
+            {children}
+        </div>
+    );
+};
 
-const TrailerVideoContainer = styled.div`
-    aspect-ratio: 16/9;
-    width: 100%;
-`;
+const TrailerVideoContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <div className="aspect-video w-full">
+        {children}
+    </div>
+);
 
 // Like/Dislike Component
 const LikeDislikeButtons: React.FC<{
@@ -254,52 +572,157 @@ const LikeDislikeButtons: React.FC<{
     onDislike: () => void;
     isLoading: boolean;
 }> = ({ mediaId, mediaType, currentPreference, onLike, onDislike, isLoading }) => {
-    const getLikeButtonClasses = () => {
-        let classes = "flex items-center gap-2 px-4 py-2 rounded-full font-semibold transition-all duration-200 ";
-        if (currentPreference === 'like') {
-            classes += "bg-green-600 text-white shadow-lg";
-        } else {
-            classes += "bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm border border-white/20";
-        }
-        if (isLoading) classes += " opacity-50 cursor-not-allowed";
-        return classes;
-    };
+    const { tokens } = useAppleTheme();
+    const { applyHoverEffect, applyPressEffect } = useAppleAnimationEffects();
 
-    const getDislikeButtonClasses = () => {
-        let classes = "flex items-center gap-2 px-4 py-2 rounded-full font-semibold transition-all duration-200 ";
-        if (currentPreference === 'dislike') {
-            classes += "bg-red-600 text-white shadow-lg";
-        } else {
-            classes += "bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm border border-white/20";
-        }
-        if (isLoading) classes += " opacity-50 cursor-not-allowed";
-        return classes;
-    };
+    // Add null check for tokens
+    if (!tokens) {
+        return null;
+    }
 
     return (
-        <div className="flex gap-3 mb-4">
-            <button
+        <div 
+            className="flex" 
+            style={{ 
+                gap: tokens.spacing.small, 
+                marginBottom: tokens.spacing.medium 
+            }}
+            role="group"
+            aria-label="Rate this content"
+        >
+            <motion.button
                 onClick={onLike}
                 disabled={isLoading}
-                className={getLikeButtonClasses()}
+                onMouseEnter={!isLoading ? applyHoverEffect : undefined}
+                onMouseDown={!isLoading ? applyPressEffect : undefined}
+                whileHover={!isLoading ? { scale: 1.02 } : {}}
+                whileTap={!isLoading ? { scale: 0.98 } : {}}
+                className="flex items-center backdrop-blur-xl border"
+                aria-label={currentPreference === 'like' ? 'Remove like' : 'Like this content'}
+                aria-pressed={currentPreference === 'like'}
+                style={{
+                    padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.medium}px`,
+                    gap: tokens.spacing.small,
+                    borderRadius: `${tokens.borderRadius.xxlarge}px`,
+                    minHeight: '44px',
+                    fontFamily: tokens.typography.families.text,
+                    fontSize: tokens.typography.sizes.body,
+                    fontWeight: tokens.typography.weights.semibold,
+                    background: currentPreference === 'like' 
+                        ? `linear-gradient(135deg, ${tokens.colors.system.green}E6 0%, ${tokens.colors.system.green}CC 100%)`
+                        : tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                    WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                    borderColor: currentPreference === 'like' 
+                        ? `${tokens.colors.system.green}80` 
+                        : tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)',
+                    color: tokens.colors.text.primary,
+                    boxShadow: currentPreference === 'like' 
+                        ? `0 4px 20px rgba(${tokens.colors.system.green.replace('#', '')}, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)`
+                        : tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.3)',
+                    opacity: isLoading ? 0.5 : 1,
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    transition: tokens.interactions.transitions.fast,
+                    position: 'relative',
+                    overflow: 'hidden'
+                }}
             >
-                <Icons.HeartIcon className="w-5 h-5" isActive={currentPreference === 'like'} />
+                {/* Material Design Ripple Effect */}
+                {currentPreference === 'like' && (
+                    <motion.div
+                        initial={{ scale: 0, opacity: 0.8 }}
+                        animate={{ scale: 1, opacity: 0.3 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            borderRadius: `${tokens.borderRadius.xxlarge}px`,
+                            background: `radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%)`,
+                            pointerEvents: 'none'
+                        }}
+                    />
+                )}
+                <Heart 
+                    size={20}
+                    fill={currentPreference === 'like' ? 'currentColor' : 'none'}
+                    aria-hidden="true"
+                />
                 {currentPreference === 'like' ? 'Liked' : 'Like'}
-            </button>
-            <button
+            </motion.button>
+            
+            <motion.button
                 onClick={onDislike}
                 disabled={isLoading}
-                className={getDislikeButtonClasses()}
+                onMouseEnter={!isLoading ? applyHoverEffect : undefined}
+                onMouseDown={!isLoading ? applyPressEffect : undefined}
+                whileHover={!isLoading ? { scale: 1.02 } : {}}
+                whileTap={!isLoading ? { scale: 0.98 } : {}}
+                className="flex items-center backdrop-blur-xl border"
+                aria-label={currentPreference === 'dislike' ? 'Remove dislike' : 'Dislike this content'}
+                aria-pressed={currentPreference === 'dislike'}
+                style={{
+                    padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.medium}px`,
+                    gap: tokens.spacing.small,
+                    borderRadius: `${tokens.borderRadius.xxlarge}px`,
+                    minHeight: '44px',
+                    fontFamily: tokens.typography.families.text,
+                    fontSize: tokens.typography.sizes.body,
+                    fontWeight: tokens.typography.weights.semibold,
+                    background: currentPreference === 'dislike' 
+                        ? `linear-gradient(135deg, ${tokens.colors.system.red}E6 0%, ${tokens.colors.system.red}CC 100%)`
+                        : tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                    WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                    borderColor: currentPreference === 'dislike' 
+                        ? `${tokens.colors.system.red}80` 
+                        : tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)',
+                    color: tokens.colors.text.primary,
+                    boxShadow: currentPreference === 'dislike' 
+                        ? `0 4px 20px rgba(${tokens.colors.system.red.replace('#', '')}, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)`
+                        : tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.3)',
+                    opacity: isLoading ? 0.5 : 1,
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    transition: tokens.interactions.transitions.fast,
+                    position: 'relative',
+                    overflow: 'hidden'
+                }}
             >
-                <Icons.ThumbsDownIcon className="w-5 h-5" isActive={currentPreference === 'dislike'} />
+                {/* Material Design Ripple Effect */}
+                {currentPreference === 'dislike' && (
+                    <motion.div
+                        initial={{ scale: 0, opacity: 0.8 }}
+                        animate={{ scale: 1, opacity: 0.3 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            borderRadius: `${tokens.borderRadius.xxlarge}px`,
+                            background: `radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%)`,
+                            pointerEvents: 'none'
+                        }}
+                    />
+                )}
+                <ThumbsDown 
+                    size={20}
+                    fill={currentPreference === 'dislike' ? 'currentColor' : 'none'}
+                    aria-hidden="true"
+                />
                 {currentPreference === 'dislike' ? 'Disliked' : 'Dislike'}
-            </button>
+            </motion.button>
         </div>
     );
 };
 
 // --- Main Component ---
 const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSelectItem, onInvalidApiKey }) => {
+    const { tokens } = useAppleTheme();
+    const { applyHoverEffect, applyPressEffect } = useAppleAnimationEffects();
+    
+    // Add null check for tokens
+    if (!tokens) {
+        return null;
+    }
+    
     const [activeTab, setActiveTab] = useState<'overview' | 'cast' | 'reviews'>('overview');
     const [showTrailerModal, setShowTrailerModal] = useState(false);
     const [details, setDetails] = useState<MovieDetails | TVShowDetails | null>(null);
@@ -329,6 +752,15 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     const [aiReviews, setAiReviews] = useState<string | null>(null);
     const [isAiReviewsLoading, setIsAiReviewsLoading] = useState(false);
     const [aiReviewsError, setAiReviewsError] = useState<string | null>(null);
+
+    // Refs for dynamic background detection
+    const contentPanelRef = useRef<HTMLDivElement>(null);
+    const trailerContainerRef = useRef<HTMLDivElement>(null);
+    const descriptionPanelRef = useRef<HTMLDivElement>(null);
+
+    // Dynamic background adaptation hooks
+    const { adaptiveStyles: trailerAdaptiveStyles } = useDynamicBackground(contentPanelRef, tokens);
+    const { adaptiveStyles: descriptionAdaptiveStyles } = useDynamicBackground(contentPanelRef, tokens);
     const [preferenceLoading, setPreferenceLoading] = useState(false);
 
     const { country } = useGeolocation();
@@ -373,28 +805,24 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                     : getTMDbTVShowDetails(apiKey, item.id));
 
                 // Fetch cast from TMDb
-                if (item.media_type === 'movie') {
-                    const credits = await getMovieCredits(apiKey, item.id);
-                    fetchedDetails.credits = credits;
-                }
+                const credits = item.media_type === 'movie'
+                    ? await getMovieCredits(apiKey, item.id)
+                    : await getTVShowCredits(apiKey, item.id);
+                fetchedDetails.credits = credits;
 
                 // Fetch watch providers from TMDb
                 const providers = item.media_type === 'movie'
                     ? await getMovieWatchProviders(apiKey, item.id, country.code)
                     : await getTVShowWatchProviders(apiKey, item.id, country.code);
 
+                // Set watch providers
+                (fetchedDetails as any)['watch/providers'] = providers;
+
                 // Fetch videos/trailers from TMDb
-                try {
-                    const videos = item.media_type === 'movie'
-                        ? await getMovieVideos(apiKey, item.id)
-                        : await getTVShowVideos(apiKey, item.id);
-                    (fetchedDetails as any).videos = videos;
-                    (fetchedDetails as any)['watch/providers'] = providers;
-                } catch (videoError) {
-                    console.warn('Trailer data not available, trailers will not be shown:', videoError);
-                    (fetchedDetails as any).videos = { results: [] };
-                    (fetchedDetails as any)['watch/providers'] = providers;
-                }
+                const videos = item.media_type === 'movie'
+                    ? await getMovieVideos(apiKey, item.id)
+                    : await getTVShowVideos(apiKey, item.id);
+                (fetchedDetails as any).videos = videos;
 
                 if (!isMounted) return;
                 setDetails(fetchedDetails as any);
@@ -489,10 +917,21 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         }
     };
 
-    const mainTrailerKey = useMemo(() => {
-        if (!details?.videos?.results) return null;
-        const officialTrailer = details.videos.results.find(v => v.type === 'Trailer' && v.official && v.site === 'YouTube');
-        return officialTrailer?.key || details.videos.results.find(v => v.site === 'YouTube' && v.type === 'Trailer')?.key || null;
+    const [mainTrailerKey, setMainTrailerKey] = useState<string | null>(null);
+    useEffect(() => {
+        // Derive the main YouTube trailer key from TMDb videos in details
+        if (!details || !(details as any).videos || !Array.isArray((details as any).videos.results)) {
+            setMainTrailerKey(null);
+            return;
+        }
+        const videos = (details as any).videos.results as Array<any>;
+        const pick = (predicate: (v: any) => boolean) => videos.find(predicate);
+        const primary =
+            pick(v => v.site === 'YouTube' && v.type === 'Trailer' && v.official) ||
+            pick(v => v.site === 'YouTube' && v.type === 'Trailer') ||
+            pick(v => v.site === 'YouTube' && v.type === 'Teaser') ||
+            pick(v => v.site === 'YouTube');
+        setMainTrailerKey(primary?.key ?? null);
     }, [details]);
 
     const providersForCountry = useMemo(
@@ -588,7 +1027,12 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
     if (isLoading) {
         return (
-            <div className="fixed inset-0 bg-primary z-50 flex items-center justify-center">
+            <div 
+                className="fixed inset-0 z-50 flex items-center justify-center"
+                style={{
+                    background: tokens.colors.background.primary
+                }}
+            >
                 <Loader />
             </div>
         );
@@ -596,9 +1040,40 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
     if (error || !details) {
         return (
-            <div className="fixed inset-0 bg-primary z-50 flex flex-col items-center justify-center p-4">
-                <p className="text-xl text-red-400 mb-4">{error || "Something went wrong."}</p>
-                <button onClick={onClose} className="glass-button px-4 py-2 rounded-lg">Go Back</button>
+            <div 
+                className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+                style={{
+                    background: tokens.colors.background.primary,
+                    padding: tokens.spacing.large
+                }}
+            >
+                <p 
+                    className="mb-4"
+                    style={{
+                        fontSize: tokens.typography.sizes.title3,
+                        color: tokens.colors.system.red,
+                        fontFamily: tokens.typography.families.text
+                    }}
+                >
+                    {error || "Something went wrong."}
+                </p>
+                <button 
+                    onClick={onClose} 
+                    onMouseEnter={applyHoverEffect}
+                    onMouseDown={applyPressEffect}
+                    className="rounded-lg backdrop-blur-xl border transition-all duration-300"
+                    style={{
+                        padding: `${tokens.spacing.small} ${tokens.spacing.medium}`,
+                        background: `linear-gradient(135deg, ${tokens.colors.background.secondary}E6, ${tokens.colors.background.primary}E6)`,
+                        borderColor: tokens.colors.border.primary,
+                        color: tokens.colors.text.primary,
+                        fontFamily: tokens.typography.families.text,
+                        fontSize: tokens.typography.sizes.body,
+                        fontWeight: tokens.typography.weights.medium
+                    }}
+                >
+                    Go Back
+                </button>
             </div>
         );
     }
@@ -614,64 +1089,251 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         switch (activeTab) {
             case 'overview':
                 return (
-                    <div className="space-y-6">
-                        <div className="text-center">
-                            <button
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: tokens.spacing.large }}>
+                        <div 
+                            ref={trailerContainerRef}
+                            className="text-center backdrop-blur-xl border"
+                            style={{
+                                background: trailerAdaptiveStyles.background,
+                                backdropFilter: trailerAdaptiveStyles.backdropFilter,
+                                WebkitBackdropFilter: trailerAdaptiveStyles.WebkitBackdropFilter,
+                                borderColor: trailerAdaptiveStyles.borderColor,
+                                boxShadow: trailerAdaptiveStyles.boxShadow,
+                                borderRadius: `${tokens.borderRadius.xlarge}px`,
+                                padding: tokens.spacing.medium,
+                                marginBottom: tokens.spacing.large,
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                transition: tokens.interactions.transitions.fast
+                            }}
+                        >
+                            <motion.button
                                 onClick={handlePlayTrailer}
                                 disabled={!mainTrailerKey}
-                                className={`bg-white text-black font-bold px-6 py-3 rounded-full mb-6 ${!mainTrailerKey ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200'}`}
+                                onMouseEnter={!mainTrailerKey ? undefined : applyHoverEffect}
+                                onMouseDown={!mainTrailerKey ? undefined : applyPressEffect}
+                                whileHover={!mainTrailerKey ? {} : { scale: 1.02 }}
+                                whileTap={!mainTrailerKey ? {} : { scale: 0.98 }}
+                                className="flex items-center justify-center backdrop-blur-xl border"
+                                aria-label={mainTrailerKey ? 'Play trailer' : 'No trailer available'}
+                                style={{
+                                    padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.medium}px`,
+                                    gap: tokens.spacing.small,
+                                    borderRadius: `${tokens.borderRadius.xxlarge}px`,
+                                    minHeight: '44px',
+                                    fontFamily: tokens.typography.families.text,
+                                    fontSize: tokens.typography.sizes.body,
+                                    fontWeight: tokens.typography.weights.semibold,
+                                    background: mainTrailerKey 
+                                        ? tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.1)'
+                                        : tokens?.materials?.pill?.secondary?.background || 'rgba(255, 255, 255, 0.05)',
+                                    backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                                    WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                                    borderColor: tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)',
+                                    color: tokens.colors.text.primary,
+                                    boxShadow: tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.3)',
+                                    opacity: !mainTrailerKey ? 0.5 : 1,
+                                    cursor: !mainTrailerKey ? 'not-allowed' : 'pointer',
+                                    transition: tokens.interactions.transitions.fast,
+                                    position: 'relative',
+                                    overflow: 'hidden'
+                                }}
                             >
+                                <Play 
+                                    size={20}
+                                    fill="currentColor"
+                                    aria-hidden="true"
+                                />
                                 {mainTrailerKey ? 'Play Trailer' : 'No Trailer Available'}
-                            </button>
+                            </motion.button>
                         </div>
 
-                        <p className="text-slate-200 leading-relaxed text-lg">
-                            {details.overview}
-                        </p>
+                        <motion.div 
+                            ref={descriptionPanelRef}
+                            className="backdrop-blur-xl border"
+                            onMouseEnter={applyHoverEffect}
+                            onMouseDown={applyPressEffect}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            style={{
+                                background: descriptionAdaptiveStyles.background,
+                                backdropFilter: descriptionAdaptiveStyles.backdropFilter,
+                                WebkitBackdropFilter: descriptionAdaptiveStyles.WebkitBackdropFilter,
+                                borderColor: descriptionAdaptiveStyles.borderColor,
+                                boxShadow: descriptionAdaptiveStyles.boxShadow,
+                                borderRadius: `${tokens.borderRadius.xxlarge}px`,
+                                padding: tokens.spacing.large,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: tokens.spacing.large,
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                transition: tokens.interactions.transitions.fast,
+                                position: 'relative',
+                                overflow: 'hidden',
+                                cursor: 'default'
+                            }}
+                        >
+                            <p 
+                                style={{
+                                    color: 'white',
+                                    lineHeight: '1.6',
+                                    fontSize: tokens.typography.sizes.body,
+                                    fontFamily: tokens.typography.families.text
+                                }}
+                            >
+                                {details.overview}
+                            </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {hasStreamingAvailability && (
+                            <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: tokens.spacing.medium }}>
+                                {hasStreamingAvailability && (
+                                    <div>
+                                        <h3 
+                                            style={{
+                                                fontWeight: tokens.typography.weights.semibold,
+                                                color: 'white',
+                                                marginBottom: tokens.spacing.small,
+                                                fontFamily: tokens.typography.families.text,
+                                                fontSize: tokens.typography.sizes.title3
+                                            }}
+                                        >
+                                            Where to Watch
+                                        </h3>
+                                        <div className="flex flex-wrap" style={{ gap: tokens.spacing.small }}>
+                                            {availabilityDescriptors.slice(0, 3).map(descriptor => (
+                                                <span
+                                                    key={descriptor.type}
+                                                    className="rounded-full backdrop-blur-xl border"
+                                                    style={{
+                                                        background: `${tokens.colors.background.secondary}80`,
+                                                        borderColor: tokens.colors.border.primary,
+                                                        padding: `${tokens.spacing.small} ${tokens.spacing.small}`,
+                                                        fontSize: tokens.typography.sizes.caption1,
+                                                        fontFamily: tokens.typography.families.text
+                                                    }}
+                                                >
+                                                    <span 
+                                                        style={{
+                                                            fontWeight: tokens.typography.weights.semibold,
+                                                            color: 'white',
+                                                            marginRight: tokens.spacing.small
+                                                        }}
+                                                    >
+                                                        {descriptor.type}:
+                                                    </span>
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                        {descriptor.text}
+                                                    </span>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div>
-                                    <h3 className="font-semibold text-white mb-3">Where to Watch</h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        {availabilityDescriptors.slice(0, 3).map(descriptor => (
-                                            <span
-                                                key={descriptor.type}
-                                                className="bg-white/10 border border-white/20 px-3 py-1 rounded-full backdrop-blur-sm text-sm"
-                                            >
-                                                <span className="font-semibold text-white mr-1">{descriptor.type}:</span>
-                                                {descriptor.text}
-                                            </span>
-                                        ))}
+                                    <h3 
+                                        style={{
+                                            fontWeight: tokens.typography.weights.semibold,
+                                            color: 'white',
+                                            marginBottom: tokens.spacing.small,
+                                            fontFamily: tokens.typography.families.text,
+                                            fontSize: tokens.typography.sizes.title3
+                                        }}
+                                    >
+                                        Details
+                                    </h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: tokens.spacing.small }}>
+                                        <p style={{ color: 'rgba(255, 255, 255, 0.8)', fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.caption1 }}>
+                                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Rating:</span> {details.vote_average.toFixed(1)}/10
+                                        </p>
+                                        <p style={{ color: 'rgba(255, 255, 255, 0.8)', fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.caption1 }}>
+                                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Year:</span> {year}
+                                        </p>
+                                        {runtimeInfo && (
+                                            <p style={{ color: 'rgba(255, 255, 255, 0.8)', fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.caption1 }}>
+                                                <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Duration:</span> {runtimeInfo}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
-                            )}
-
-                            <div>
-                                <h3 className="font-semibold text-white mb-3">Details</h3>
-                                <div className="space-y-1 text-sm">
-                                    <p><span className="text-slate-400">Rating:</span> {details.vote_average.toFixed(1)}/10</p>
-                                    <p><span className="text-slate-400">Year:</span> {year}</p>
-                                    {runtimeInfo && <p><span className="text-slate-400">Duration:</span> {runtimeInfo}</p>}
-                                </div>
                             </div>
-                        </div>
+                        </motion.div>
                     </div>
                 );
             case 'cast':
                 return (
                     <div>
-                        <h3 className="text-xl font-bold mb-4">Top Billed Cast</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                            {details.credits?.cast?.slice(0, 12).map(member => member && (
-                                <div key={member.id} className="text-center">
-                                    <img
-                                        src={member.profile_path ? `${IMAGE_BASE_URL}w185${member.profile_path}` : 'https://via.placeholder.com/185x278?text=N/A'}
-                                        alt={member.name}
-                                        className="w-full aspect-[2/3] object-cover rounded-lg bg-glass mb-2"
-                                    />
-                                    <p className="font-semibold text-sm">{member.name}</p>
-                                    <p className="text-xs text-slate-400 line-clamp-2">{member.character}</p>
+                        <h3 
+                            style={{
+                                fontSize: tokens.typography.sizes.title3,
+                                fontWeight: tokens.typography.weights.bold,
+                                marginBottom: tokens.spacing.medium,
+                                color: tokens.colors.text.primary,
+                                fontFamily: tokens.typography.families.text
+                            }}
+                        >
+                            Top Billed Cast
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" style={{ gap: tokens.spacing.medium }}>
+                            {details.credits?.cast?.slice(0, 15).map(member => member && (
+                                <div 
+                                    key={member.id} 
+                                    className="text-center"
+                                    style={{
+                                        background: tokens?.materials?.pill?.primary?.background || `rgba(255, 255, 255, 0.1)`,
+                                        backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                                        WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                                        borderColor: tokens?.colors?.border?.primary || 'rgba(255, 255, 255, 0.2)',
+                                        boxShadow: tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.12)',
+                                        borderRadius: '16px',
+                                        border: '1px solid',
+                                        padding: tokens.spacing.medium,
+                                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            position: 'relative',
+                                            marginBottom: tokens.spacing.small,
+                                            borderRadius: '12px',
+                                            overflow: 'hidden'
+                                        }}
+                                    >
+                                        <img
+                                            src={member.profile_path ? `${IMAGE_BASE_URL}w185${member.profile_path}` : 'https://via.placeholder.com/185x278/333/fff?text=N/A'}
+                                            alt={member.name}
+                                            className="w-full aspect-[2/3] object-cover"
+                                            style={{
+                                                background: `linear-gradient(135deg, ${tokens.colors.background.secondary}80, ${tokens.colors.background.primary}80)`,
+                                                filter: member.profile_path ? 'none' : 'brightness(0.7)'
+                                            }}
+                                            onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                target.src = 'https://via.placeholder.com/185x278/333/fff?text=N/A';
+                                            }}
+                                        />
+                                    </div>
+                                    <p 
+                                        style={{
+                                            fontWeight: tokens.typography.weights.semibold,
+                                            fontSize: tokens.typography.sizes.caption1,
+                                            color: tokens.colors.text.primary,
+                                            fontFamily: tokens.typography.families.text,
+                                            marginBottom: tokens.spacing.small / 2,
+                                            lineHeight: 1.2
+                                        }}
+                                    >
+                                        {member.name}
+                                    </p>
+                                    <p 
+                                        style={{
+                                            fontSize: tokens.typography.sizes.caption2,
+                                            color: tokens.colors.text.tertiary,
+                                            fontFamily: tokens.typography.families.text,
+                                            lineHeight: 1.3,
+                                            opacity: 0.8
+                                        }}
+                                    >
+                                        {member.character}
+                                    </p>
                                 </div>
                             ))}
                         </div>
@@ -680,83 +1342,245 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
             case 'reviews':
                 return (
                     <div>
-                        <h3 className="text-xl font-bold mb-4">Reviews & Analysis</h3>
-                        <div className="space-y-6">
+                        <h3 
+                            style={{
+                                fontSize: tokens.typography.sizes.title3,
+                                fontWeight: tokens.typography.weights.bold,
+                                marginBottom: tokens.spacing.medium,
+                                color: tokens.colors.text.primary,
+                                fontFamily: tokens.typography.families.text
+                            }}
+                        >
+                            Reviews & Analysis
+                        </h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: tokens.spacing.large }}>
             {!storyScape && !isStoryScapeLoading && !storyScapeError && (
-                <button onClick={handleGenerateStoryScape} className="bg-accent-500 text-white font-bold px-6 py-3 rounded-full hover:bg-accent-600 transition-colors">
+                <button 
+                    onClick={handleGenerateStoryScape} 
+                    onMouseEnter={applyHoverEffect}
+                    onMouseDown={applyPressEffect}
+                    className="rounded-xl backdrop-blur-xl border transition-all duration-300"
+                    style={{
+                        padding: `${tokens.spacing.small} ${tokens.spacing.large}`,
+                        background: `linear-gradient(135deg, ${tokens.colors.system.purple}, ${tokens.colors.system.purple}E6)`,
+                        borderColor: tokens.colors.border.primary,
+                        color: tokens.colors.text.primary,
+                        fontFamily: tokens.typography.families.text,
+                        fontWeight: tokens.typography.weights.bold,
+                        fontSize: tokens.typography.sizes.body
+                    }}
+                >
                     Generate AI Summary
                 </button>
             )}
 
                             {storyScape && (
-                                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                                    <h4 className="font-semibold text-accent-400 mb-2">AI Analysis</h4>
-                                    <p className="text-slate-200 italic mb-3">"{storyScape.summary}"</p>
-                                    <div className="flex flex-col sm:flex-row gap-4 text-sm">
+                                <div 
+                                    className="rounded-xl backdrop-blur-xl border"
+                                    style={{
+                                        background: `linear-gradient(135deg, ${tokens.colors.background.secondary}80, ${tokens.colors.background.primary}80)`,
+                                        borderColor: tokens.colors.border.primary,
+                                        padding: tokens.spacing.medium
+                                    }}
+                                >
+                                    <h4 
+                                        style={{
+                                            fontWeight: tokens.typography.weights.semibold,
+                                            color: tokens.colors.system.purple,
+                                            marginBottom: tokens.spacing.small,
+                                            fontFamily: tokens.typography.families.text,
+                                            fontSize: tokens.typography.sizes.body
+                                        }}
+                                    >
+                                        AI Analysis
+                                    </h4>
+                                    <p 
+                                        style={{
+                                            color: tokens.colors.text.primary,
+                                            fontStyle: 'italic',
+                                            marginBottom: tokens.spacing.small,
+                                            fontFamily: tokens.typography.families.text,
+                                            fontSize: tokens.typography.sizes.body
+                                        }}
+                                    >
+                                        "{storyScape.summary}"
+                                    </p>
+                                    <div className="flex flex-col sm:flex-row" style={{ gap: tokens.spacing.medium, fontSize: tokens.typography.sizes.caption1 }}>
                                         <div>
-                                            <h5 className="font-semibold text-slate-400">Emotional Tone</h5>
-                                            <p>{storyScape.tone}</p>
+                                            <h5 
+                                                style={{
+                                                    fontWeight: tokens.typography.weights.semibold,
+                                                    color: tokens.colors.text.tertiary,
+                                                    fontFamily: tokens.typography.families.text
+                                                }}
+                                            >
+                                                Emotional Tone
+                                            </h5>
+                                            <p style={{ color: tokens.colors.text.secondary, fontFamily: tokens.typography.families.text }}>
+                                                {storyScape.tone}
+                                            </p>
                                         </div>
                                         <div>
-                                            <h5 className="font-semibold text-slate-400">Cinematic Style</h5>
-                                            <p>{storyScape.style}</p>
+                                            <h5 
+                                                style={{
+                                                    fontWeight: tokens.typography.weights.semibold,
+                                                    color: tokens.colors.text.tertiary,
+                                                    fontFamily: tokens.typography.families.text
+                                                }}
+                                            >
+                                                Cinematic Style
+                                            </h5>
+                                            <p style={{ color: tokens.colors.text.secondary, fontFamily: tokens.typography.families.text }}>
+                                                {storyScape.style}
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
                             {!aiReviews && !isAiReviewsLoading && !aiReviewsError && (
-                                <button onClick={handleGenerateReviewsAI} className="bg-blue-500 text-white font-bold px-6 py-3 rounded-full">
+                                <button 
+                                    onClick={handleGenerateReviewsAI} 
+                                    onMouseEnter={applyHoverEffect}
+                                    onMouseDown={applyPressEffect}
+                                    className="rounded-xl backdrop-blur-xl border transition-all duration-300"
+                                    style={{
+                                        padding: `${tokens.spacing.small} ${tokens.spacing.large}`,
+                                        background: `linear-gradient(135deg, ${tokens.colors.system.blue}, ${tokens.colors.system.blue}E6)`,
+                                        borderColor: tokens.colors.border.primary,
+                                        color: tokens.colors.text.primary,
+                                        fontFamily: tokens.typography.families.text,
+                                        fontWeight: tokens.typography.weights.bold,
+                                        fontSize: tokens.typography.sizes.body
+                                    }}
+                                >
                                     Generate AI Reviews
                                 </button>
                             )}
 
                             {isAiReviewsLoading && (
-                                <div className="text-center py-4">
-                                    <div className="spinner mx-auto mb-2"></div>
-                                    <p className="text-slate-400">Generating AI reviews...</p>
+                                <div className="text-center" style={{ padding: tokens.spacing.medium }}>
+                                    <div className="spinner mx-auto" style={{ marginBottom: tokens.spacing.small }}></div>
+                                    <p style={{ color: tokens.colors.text.tertiary, fontFamily: tokens.typography.families.text }}>
+                                        Generating AI reviews...
+                                    </p>
                                 </div>
                             )}
 
                             {aiReviewsError && (
-                                <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4">
-                                    <p className="text-red-400">Error generating reviews: {aiReviewsError}</p>
+                                <div 
+                                    className="rounded-xl border"
+                                    style={{
+                                        background: `${tokens.colors.system.red}20`,
+                                        borderColor: `${tokens.colors.system.red}50`,
+                                        padding: tokens.spacing.medium
+                                    }}
+                                >
+                                    <p style={{ color: tokens.colors.system.red, fontFamily: tokens.typography.families.text }}>
+                                        Error generating reviews: {aiReviewsError}
+                                    </p>
                                 </div>
                             )}
 
                             {aiReviews && (
-                                <div className="bg-blue-500/10 backdrop-blur-sm rounded-xl p-6">
-                                    <h4 className="font-semibold text-blue-400 mb-4">AI-Generated Reviews</h4>
-                                    <div className="text-slate-200 whitespace-pre-line leading-relaxed">
+                                <div 
+                                    className="rounded-xl backdrop-blur-xl border"
+                                    style={{
+                                        background: `${tokens.colors.system.blue}10`,
+                                        borderColor: tokens.colors.border.primary,
+                                        padding: tokens.spacing.large
+                                    }}
+                                >
+                                    <h4 
+                                        style={{
+                                            fontWeight: tokens.typography.weights.semibold,
+                                            color: tokens.colors.system.blue,
+                                            marginBottom: tokens.spacing.medium,
+                                            fontFamily: tokens.typography.families.text,
+                                            fontSize: tokens.typography.sizes.body
+                                        }}
+                                    >
+                                        AI-Generated Reviews
+                                    </h4>
+                                    <div 
+                                        style={{
+                                            color: tokens.colors.text.primary,
+                                            whiteSpace: 'pre-line',
+                                            lineHeight: '1.6',
+                                            fontFamily: tokens.typography.families.text,
+                                            fontSize: tokens.typography.sizes.body
+                                        }}
+                                    >
                                         {aiReviews}
                                     </div>
                                 </div>
                             )}
 
                             {(omdbData && item.media_type === 'movie') && (
-                                <div className="bg-white/30 backdrop-blur-sm rounded-xl p-4">
-                                    <h4 className="font-semibold text-black mb-3" style={{textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>Additional Information</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div 
+                                    className="rounded-xl backdrop-blur-xl border"
+                                    style={{
+                                        background: `${tokens.colors.background.secondary}CC`,
+                                        borderColor: tokens.colors.border.primary,
+                                        padding: tokens.spacing.medium
+                                    }}
+                                >
+                                    <h4 
+                                        style={{
+                                            fontWeight: tokens.typography.weights.semibold,
+                                            color: tokens.colors.text.primary,
+                                            marginBottom: tokens.spacing.small,
+                                            fontFamily: tokens.typography.families.text,
+                                            fontSize: tokens.typography.sizes.body
+                                        }}
+                                    >
+                                        Additional Information
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: tokens.spacing.medium, fontSize: tokens.typography.sizes.caption1 }}>
                                         {omdbData.Rated && omdbData.Rated !== 'N/A' && (
-                                            <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>
-                                                <span className="font-medium">Rating:</span> {omdbData.Rated}
+                                            <p style={{ color: tokens.colors.text.secondary, fontFamily: tokens.typography.families.text }}>
+                                                <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>Rating:</span> {omdbData.Rated}
                                             </p>
                                         )}
                                         {omdbData.Awards && omdbData.Awards !== 'N/A' && (
-                                            <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>
-                                                <span className="font-medium">Awards:</span> {omdbData.Awards}
+                                            <p style={{ color: tokens.colors.text.secondary, fontFamily: tokens.typography.families.text }}>
+                                                <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>Awards:</span> {omdbData.Awards}
                                             </p>
                                         )}
                                         {omdbData.BoxOffice && omdbData.BoxOffice !== 'N/A' && (
-                                            <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>
-                                                <span className="font-medium">Box Office:</span> {omdbData.BoxOffice}
+                                            <p style={{ color: tokens.colors.text.secondary, fontFamily: tokens.typography.families.text }}>
+                                                <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>Box Office:</span> {omdbData.BoxOffice}
                                             </p>
                                         )}
                                         {omdbData.imdbRating && omdbData.imdbRating !== 'N/A' && (
-                                            <p style={{color: 'rgba(0,0,0,0.8)', textShadow: '0 1px 2px rgba(0,0,0,0.3)'}}>
-                                                <span className="font-medium">IMDb Score:</span> {omdbData.imdbRating}/10
+                                            <p style={{ color: tokens.colors.text.secondary, fontFamily: tokens.typography.families.text }}>
+                                                <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>IMDb Score:</span> {omdbData.imdbRating}/10
                                             </p>
                                         )}
+                                        {(() => {
+                                            const rtRating = extractRottenTomatoesRating(omdbData);
+                                            return rtRating && (
+                                                <div style={{ gridColumn: 'span 2' }}>
+                                                    <RottenTomatoesRating 
+                                                        rating={rtRating} 
+                                                        size="md" 
+                                                        showLabel={true}
+                                                    />
+                                                    {(() => {
+                                                        const consensus = extractRottenTomatoesConsensus(omdbData);
+                                                        return consensus ? (
+                                                            <p style={{
+                                                                marginTop: tokens.spacing.small,
+                                                                color: tokens.colors.text.secondary,
+                                                                fontFamily: tokens.typography.families.text
+                                                            }}>
+                                                                <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>Critics Consensus:</span> {consensus}
+                                                            </p>
+                                                        ) : null;
+                                                    })()}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             )}
@@ -768,22 +1592,61 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
     return (
         <>
-            <Backdrop backdropPath={details.backdrop_path!} />
-            <Overlay />
             <DetailContainer>
+                <BackgroundHeader backdropPath={details.backdrop_path!} />
+                <PanelOverlay />
+                
                 <button
                     onClick={onClose}
-                    className="absolute top-6 right-6 z-10 p-2 bg-black/50 rounded-full text-white hover:bg-white/20 transition-colors"
-                    style={{zIndex: 10}}
+                    onMouseEnter={applyHoverEffect}
+                    onMouseDown={applyPressEffect}
+                    className="absolute top-6 right-6 z-10 backdrop-blur-xl border"
+                    aria-label="Close media details"
+                    style={{
+                        zIndex: 10,
+                        padding: '12px',
+                        borderRadius: '50%',
+                        minWidth: '44px',
+                        minHeight: '44px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.1)',
+                        backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                        WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                        borderColor: tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)',
+                        boxShadow: tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.3)',
+                        color: tokens.colors.text.primary,
+                        cursor: 'pointer',
+                        transition: tokens.interactions.transitions.fast
+                    }}
                 >
-                    <Icons.XIcon className="w-6 h-6" />
+                    <X size={20} />
                 </button>
 
                 <HeaderSection>
-                    <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-4" style={{textShadow: '0 1px 2px rgba(0, 0, 0, 0.8)'}}>
-                        {title}
-                    </h1>
-                    <div className="flex flex-wrap items-center gap-3 mb-4 text-slate-200">
+                    <div className="mb-4">
+                        <MediaTitleLogo
+                            media={item}
+                            apiKey={apiKey}
+                            size="large"
+                            className="leading-tight"
+                            style={{
+                                textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
+                            }}
+                            fallbackToText={true}
+                        />
+                    </div>
+                    
+                    <div 
+                        className="flex flex-wrap items-center mb-4"
+                        style={{
+                            gap: tokens.spacing.small,
+                            color: tokens.colors.text.secondary,
+                            fontFamily: tokens.typography.families.text,
+                            fontSize: tokens.typography.sizes.body
+                        }}
+                    >
                         <span>{year}</span>
                         <span>•</span>
                         <span>{details.genres?.map(g => g?.name).filter(Boolean).join(', ')}</span>
@@ -794,11 +1657,45 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                             </>
                         )}
                     </div>
-                    <div className="flex items-center gap-2 mb-4">
-                        <Icons.StarIcon className="w-6 h-6 text-yellow-400" isActive />
-                        <span className="text-xl font-bold">{details.vote_average.toFixed(1)}</span>
-                        <span className="text-slate-400">/ 10</span>
+                    
+                    <div 
+                        className="flex items-center mb-4"
+                        style={{
+                            gap: tokens.spacing.small,
+                            fontFamily: tokens.typography.families.text
+                        }}
+                    >
+                        <Star 
+                            className="w-6 h-6" 
+                            style={{ color: tokens.colors.system.yellow }}
+                            fill="currentColor"
+                        />
+                        <span 
+                            style={{
+                                fontSize: tokens.typography.sizes.title3,
+                                fontWeight: tokens.typography.weights.bold,
+                                color: tokens.colors.text.primary
+                            }}
+                        >
+                            {details.vote_average.toFixed(1)}
+                        </span>
+                        <span style={{ color: tokens.colors.text.tertiary }}>/ 10</span>
                     </div>
+                    
+                    {/* Rotten Tomatoes Rating in Header */}
+                    {omdbData && (() => {
+                        const rtRating = extractRottenTomatoesRating(omdbData);
+                        return rtRating && (
+                            <div className="mb-4">
+                                <RottenTomatoesRating 
+                                    rating={rtRating} 
+                                    size="lg" 
+                                    showLabel={true}
+                                />
+                            </div>
+                        );
+                    })()}
+                    
                     <LikeDislikeButtons
                         mediaId={item.id}
                         mediaType={item.media_type}
@@ -823,11 +1720,23 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
                 <AnimatePresence mode="wait">
                     <ContentPanel
+                        ref={contentPanelRef}
                         key={activeTab}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
                         transition={{ duration: 0.3 }}
+                        className="flex-1 rounded-t-3xl backdrop-blur-xl border-t relative"
+                        style={{
+                            padding: `${tokens.spacing.xlarge} ${tokens.spacing.large}`,
+                            background: tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.15)',
+                            backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                            WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                            borderColor: tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)',
+                            boxShadow: tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.3)',
+                            minHeight: 'calc(100vh - 400px)',
+                            zIndex: 2
+                        }}
                     >
                         {renderTabContent()}
                     </ContentPanel>
@@ -840,9 +1749,29 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                     <TrailerModalContent onClick={(e) => e.stopPropagation()}>
                         <button
                             onClick={handleCloseTrailerModal}
-                            className="absolute top-4 right-4 z-10 p-2 bg-black/50 rounded-full text-white hover:bg-white/20 transition-colors"
+                            onMouseEnter={applyHoverEffect}
+                            onMouseDown={applyPressEffect}
+                            className="absolute top-4 right-4 z-10 backdrop-blur-xl border"
+                            aria-label="Close trailer"
+                            style={{
+                                padding: '12px',
+                                borderRadius: '50%',
+                                minWidth: '44px',
+                                minHeight: '44px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.1)',
+                                backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                                WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
+                                borderColor: tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)',
+                                boxShadow: tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.3)',
+                                color: tokens.colors.text.primary,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }}
                         >
-                            <Icons.XIcon className="w-6 h-6" />
+                            <X size={20} />
                         </button>
                         <TrailerVideoContainer>
                             <VideoPlayer

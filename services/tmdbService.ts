@@ -2,21 +2,59 @@ import { PaginatedResponse, Movie, TVShow, Video, WatchProviderResponse, MediaIt
 
 const API_BASE_URL = 'https://api.themoviedb.org/3';
 
-const apiFetch = async <T>(apiKey: string, endpoint: string, params: Record<string, string | number | boolean> = {}): Promise<T> => {
+const apiFetch = async <T>(
+  apiKey: string, 
+  endpoint: string, 
+  params: Record<string, string | number | boolean> = {},
+  retries: number = 2
+): Promise<T> => {
   const url = new URL(`${API_BASE_URL}${endpoint}`);
   url.searchParams.append('api_key', apiKey);
   for (const key in params) {
     url.searchParams.append(key, String(params[key]));
   }
 
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    if (response.status === 401) {
-        throw new Error("Invalid API Key");
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(url.toString(), {
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Invalid API Key");
+        }
+        if (response.status === 429 && attempt < retries) {
+          // Rate limited - wait and retry
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          continue;
+        }
+        throw new Error(`TMDb API error: ${response.status} ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      // Handle network errors
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        if (attempt < retries) {
+          // Network error - wait and retry
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          continue;
+        }
+        throw new Error(`Network error: Unable to reach TMDb API after ${retries + 1} attempts`);
+      }
+      
+      // Re-throw other errors immediately
+      throw error;
     }
-    throw new Error(`TMDb API error: ${response.status} ${response.statusText}`);
   }
-  return response.json();
+  
+  throw new Error(`Failed to fetch after ${retries + 1} attempts`);
 };
 
 // STREAMING AVAILABILITY FUNCTIONS (Only kept functions)
@@ -54,6 +92,26 @@ export const getPopularMovies = (apiKey: string, page: number = 1): Promise<Pagi
   return apiFetch(apiKey, '/movie/popular', { page });
 };
 
+// POPULAR TV SHOWS
+export const getPopularTVShows = (apiKey: string, page: number = 1): Promise<PaginatedResponse<TVShow>> => {
+  return apiFetch(apiKey, '/tv/popular', { page });
+};
+
+// TOP RATED MOVIES
+export const getTopRatedMovies = (apiKey: string, page: number = 1): Promise<PaginatedResponse<Movie>> => {
+  return apiFetch(apiKey, '/movie/top_rated', { page });
+};
+
+// TOP RATED TV SHOWS
+export const getTopRatedTVShows = (apiKey: string, page: number = 1): Promise<PaginatedResponse<TVShow>> => {
+  return apiFetch(apiKey, '/tv/top_rated', { page });
+};
+
+// UPCOMING MOVIES
+export const getUpcomingMovies = (apiKey: string, page: number = 1): Promise<PaginatedResponse<Movie>> => {
+  return apiFetch(apiKey, '/movie/upcoming', { page });
+};
+
 // MOVIE IMAGES
 export const getMovieImages = (apiKey: string, movieId: number): Promise<{
   id: number;
@@ -88,6 +146,40 @@ export const getMovieImages = (apiKey: string, movieId: number): Promise<{
   return apiFetch(apiKey, `/movie/${movieId}/images`);
 };
 
+// TV SHOW IMAGES
+export const getTVShowImages = (apiKey: string, tvId: number): Promise<{
+  id: number;
+  backdrops: Array<{
+    aspect_ratio: number;
+    file_path: string;
+    height: number;
+    width: number;
+    iso_639_1: string | null;
+    vote_average: number;
+    vote_count: number;
+  }>;
+  logos: Array<{
+    aspect_ratio: number;
+    file_path: string;
+    height: number;
+    width: number;
+    iso_639_1: string | null;
+    vote_average: number;
+    vote_count: number;
+  }>;
+  posters: Array<{
+    aspect_ratio: number;
+    file_path: string;
+    height: number;
+    width: number;
+    iso_639_1: string | null;
+    vote_average: number;
+    vote_count: number;
+  }>;
+}> => {
+  return apiFetch(apiKey, `/tv/${tvId}/images`);
+};
+
 // PERSON SEARCH AND CREDITS
 // FIX: Update searchPerson to add media_type for consistency with the updated Person type.
 export const searchPerson = async (apiKey: string, query: string, page: number = 1): Promise<PaginatedResponse<Person>> => {
@@ -112,6 +204,15 @@ export const getMovieCredits = (apiKey: string, movieId: number): Promise<{
   crew: CrewMember[];
 }> => {
   return apiFetch(apiKey, `/movie/${movieId}/credits`);
+};
+
+// TV SHOW CREDITS
+export const getTVShowCredits = (apiKey: string, tvId: number): Promise<{
+  id: number;
+  cast: CastMember[];
+  crew: CrewMember[];
+}> => {
+  return apiFetch(apiKey, `/tv/${tvId}/credits`);
 };
 
 // NORMALIZE FUNCTIONS

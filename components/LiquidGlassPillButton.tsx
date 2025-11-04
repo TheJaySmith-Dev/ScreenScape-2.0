@@ -8,6 +8,7 @@ import React from 'react';
 import styled from 'styled-components';
 import { GlassPillButton } from './GlassPillButton';
 import { LiquidGlassWrapper } from './LiquidGlassWrapper';
+import { defaultLiquidVisualTuning } from '../utils/liquidGlassUserTuning';
 import { useAppleTheme } from './AppleThemeProvider';
 
 export interface LiquidGlassPillButtonProps {
@@ -26,7 +27,7 @@ export interface LiquidGlassPillButtonProps {
   refractionMode?: 'standard' | 'polar' | 'prominent' | 'shader';
   enableLiquidEffects?: boolean;
   elasticResponse?: boolean;
-  mouseContainer?: React.RefObject<HTMLElement>;
+  mouseContainer?: React.RefObject<HTMLDivElement>;
 }
 
 // Styled wrapper for the button content
@@ -91,7 +92,7 @@ export const LiquidGlassPillButton: React.FC<LiquidGlassPillButtonProps> = ({
   );
 
   // Handle click with elastic feedback
-  const handleClick = (event: React.MouseEvent) => {
+  const handleClick = () => {
     if (disabled || loading) return;
     
     // Add haptic feedback for supported devices
@@ -101,6 +102,21 @@ export const LiquidGlassPillButton: React.FC<LiquidGlassPillButtonProps> = ({
     
     onClick?.();
   };
+
+  // Physical refraction parameters tailored for buttons
+  const refractionParams = {
+    indexOfRefraction: material === 'prominent' ? 1.52 : 1.49,
+    surfaceSmoothness: material === 'ultraThin' || material === 'thin' ? 0.92 : 0.86,
+    lightIntensity: 0.6,
+    lightAngleDeg: 30,
+    lightColorTemperatureK: 6500,
+    mediumDensity: 1.0,
+    surroundingComplexity: 0.4,
+    cameraAngleDeg: 18,
+    cameraDistance: 0.5,
+  };
+  const refractionQuality = effectiveIntensity === 'prominent' ? 'high' : 'balanced';
+  const artifactReduction = 'mild' as const;
 
   return (
     <LiquidGlassWrapper
@@ -112,6 +128,10 @@ export const LiquidGlassPillButton: React.FC<LiquidGlassPillButtonProps> = ({
       className={className}
       effect={material === 'ultraThin' || material === 'thin' ? 'clear' : 'regular'}
       tintColor={(tokens.materials.pill as any)[variant]?.background || tokens.materials.pill.secondary.background}
+      refractionParams={refractionParams}
+      refractionQuality={refractionQuality}
+      artifactReduction={artifactReduction}
+      visualTuning={defaultLiquidVisualTuning}
       onClick={handleClick}
     >
       <ButtonContent

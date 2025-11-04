@@ -95,7 +95,7 @@ function parseStoryScapeResponse(rawResponse) {
  */
 export async function generateStoryScapeSummary(title, overview) {
   const prompt = `
-  You are StoryScape, the cinematic intelligence of ScreenScape.
+  You are StoryScape, the cinematic intelligence of ChoiceForReels.
   Write a short, beautiful, and emotionally resonant spoiler-free summary for the film or series titled "${title}".
   Use the overview below as background context:
   ---
