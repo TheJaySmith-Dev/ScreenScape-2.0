@@ -1,16 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
-import { motion } from 'framer-motion';
-import { FaHome, FaSearch, FaCog, FaGamepad, FaPlay, FaListUl, FaSync, FaHeart, FaRobot, FaUser } from 'react-icons/fa';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Home, Search, Settings, Gamepad2, Play, Heart, Bot, User, X, RefreshCw } from 'lucide-react';
 import { ViewType } from '../App';
 import { useImageGenerator } from '../contexts/ImageGeneratorContext';
 import { useDeviceSync } from '../hooks/useDeviceSync';
+import { searchMulti, normalizeMovie, normalizeTVShow } from '../services/tmdbService';
+import { MediaItem, Movie, TVShow, Person } from '../types';
+import Loader from './Loader';
+import { useAppleTheme } from './AppleDesignSystem';
 
 interface HeaderProps {
     view: ViewType;
     setView: (view: ViewType) => void;
     onSettingsClick: () => void;
     onSyncClick?: () => void;
+    apiKey: string;
+    onSelectItem: (item: MediaItem) => void;
 }
 
 interface NavItem {
@@ -21,591 +26,409 @@ interface NavItem {
     pulse?: boolean;
     badge?: number;
     isMore?: boolean;
+    isGamesIcon?: boolean;
 }
 
-const NavContainer = styled.nav`
-    position: fixed;
-    bottom: max(20px, env(safe-area-inset-bottom, 0px) + 8px); /* Float at bottom with safe area */
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 50;
-    display: flex;
-    flex-direction: row;
-    width: auto;
-    padding: 8px 24px;
-    gap: 16px;
-    border-radius: 40px;
-    max-width: 90vw;
-    justify-content: center;
-    box-sizing: border-box;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(12px);
-    /* Fallback for browsers that don't support backdrop-filter */
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-`;
+// Simple frosted glass navigation container
+const NavContainer: React.FC<{ isSearchMode: boolean; children: React.ReactNode }> = ({ isSearchMode, children }) => {
+  const { tokens } = useAppleTheme();
+  
+  return (
+    <motion.div
+      style={{
+        position: 'fixed',
+        bottom: `max(${tokens.spacing.standard[3]}px, env(safe-area-inset-bottom, 0px) + ${tokens.spacing.standard[1]}px)`,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 50,
+        width: isSearchMode ? 'auto' : 'auto',
+        minWidth: isSearchMode ? '320px' : 'auto',
+        maxWidth: isSearchMode ? '500px' : '90vw',
+        transition: 'all 0.3s ease',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: `${tokens.spacing.standard[1]}px ${tokens.spacing.standard[2]}px`,
+          gap: tokens.spacing.standard[1],
+          borderRadius: '24px',
+          justifyContent: 'center',
+          boxSizing: 'border-box',
+          background: 'rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+          fontFamily: tokens.typography.families.text,
+        }}
+      >
+        {children}
+      </div>
+    </motion.div>
+  );
+};
 
-const NavButton = styled(motion.button)<{ active: boolean }>`
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 8px;
-    margin: 2px;
-    border-radius: 12px;
-    background: ${({ active }) =>
-        active
-            ? 'rgba(255, 255, 255, 0.3)'
-            : 'transparent'
+// Simple frosted glass navigation button
+const NavButton: React.FC<{
+  active: boolean;
+  isGamesIcon?: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+  title?: string;
+}> = ({ active, isGamesIcon, children, onClick, title }) => {
+  const { tokens } = useAppleTheme();
+  
+  return (
+    <motion.button
+      onClick={onClick}
+      title={title}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: tokens.spacing.standard[1],
+        margin: '1px',
+        borderRadius: isGamesIcon ? '0 10px 10px 0' : '12px',
+        background: active ? 'rgba(0, 122, 255, 0.2)' : 'transparent',
+        color: tokens.colors.label.primary,
+        fontFamily: tokens.typography.families.text,
+        fontSize: tokens.typography.sizes.caption1,
+        fontWeight: tokens.typography.weights.medium,
+        border: 'none',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        minWidth: '38px',
+      }}
+      whileHover={{ scale: 1.08, background: 'rgba(255, 255, 255, 0.1)' }}
+      whileTap={{ scale: 0.95 }}
+      onFocus={(e) => {
+        e.currentTarget.style.outline = `2px solid ${tokens.colors.system.blue}`;
+        e.currentTarget.style.outlineOffset = '2px';
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.outline = 'none';
+      }}
+    >
+      {children}
+    </motion.button>
+  );
+};
+
+// Simple navigation icon
+const NavIcon: React.FC<{
+  view: ViewType;
+  currentView: ViewType;
+  children: React.ReactNode;
+}> = ({ view, currentView, children }) => {
+  const { tokens } = useAppleTheme();
+  
+  return (
+    <div
+      style={{
+        fontSize: tokens.typography.sizes.body,
+        marginBottom: tokens.spacing.micro[1],
+        color: view === currentView 
+          ? tokens.colors.label.primary 
+          : tokens.colors.label.secondary,
+        transition: 'all 0.3s ease',
+      }}
+    >
+      {children}
+    </div>
+  );
+};
+
+const Header: React.FC<HeaderProps> = ({ 
+  view, 
+  setView, 
+  onSettingsClick, 
+  onSyncClick, 
+  apiKey, 
+  onSelectItem 
+}) => {
+  const { tokens } = useAppleTheme();
+  
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<(Movie | TVShow | Person)[]>([]);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 768);
     };
-    color: white;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-    font-family: 'Inter', sans-serif;
-    font-size: 11px;
-    font-weight: 500;
-    border: none;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    min-width: 50px;
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-    &:hover {
-        transform: scale(1.1);
+  useEffect(() => {
+    if (isSearchMode && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isSearchMode]);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
 
-    @media (max-width: 768px) {
-        font-size: 10px;
-        padding: 8px;
-        min-width: 44px;
-    }
-`;
-
-const NavIcon = styled.div<{ view: ViewType; currentView: ViewType }>`
-    font-size: 20px;
-    margin-bottom: 4px;
-    opacity: ${({ view, currentView }) => (view === currentView ? 1 : 0.6)};
-    transition: all 0.3s ease;
-
-    ${NavButton}:hover & {
-        opacity: 1;
-        transform: scale(1.1);
-    }
-
-    @media (max-width: 768px) {
-        font-size: 16px;
-    }
-`;
-
-const Header: React.FC<HeaderProps> = ({ view, setView, onSettingsClick, onSyncClick }) => {
-    const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
-    const [showAIPanel, setShowAIPanel] = useState(false);
-    const { selectedModel } = useImageGenerator();
-    const { syncState, disconnect } = useDeviceSync();
-
-    useEffect(() => {
-        const handleResize = () => {
-            setIsDesktop(window.innerWidth >= 768);
-        };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    const navItems: NavItem[] = [
-        { viewName: 'screenSearch', icon: FaHome, label: 'Home' },
-        { viewName: 'explore', icon: FaSearch, label: 'Explore' },
-        { viewName: 'imageGenerator', icon: FaPlay, label: 'ScreenGenAI', unique: true },
-        { viewName: 'live', icon: FaPlay, label: 'Live', pulse: true },
-        { viewName: 'likes', icon: FaHeart, label: 'Likes' },
-        { viewName: 'game', icon: FaGamepad, label: 'Games' },
-    ];
-
-    // For mobile, show core items: Home, Explore, Live, Likes, Games
-    const mobileItems: NavItem[] = [
-        { viewName: 'screenSearch', icon: FaHome, label: 'Home' },
-        { viewName: 'explore', icon: FaSearch, label: 'Explore' },
-        { viewName: 'live', icon: FaPlay, label: 'Live', pulse: true },
-        { viewName: 'likes', icon: FaHeart, label: 'Likes' },
-        { viewName: 'game', icon: FaGamepad, label: 'Games' },
-    ];
-
-    const [showMore, setShowMore] = useState(false);
-    const [showUserPanel, setShowUserPanel] = useState(false);
-
-    const handleNavClick = (viewName: ViewType | 'more') => {
-        if (viewName === 'more') {
-            setShowMore(true);
-        } else {
-            setView(viewName);
+    if (searchQuery.trim()) {
+      setIsSearchLoading(true);
+      searchTimeoutRef.current = window.setTimeout(async () => {
+        try {
+           const results = await searchMulti(searchQuery, apiKey);
+           setSearchResults(results.results.slice(0, 8));
+           setShowSearchResults(true);
+         } catch (error) {
+          console.error('Search error:', error);
+          setSearchResults([]);
+        } finally {
+          setIsSearchLoading(false);
         }
+      }, 300);
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      setIsSearchLoading(false);
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
     };
+  }, [searchQuery, apiKey]);
 
-    const currentNavItems = isDesktop ? navItems : mobileItems;
+  const handleSearchSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      setView('explore');
+      setIsSearchMode(false);
+      setShowSearchResults(false);
+      // Trigger search in NetflixView
+      window.dispatchEvent(new CustomEvent('setSearchView', { 
+        detail: { query: searchQuery.trim() } 
+      }));
+    }
+  }, [searchQuery, setView]);
 
+  const handleResultClick = useCallback((item: Movie | TVShow | Person) => {
+    if (item.media_type === 'person') return;
+    
+    const mediaItem: MediaItem = item.media_type === 'movie' 
+      ? normalizeMovie(item as Movie)
+      : normalizeTVShow(item as TVShow);
+    
+    onSelectItem(mediaItem);
+    setIsSearchMode(false);
+    setShowSearchResults(false);
+    setSearchQuery('');
+  }, [onSelectItem]);
+
+  const navItems: NavItem[] = [
+    { viewName: 'screenSearch', icon: Home, label: 'Home' },
+    { viewName: 'explore', icon: Search, label: 'Explore' },
+    { viewName: 'game', icon: Gamepad2, label: 'Games', isGamesIcon: true },
+    { viewName: 'likes', icon: Heart, label: 'Likes' },
+    { viewName: 'imageGenerator', icon: Bot, label: 'AI' },
+  ];
+
+  if (isSearchMode) {
     return (
-        <>
-            {/* Sync Status Indicator - Desktop Only */}
-            {isDesktop && (
+      <NavContainer isSearchMode={true}>
+        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', alignItems: 'center', flex: 1, gap: tokens.spacing.standard[1] }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search movies, shows, people..."
+              style={{
+                width: '100%',
+                padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.standard[1]}px`,
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: '12px',
+                color: tokens.colors.label.primary,
+                fontSize: tokens.typography.sizes.body,
+                fontFamily: tokens.typography.families.text,
+                outline: 'none',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = tokens.colors.system.blue;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+              }}
+            />
+            
+            {/* Search Results Dropdown */}
+            <AnimatePresence>
+              {showSearchResults && searchResults.length > 0 && (
                 <motion.div
-                    style={{
-                        position: 'fixed',
-                        top: 20,
-                        right: 20,
-                        zIndex: 60,
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '12px',
+                    marginTop: tokens.spacing.micro[1],
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                    zIndex: 1000,
+                  }}
                 >
+                  {searchResults.map((result, index) => (
                     <div
-                        style={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: '16px',
-                            background: syncState.isConnected
-                                ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1))'
-                                : 'rgba(255, 255, 255, 0.1)',
-                            backdropFilter: 'blur(12px)',
-                            border: syncState.isConnected
-                                ? '1px solid rgba(34, 197, 94, 0.3)'
-                                : '1px solid rgba(148, 163, 184, 0.2)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-                        }}
-                        onClick={() => {
-                            if (onSyncClick) {
-                                onSyncClick();
-                            }
-                        }}
-                        title={syncState.isConnected ? `Synced (${syncState.deviceCount} devices)` : 'Not synced'}
+                      key={`${result.id}-${result.media_type}`}
+                      onClick={() => handleResultClick(result)}
+                      style={{
+                        padding: tokens.spacing.standard[1],
+                        borderBottom: index < searchResults.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+                        cursor: result.media_type === 'person' ? 'default' : 'pointer',
+                        transition: 'background 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (result.media_type !== 'person') {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}
                     >
-                        <motion.div
-                            animate={syncState.isSyncing ? { rotate: 360 } : {}}
-                            transition={syncState.isSyncing ? { duration: 1, repeat: Infinity, ease: 'linear' } : {}}
-                            style={{
-                                color: syncState.isConnected ? '#22c55e' : '#94a3b8',
-                                fontSize: '18px',
-                            }}
-                        >
-                            <FaSync />
-                        </motion.div>
-                        {syncState.isConnected && (
-                            <motion.div
-                                style={{
-                                    position: 'absolute',
-                                    top: 2,
-                                    right: 2,
-                                    width: 12,
-                                    height: 12,
-                                    backgroundColor: '#22c55e',
-                                    borderRadius: '50%',
-                                    border: '2px solid rgba(15, 23, 42, 0.8)',
-                                }}
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-                            />
-                        )}
+                      <div style={{ 
+                         color: tokens.colors.label.primary,
+                         fontSize: tokens.typography.sizes.body,
+                         fontWeight: tokens.typography.weights.medium,
+                       }}>
+                         {(result as Movie).title || (result as TVShow | Person).name}
+                       </div>
+                       <div style={{ 
+                         color: tokens.colors.label.secondary,
+                         fontSize: tokens.typography.sizes.caption1,
+                         marginTop: tokens.spacing.micro[0],
+                       }}>
+                         {result.media_type === 'movie' ? 'Movie' : 
+                          result.media_type === 'tv' ? 'TV Show' : 'Person'}
+                         {(result as Movie).release_date && ` • ${new Date((result as Movie).release_date).getFullYear()}`}
+                         {(result as TVShow).first_air_date && ` • ${new Date((result as TVShow).first_air_date).getFullYear()}`}
+                       </div>
                     </div>
+                  ))}
                 </motion.div>
-            )}
-
-            <NavContainer>
-                {currentNavItems.map((item) => (
-                    <NavButton
-                        key={item.viewName}
-                        active={view === item.viewName}
-                        onClick={() => handleNavClick(item.viewName as ViewType)}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                    >
-                        <NavIcon view={item.viewName as ViewType} currentView={view}>
-                            <item.icon />
-                            {item.pulse && (
-                                <motion.div
-                                    style={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        right: 0,
-                                        width: 8,
-                                        height: 8,
-                                        backgroundColor: 'red',
-                                        borderRadius: '50%',
-                                    }}
-                                    animate={{ opacity: [1, 0.5, 1] }}
-                                    transition={{ duration: 2, repeat: Infinity }}
-                                />
-                            )}
-                            {item.badge && (
-                                <motion.div
-                                    style={{
-                                        position: 'absolute',
-                                        top: -5,
-                                        right: -5,
-                                        width: 16,
-                                        height: 16,
-                                        backgroundColor: '#007AFF',
-                                        borderRadius: '50%',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: 10,
-                                        color: 'white',
-                                        fontWeight: 'bold',
-                                    }}
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-                                >
-                                    {item.badge}
-                                </motion.div>
-                            )}
-                        </NavIcon>
-                        <div style={{ fontSize: '11px', textAlign: 'center' }}>
-                            {item.label}
-                            {item.viewName === 'imageGenerator' && isDesktop && selectedModel && (
-                                <div style={{
-                                    fontSize: '9px',
-                                    opacity: 0.8,
-                                    marginTop: '2px',
-                                    fontWeight: '400',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.5px'
-                                }}>
-                                    {selectedModel}
-                                </div>
-                            )}
-                        </div>
-                    </NavButton>
-                ))}
-            </NavContainer>
-
-            {/* AI Button with Panel */}
-            <motion.div style={{ position: 'relative' }}>
-                <motion.button
-                    style={{
-                        position: 'fixed',
-                        top: 20,
-                        right: isDesktop ? 140 : 80,
-                        zIndex: 60,
-                        width: 48,
-                        height: 48,
-                        borderRadius: '16px',
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        backdropFilter: 'blur(12px)',
-                        border: '1px solid rgba(148, 163, 184, 0.2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-                        color: 'white',
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowAIPanel(!showAIPanel)}
-                    title="AI Assistant"
-                >
-                    <FaRobot style={{ fontSize: '18px' }} />
-                </motion.button>
-
-                {showAIPanel && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                        style={{
-                            position: 'fixed',
-                            top: isDesktop ? 80 : 80,
-                            right: isDesktop ? 20 : 20,
-                            zIndex: 65,
-                            width: isDesktop ? 200 : 160,
-                            background: 'rgba(255, 255, 255, 0.15)',
-                            backdropFilter: 'blur(24px)',
-                            borderRadius: 16,
-                            border: '1px solid rgba(148, 163, 184, 0.3)',
-                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
-                        }}
-                    >
-                        <div style={{ padding: '16px' }}>
-                            <div style={{ fontSize: '14px', fontWeight: '600', color: 'white', marginBottom: '12px' }}>
-                                AI Assistant
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <button
-                                    onClick={() => {
-                                        // Trigger Type to AI
-                                        const event = new CustomEvent('openTypeToAI');
-                                        window.dispatchEvent(event);
-                                        setShowAIPanel(false);
-                                    }}
-                                    style={{
-                                        width: '100%',
-                                        padding: '12px 16px',
-                                        borderRadius: '8px',
-                                        background: 'rgba(34, 197, 94, 0.2)',
-                                        border: '1px solid rgba(34, 197, 94, 0.3)',
-                                        color: 'white',
-                                        fontSize: '14px',
-                                        cursor: 'pointer',
-                                        textAlign: 'left',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = 'rgba(34, 197, 94, 0.3)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = 'rgba(34, 197, 94, 0.2)';
-                                    }}
-                                >
-                                    ✍️ Type to AI
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        // Trigger Voice AI
-                                        const event = new CustomEvent('openVoiceAI');
-                                        window.dispatchEvent(event);
-                                        setShowAIPanel(false);
-                                    }}
-                                    style={{
-                                        width: '100%',
-                                        padding: '12px 16px',
-                                        borderRadius: '8px',
-                                        background: 'rgba(59, 130, 246, 0.2)',
-                                        border: '1px solid rgba(59, 130, 246, 0.3)',
-                                        color: 'white',
-                                        fontSize: '14px',
-                                        cursor: 'pointer',
-                                        textAlign: 'left',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
-                                    }}
-                                >
-                                    🎤 Voice AI
-                                </button>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-            </motion.div>
-
-            {/* User Button for Mobile */}
-            {!isDesktop && (
-                <motion.div style={{ position: 'relative' }}>
-                    <motion.button
-                        style={{
-                            position: 'fixed',
-                            top: 20,
-                            right: 20,
-                            zIndex: 60,
-                            width: 48,
-                            height: 48,
-                            borderRadius: '16px',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            backdropFilter: 'blur(12px)',
-                            border: '1px solid rgba(148, 163, 184, 0.2)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-                            color: 'white',
-                        }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setShowUserPanel(!showUserPanel)}
-                        title="User Menu"
-                    >
-                        <FaUser style={{ fontSize: '18px' }} />
-                    </motion.button>
-
-                    {showUserPanel && (
-                        <motion.div
-                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                            style={{
-                                position: 'fixed',
-                                top: 80,
-                                right: 20,
-                                zIndex: 65,
-                                width: 180,
-                                background: 'rgba(255, 255, 255, 0.15)',
-                                backdropFilter: 'blur(24px)',
-                                borderRadius: 16,
-                                border: '1px solid rgba(148, 163, 184, 0.3)',
-                                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
-                            }}
-                        >
-                            <div style={{ padding: '16px' }}>
-                                <div style={{ fontSize: '14px', fontWeight: '600', color: 'white', marginBottom: '12px' }}>
-                                    User Menu
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    <button
-                                        onClick={() => {
-                                            onSettingsClick();
-                                            setShowUserPanel(false);
-                                        }}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 16px',
-                                            borderRadius: '8px',
-                                            background: 'rgba(139, 69, 19, 0.2)',
-                                            border: '1px solid rgba(139, 69, 19, 0.3)',
-                                            color: 'white',
-                                            fontSize: '14px',
-                                            cursor: 'pointer',
-                                            textAlign: 'left',
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = 'rgba(139, 69, 19, 0.3)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = 'rgba(139, 69, 19, 0.2)';
-                                        }}
-                                    >
-                                        ⚙️ Settings
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            if (onSyncClick) onSyncClick();
-                                            setShowUserPanel(false);
-                                        }}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 16px',
-                                            borderRadius: '8px',
-                                            background: 'rgba(34, 197, 94, 0.2)',
-                                            border: '1px solid rgba(34, 197, 94, 0.3)',
-                                            color: 'white',
-                                            fontSize: '14px',
-                                            cursor: 'pointer',
-                                            textAlign: 'left',
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = 'rgba(34, 197, 94, 0.3)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = 'rgba(34, 197, 94, 0.2)';
-                                        }}
-                                    >
-                                        📡 Sync Devices
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-                </motion.div>
-            )}
-
-            {/* Desktop Settings Button */}
-            {isDesktop && (
-                <motion.button
-                    style={{
-                        position: 'fixed',
-                        top: 20,
-                        right: 80, // Next to the sync button
-                        zIndex: 60,
-                        width: 48,
-                        height: 48,
-                        borderRadius: '16px',
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        backdropFilter: 'blur(12px)',
-                        border: '1px solid rgba(148, 163, 184, 0.2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-                        color: 'white',
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={onSettingsClick}
-                    title="Settings"
-                >
-                    <FaCog style={{ fontSize: '18px' }} />
-                </motion.button>
-            )}
-
-            {/* More Menu for Mobile */}
-            {showMore && !isDesktop && (
-                <motion.div
-                    initial={{ opacity: 0, y: 100 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 100 }}
-                    style={{
-                        position: 'fixed',
-                        bottom: 120,
-                        left: 20,
-                        right: 20,
-                        background: 'rgba(255, 255, 255, 0.15)',
-                        backdropFilter: 'blur(12px)',
-                        borderRadius: 24,
-                        padding: 20,
-                        zIndex: 100,
-                    }}
-                >
-                    {navItems.slice(4).map((item) => (
-                        <motion.button
-                            key={item.viewName}
-                            onClick={() => {
-                                setView(item.viewName as ViewType);
-                                setShowMore(false);
-                            }}
-                            whileHover={{ scale: 1.05 }}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: 12,
-                                margin: 4,
-                                borderRadius: 16,
-                                background: 'transparent',
-                                color: 'white',
-                                border: 'none',
-                                cursor: 'pointer',
-                                width: '100%',
-                                justifyContent: 'flex-start',
-                            }}
-                        >
-                            <item.icon style={{ marginRight: 12, fontSize: 18 }} />
-                            {item.label}
-                        </motion.button>
-                    ))}
-                    <motion.button
-                        onClick={() => {
-                            onSettingsClick();
-                            setShowMore(false);
-                        }}
-                        whileHover={{ scale: 1.05 }}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: 12,
-                            margin: 4,
-                            borderRadius: 16,
-                            background: 'transparent',
-                            color: 'white',
-                            border: 'none',
-                            cursor: 'pointer',
-                            width: '100%',
-                            justifyContent: 'flex-start',
-                        }}
-                    >
-                        <FaCog style={{ marginRight: 12, fontSize: 18 }} />
-                        Settings
-                    </motion.button>
-                </motion.div>
-            )}
-        </>
+              )}
+            </AnimatePresence>
+          </div>
+          
+          {isSearchLoading && (
+             <div style={{ padding: tokens.spacing.micro[1] }}>
+               <Loader />
+             </div>
+           )}
+          
+          <button
+            type="button"
+            onClick={() => {
+              setIsSearchMode(false);
+              setSearchQuery('');
+              setShowSearchResults(false);
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: tokens.colors.label.primary,
+              cursor: 'pointer',
+              padding: tokens.spacing.micro[1],
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <X size={18} />
+          </button>
+        </form>
+      </NavContainer>
     );
+  }
+
+  return (
+    <NavContainer isSearchMode={false}>
+      {navItems.map((item) => (
+        <NavButton
+          key={item.viewName}
+          active={view === item.viewName}
+          isGamesIcon={item.isGamesIcon}
+          onClick={() => {
+            if (item.viewName === 'more') return;
+            setView(item.viewName as ViewType);
+          }}
+          title={item.label}
+        >
+          <NavIcon view={item.viewName as ViewType} currentView={view}>
+            <item.icon size={20} />
+          </NavIcon>
+          <span style={{ 
+            fontSize: tokens.typography.sizes.caption2,
+            marginTop: tokens.spacing.micro[0],
+          }}>
+            {item.label}
+          </span>
+        </NavButton>
+      ))}
+      
+      <NavButton
+        active={false}
+        onClick={() => setIsSearchMode(true)}
+        title="Search"
+      >
+        <NavIcon view="explore" currentView={view}>
+          <Search size={20} />
+        </NavIcon>
+        <span style={{ 
+          fontSize: tokens.typography.sizes.caption2,
+          marginTop: tokens.spacing.micro[0],
+        }}>
+          Search
+        </span>
+      </NavButton>
+      
+      <NavButton
+        active={false}
+        onClick={onSettingsClick}
+        title="Settings"
+      >
+        <NavIcon view="explore" currentView={view}>
+          <Settings size={20} />
+        </NavIcon>
+        <span style={{ 
+          fontSize: tokens.typography.sizes.caption2,
+          marginTop: tokens.spacing.micro[0],
+        }}>
+          Settings
+        </span>
+      </NavButton>
+    </NavContainer>
+  );
 };
 
 export default Header;

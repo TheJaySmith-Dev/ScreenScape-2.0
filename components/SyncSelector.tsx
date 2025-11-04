@@ -23,7 +23,7 @@ const SyncSelector: React.FC<SyncSelectorProps> = ({
         <div className="space-y-4 mb-6">
           <button
             onClick={onExportClick}
-            className="w-full glass-button glass-button-primary py-6 rounded-xl font-semibold flex items-center justify-center gap-3 hover:scale-105 transition-transform"
+            className="w-full glass-button-sync glass-button-sync-primary py-6 rounded-xl font-semibold flex items-center justify-center gap-3 hover:scale-105 transition-transform"
           >
             <FaUpload className="text-xl" />
             <div className="text-left">
@@ -34,7 +34,7 @@ const SyncSelector: React.FC<SyncSelectorProps> = ({
 
           <button
             onClick={onImportClick}
-            className="w-full glass-button glass-button-secondary py-6 rounded-xl font-semibold flex items-center justify-center gap-3 hover:scale-105 transition-transform"
+            className="w-full glass-button-sync glass-button-sync-secondary py-6 rounded-xl font-semibold flex items-center justify-center gap-3 hover:scale-105 transition-transform"
           >
             <FaDownload className="text-xl" />
             <div className="text-left">
@@ -51,7 +51,7 @@ const SyncSelector: React.FC<SyncSelectorProps> = ({
 
         <button
           onClick={onBack}
-          className="w-full glass-button glass-button-secondary py-3 rounded-xl font-semibold"
+          className="w-full glass-button-sync glass-button-sync-secondary py-3 rounded-xl font-semibold"
         >
           Cancel
         </button>

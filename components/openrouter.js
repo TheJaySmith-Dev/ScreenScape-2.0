@@ -28,12 +28,12 @@ export async function queryOpenRouter(prompt) {
             "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
             "Content-Type": "application/json",
             "HTTP-Referer": "https://screenscape.space",
-            "X-Title": "ScreenScape",
+            "X-Title": "ChoiceForReels",
           },
           body: JSON.stringify({
             model: model,
             messages: [
-              { role: "system", content: "You are ScreenScape AI, a cinematic assistant who speaks like a film curator with poetic energy and deep insight. Keep your answers concise, ideally two to three sentences." },
+              { role: "system", content: "You are ChoiceForReels AI, a cinematic assistant who speaks like a film curator with poetic energy and deep insight. Keep your answers concise, ideally two to three sentences." },
               { role: "user", content: prompt }
             ]
           })

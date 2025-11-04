@@ -36,8 +36,10 @@ export const getAvailabilityBuckets = (
     buy: sortProviders(providers?.buy, providerIds),
 });
 
-export const hasAvailability = (buckets: AvailabilityBuckets): boolean =>
-    buckets.stream.length > 0 || buckets.rent.length > 0 || buckets.buy.length > 0;
+export const hasAvailability = (buckets: AvailabilityBuckets | undefined): boolean => {
+    if (!buckets) return false;
+    return buckets.stream.length > 0 || buckets.rent.length > 0 || buckets.buy.length > 0;
+};
 
 const formatProviderNames = (providers: WatchProvider[], limit: number): string => {
     if (providers.length === 0) return '';

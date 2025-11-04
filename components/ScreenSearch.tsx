@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import styled, { keyframes } from 'styled-components';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { MediaItem, Movie, TVShow, PersonMovieCredit, Person } from '../types';
 import { searchMulti } from '../services/tmdbService';
 import { normalizeMovie, normalizeTVShow, getCollectionDetails, getPersonMovieCredits, getMovieDetailsForCollections } from '../services/tmdbService';
 import { findFranchise } from '../services/franchiseService';
 import { SearchIcon, StarIcon, XIcon } from './Icons';
+import { useAppleTheme } from './AppleThemeProvider';
 import Loader from './Loader';
 import TrendingStrip from './TrendingStrip';
 import HeroCarousel from './HeroCarousel';
+import { Search, Star, X, Play, Share, Copy } from 'lucide-react';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 
@@ -18,6 +19,7 @@ const WatchPathTimeline: React.FC<{
     onSelectItem: (item: MediaItem) => void;
     query: string;
 }> = ({ path, pathTitle, onSelectItem, query }) => {
+    const { tokens } = useAppleTheme();
     const timelineRef = useRef<HTMLDivElement>(null);
     const intervalRef = useRef<number | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -70,122 +72,270 @@ const WatchPathTimeline: React.FC<{
     };
     
     return (
-        <div className="animate-fade-in-up h-full flex flex-col mt-12 w-full">
-            <div className="flex justify-between items-center mb-4 px-4 flex-shrink-0">
-                <h3 className="text-xl font-bold truncate pr-2" title={pathTitle}>{pathTitle}</h3>
-                <div className="flex gap-2 flex-shrink-0">
-                    <button onClick={handlePlayPath} className="glass-button text-xs px-3 py-1 rounded-full">
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="h-full flex flex-col w-full"
+            style={{ marginTop: `${tokens.spacing.macro[0]}px` }}
+        >
+            <div 
+                className="flex justify-between items-center mb-4 px-4 flex-shrink-0"
+                style={{ marginBottom: `${tokens.spacing.standard[1]}px` }}
+            >
+                <h3 
+                    className="truncate pr-2" 
+                    title={pathTitle}
+                    style={{
+                        fontSize: `${tokens.typography.sizes.title2}px`,
+                        fontWeight: tokens.typography.weights.bold,
+                        fontFamily: tokens.typography.families.text,
+                        color: tokens.colors.label.primary
+                    }}
+                >
+                    {pathTitle}
+                </h3>
+                <div className="flex flex-shrink-0" style={{ gap: `${tokens.spacing.micro[2]}px` }}>
+                    <button 
+                        onClick={handlePlayPath} 
+                        className="rounded-full backdrop-blur-xl border transition-all duration-300"
+                        style={{
+                            padding: `${tokens.spacing.micro[0]}px ${tokens.spacing.standard[1]}px`,
+                            background: `linear-gradient(135deg, ${tokens.colors.background.secondary}E6, ${tokens.colors.background.primary}E6)`,
+                            borderColor: tokens.colors.separator.opaque,
+                            color: tokens.colors.label.primary,
+                            fontSize: `${tokens.typography.sizes.caption1}px`,
+                            fontFamily: tokens.typography.families.text,
+                            fontWeight: tokens.typography.weights.medium
+                        }}
+                    >
+                        <Play className="w-4 h-4 mr-1 inline" />
                         {isPlaying ? 'Stop' : 'Play'}
                     </button>
-                    <button onClick={handleShareLink} className="glass-button text-xs px-3 py-1 rounded-full">
+                    <button 
+                        onClick={handleShareLink} 
+                        className="rounded-full backdrop-blur-xl border transition-all duration-300"
+                        style={{
+                            padding: `${tokens.spacing.micro[0]}px ${tokens.spacing.standard[1]}px`,
+                            background: linkCopied 
+                                ? `linear-gradient(135deg, ${tokens.colors.system.green}, ${tokens.colors.system.green})`
+                                : `linear-gradient(135deg, ${tokens.colors.background.secondary}E6, ${tokens.colors.background.primary}E6)`,
+                            borderColor: linkCopied ? tokens.colors.system.green : tokens.colors.separator.opaque,
+                            color: linkCopied ? tokens.colors.background.primary : tokens.colors.label.primary,
+                            fontSize: `${tokens.typography.sizes.caption1}px`,
+                            fontFamily: tokens.typography.families.text,
+                            fontWeight: tokens.typography.weights.medium
+                        }}
+                    >
+                        {linkCopied ? <Copy className="w-4 h-4 mr-1 inline" /> : <Share className="w-4 h-4 mr-1 inline" />}
                         {linkCopied ? 'Copied!' : 'Share'}
                     </button>
                 </div>
             </div>
-            <div className="watch-path-timeline-container">
-                <div className="watch-path-timeline-line" />
-                <div ref={timelineRef} className="watch-path-timeline" onWheel={stopAutoScroll} onTouchStart={stopAutoScroll}>
-                    {path.map((movie) => (
-                        <div key={movie.id} className="watch-path-item group" onClick={() => onSelectItem(movie)}>
-                            <div className="watch-path-poster-wrapper">
-                                <img src={`${IMAGE_BASE_URL}w342${movie.poster_path}`} alt={movie.title} className="watch-path-poster"/>
-                                <div className="watch-path-poster-overlay">
-                                    <h4 className="font-bold">{movie.title}</h4>
-                                    <div className="flex items-center justify-between text-xs mt-1">
+            
+            <div className="relative">
+                <div 
+                    className="absolute left-1/2 transform -translate-x-1/2 w-1 rounded-full"
+                    style={{
+                        background: `linear-gradient(180deg, ${tokens.colors.system.blue}, ${tokens.colors.system.purple})`,
+                        height: '100%',
+                        top: 0,
+                        zIndex: 1
+                    }}
+                />
+                <div 
+                    ref={timelineRef} 
+                    className="flex overflow-x-auto pb-4 space-x-6"
+                    onWheel={stopAutoScroll} 
+                    onTouchStart={stopAutoScroll}
+                    style={{
+                        scrollbarWidth: 'none',
+                        msOverflowStyle: 'none',
+                        paddingLeft: `${tokens.spacing.standard[1]}px`,
+                        paddingRight: `${tokens.spacing.standard[1]}px`
+                    }}
+                >
+                    {path.map((movie, index) => (
+                        <motion.div 
+                            key={movie.id} 
+                            className="flex-shrink-0 relative group cursor-pointer"
+                            onClick={() => onSelectItem(movie)}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            style={{ width: '200px' }}
+                        >
+                            <div className="relative">
+                                <img 
+                                    src={`${IMAGE_BASE_URL}w342${movie.poster_path}`} 
+                                    alt={movie.title} 
+                                    className="w-full aspect-[2/3] object-cover rounded-xl backdrop-blur-xl border transition-all duration-300"
+                                    style={{
+                                        borderColor: tokens.colors.separator.opaque,
+                                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)'
+                                    }}
+                                />
+                                <div 
+                                    className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end"
+                                    style={{
+                                        background: 'linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.8) 100%)',
+                                        padding: `${tokens.spacing.standard[1]}px`
+                                    }}
+                                >
+                                    <h4 
+                                        className="font-bold mb-1"
+                                        style={{
+                                            color: tokens.colors.background.primary,
+                                            fontSize: `${tokens.typography.sizes.body}px`,
+                                            fontFamily: tokens.typography.families.text
+                                        }}
+                                    >
+                                        {movie.title}
+                                    </h4>
+                                    <div 
+                                        className="flex items-center justify-between"
+                                        style={{
+                                            fontSize: `${tokens.typography.sizes.caption1}px`,
+                                            color: tokens.colors.label.secondary
+                                        }}
+                                    >
                                         <span>{movie.release_date.substring(0,4)}</span>
-                                        <span className="flex items-center gap-1"><StarIcon className="w-3 h-3 text-yellow-400" isActive/>{movie.vote_average.toFixed(1)}</span>
+                                        <div className="flex items-center" style={{ gap: tokens.spacing.smallall }}>
+                                            <Star className="w-3 h-3" style={{ color: tokens.colors.accent.yellow }} fill="currentColor" />
+                                            <span>{movie.vote_average.toFixed(1)}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="watch-path-dot" />
-                            <div className="watch-path-year">{movie.release_date.substring(0, 4)}</div>
-                        </div>
+                            
+                            <div 
+                                className="absolute left-1/2 transform -translate-x-1/2 w-4 h-4 rounded-full border-2"
+                                style={{
+                                    background: tokens.colors.accent.blue,
+                                    borderColor: tokens.colors.background.primary,
+                                    top: '50%',
+                                    transform: 'translate(-50%, -50%)',
+                                    zIndex: 2
+                                }}
+                            />
+                            
+                            <div 
+                                className="text-center mt-2"
+                                style={{
+                                    fontSize: tokens.typography.sizes.caption,
+                                    color: tokens.colors.text.tertiary,
+                                    fontFamily: tokens.typography.families.text
+                                }}
+                            >
+                                {movie.release_date.substring(0, 4)}
+                            </div>
+                        </motion.div>
                     ))}
                 </div>
             </div>
-        </div>
+        </motion.div>
     );
 };
 
-const shimmer = keyframes`
-    0%, 100% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.1); }
-    50% { box-shadow: 0 0 30px rgba(255, 255, 255, 0.3); }
-`;
-
-const ripple = keyframes`
-    0% { transform: scale(1); opacity: 1; }
-    100% { transform: scale(1.2); opacity: 0; }
-`;
-
-const Card = styled(motion.div)<{ active: boolean }>`
-    position: relative;
-    aspect-ratio: 2/3;
-    width: 100%;
-    overflow: hidden;
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: all 0.3s ease;
-    cursor: pointer;
-
-    &:hover {
-        transform: scale(1.05);
-        animation: ${shimmer} 1.5s ease-in-out infinite;
-        background: rgba(255, 255, 255, 0.2);
-        backdrop-filter: blur(16px);
-    }
-
-    &:active::before {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 16px;
-        transform: translate(-50%, -50%);
-        animation: ${ripple} 0.6s ease-out;
-    }
-`;
-
 const SearchResultCard: React.FC<{ item: MediaItem, onClick: (item: MediaItem) => void }> = ({ item, onClick }) => {
+    const { tokens } = useAppleTheme();
     const title = 'title' in item ? item.title : item.name;
     const year = 'release_date' in item && item.release_date ? item.release_date.substring(0, 4) : ('first_air_date' in item && item.first_air_date ? item.first_air_date.substring(0, 4) : '');
 
     return (
-        <Card onClick={() => onClick(item)} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+        <motion.div 
+            onClick={() => onClick(item)} 
+            whileHover={{ scale: 1.02, y: -4 }}
+            whileTap={{ scale: 0.98 }}
+            className="relative aspect-[2/3] w-full overflow-hidden rounded-xl backdrop-blur-xl border cursor-pointer transition-all duration-300"
+            style={{
+                background: `linear-gradient(135deg, ${tokens.colors.background.secondary}40, ${tokens.colors.background.primary}40)`,
+                borderColor: tokens.colors.separator.opaque,
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)'
+            }}
+        >
             <img
                 src={item.poster_path ? `${IMAGE_BASE_URL}w500${item.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'}
                 alt={title}
                 className="h-full w-full object-cover"
                 loading="lazy"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+            
+            <div 
+                className="absolute inset-0"
+                style={{
+                    background: 'linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.5) 70%, rgba(0, 0, 0, 0.8) 100%)'
+                }}
+            />
 
             {/* Info overlay */}
-            <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/30 backdrop-blur-sm border-t border-white/10">
-                <h3 className="font-bold text-white text-sm mb-1 font-family: 'Inter', sans-serif; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);">{title}</h3>
-                <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-200">{year || 'N/A'}</span>
-                    <div className="flex items-center gap-1 text-yellow-400">
-                        <StarIcon className="h-3 w-3" isActive />
-                        <span className="text-slate-200">{item.vote_average.toFixed(1)}</span>
+            <div 
+                className="absolute bottom-0 left-0 right-0 backdrop-blur-sm border-t"
+                style={{
+                    padding: `${tokens.spacing.micro[2]}px`,
+                    background: `${tokens.colors.background.secondary}80`,
+                    borderColor: `${tokens.colors.separator.opaque}40`
+                }}
+            >
+                <h3 
+                    className="font-bold mb-1 line-clamp-2"
+                    style={{
+                        color: tokens.colors.text.primary,
+                        fontSize: tokens.typography.sizes.caption,
+                        fontFamily: tokens.typography.families.system,
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
+                    }}
+                >
+                    {title}
+                </h3>
+                <div 
+                    className="flex items-center justify-between"
+                    style={{
+                        fontSize: tokens.typography.sizes.caption2,
+                        fontFamily: tokens.typography.families.text
+                    }}
+                >
+                    <span style={{ color: tokens.colors.text.secondary }}>{year || 'N/A'}</span>
+                    <div className="flex items-center" style={{ gap: tokens.spacing.smallall }}>
+                        <Star className="h-3 w-3" style={{ color: tokens.colors.accent.yellow }} fill="currentColor" />
+                        <span style={{ color: tokens.colors.text.secondary }}>{item.vote_average.toFixed(1)}</span>
                     </div>
                 </div>
             </div>
 
             {/* Hover overlay */}
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm opacity-0 hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3 pointer-events-none">
-                <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed mb-3">
+            <div 
+                className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end pointer-events-none"
+                style={{
+                    background: `${tokens.colors.background.overlay}CC`,
+                    backdropFilter: 'blur(8px)',
+                    padding: tokens.spacing.small
+                }}
+            >
+                <p 
+                    className="line-clamp-3 leading-relaxed mb-3"
+                    style={{
+                        fontSize: tokens.typography.sizes.caption,
+                        color: tokens.colors.text.secondary,
+                        fontFamily: tokens.typography.families.text
+                    }}
+                >
                     {item.overview || 'No overview available.'}
                 </p>
-                <div className="text-center bg-white/20 py-1.5 rounded-md text-sm font-semibold text-white">
+                <div 
+                    className="text-center rounded-lg"
+                    style={{
+                        background: `${tokens.colors.background.secondary}80`,
+                        padding: `${tokens.spacing.smallall} 0`,
+                        fontSize: tokens.typography.sizes.caption,
+                        fontWeight: tokens.typography.weights.semibold,
+                        color: tokens.colors.text.primary,
+                        fontFamily: tokens.typography.families.text
+                    }}
+                >
                     View Details
                 </div>
             </div>
-        </Card>
+        </motion.div>
     );
 };
 
@@ -196,6 +346,8 @@ interface ScreenSearchProps {
 }
 
 const ScreenSearch: React.FC<ScreenSearchProps> = ({ apiKey, onSelectItem, onInvalidApiKey }) => {
+    const { tokens } = useAppleTheme();
+    
     const [query, setQuery] = useState('');
     const [searchMode, setSearchMode] = useState<'media' | 'path'>('media');
     const [mediaResults, setMediaResults] = useState<MediaItem[]>([]);
@@ -261,7 +413,7 @@ const ScreenSearch: React.FC<ScreenSearchProps> = ({ apiKey, onSelectItem, onInv
                             const collection = await getCollectionDetails(apiKey, franchise.id);
                             processAndSetPath(franchise.name, collection.parts);
                         } else if (franchise.type === 'curated_list' && franchise.ids) {
-                            const moviePromises = franchise.ids.map(id => getMovieDetailsForCollections(apiKey, id)); // Region is required
+                            const moviePromises = franchise.ids.map(id => getMovieDetailsForCollections(apiKey, id));
                             const movies = await Promise.all(moviePromises);
                             processAndSetPath(franchise.name, movies);
                         }
@@ -313,67 +465,124 @@ const ScreenSearch: React.FC<ScreenSearchProps> = ({ apiKey, onSelectItem, onInv
         if (isLoading) return <Loader />;
 
         if (searchMode === 'path') {
-            if (pathError) return <p className="text-center text-red-400 mt-8">{pathError}</p>;
+            if (pathError) {
+                return (
+                    <p 
+                        className="text-center mt-8"
+                        style={{
+                            color: tokens.colors.system.red,
+                            fontFamily: tokens.typography.families.text,
+                            fontSize: tokens.typography.sizes.body
+                        }}
+                    >
+                        {pathError}
+                    </p>
+                );
+            }
             if (pathResults.length > 0) return <WatchPathTimeline path={pathResults} pathTitle={pathTitle} onSelectItem={onSelectItem} query={query} />;
-            if (hasSearched) return null; // No results, no error = still loading or empty query
-             return (
-                <div className="text-center text-slate-400 p-4 mt-8 animate-fade-in">
-                    <p className="text-lg">Your cinematic journey awaits.</p>
-                    <p>Enter a franchise (e.g., Harry Potter), director (e.g., Wes Anderson), or actor (e.g., Tom Hanks) to begin.</p>
-                </div>
+            if (hasSearched) return null;
+            return (
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-center p-4 mt-8"
+                    style={{
+                        color: tokens.colors.text.tertiary,
+                        fontFamily: tokens.typography.families.text
+                    }}
+                >
+                    <p style={{ fontSize: tokens.typography.sizes.title3, marginBottom: tokens.spacing.small }}>
+                        Your cinematic journey awaits.
+                    </p>
+                    <p style={{ fontSize: tokens.typography.sizes.body }}>
+                        Enter a franchise (e.g., Harry Potter), director (e.g., Wes Anderson), or actor (e.g., Tom Hanks) to begin.
+                    </p>
+                </motion.div>
             );
         }
 
         // searchMode === 'media'
         if (hasSearched && mediaResults.length > 0) {
             return (
-                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+                    style={{ gap: tokens.spacing.medium }}
+                >
                     {mediaResults.map(item => (
                         <SearchResultCard key={`${item.id}-${item.media_type}`} item={item} onClick={onSelectItem} />
                     ))}
-                </div>
+                </motion.div>
             );
         }
         
         if (hasSearched && mediaResults.length === 0) {
-            return <p className="text-center text-slate-400 mt-8">No results found for "{query}".</p>;
+            return (
+                <p 
+                    className="text-center mt-8"
+                    style={{
+                        color: tokens.colors.text.tertiary,
+                        fontFamily: tokens.typography.families.text,
+                        fontSize: tokens.typography.sizes.body
+                    }}
+                >
+                    No results found for "{query}".
+                </p>
+            );
         }
 
         return (
-            <div className="animate-fade-in-up">
-                <h2 className="text-2xl font-bold mb-4">Trending This Week</h2>
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+            >
+                <h2 
+                    className="mb-4"
+                    style={{
+                        fontSize: tokens.typography.sizes.title1,
+                        fontWeight: tokens.typography.weights.bold,
+                        color: tokens.colors.text.primary,
+                        fontFamily: tokens.typography.families.text
+                    }}
+                >
+                    Trending This Week
+                </h2>
                 <TrendingStrip apiKey={apiKey} onSelectItem={onSelectItem} onInvalidApiKey={onInvalidApiKey} />
-            </div>
+            </motion.div>
         );
     };
 
-    const SearchOverlay = styled.div<{ hasSearched: boolean }>`
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(12px);
-        z-index: 10;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: ${props => props.hasSearched ? 1 : 0};
-        pointer-events: ${props => props.hasSearched ? 'auto' : 'none'};
-        transition: opacity 0.3s ease;
-    `;
+    const SearchContent: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+        <div 
+            className={`rounded-3xl backdrop-blur-xl border ${className}`}
+            style={{
+                background: `linear-gradient(135deg, ${tokens.colors.background.secondary}40, ${tokens.colors.background.primary}40)`,
+                borderColor: tokens.colors.border.primary,
+                padding: tokens.spacing.xlarge,
+                maxWidth: '600px',
+                width: '90%',
+                textAlign: 'center',
+                boxShadow: tokens.shadows.large
+            }}
+        >
+            {children}
+        </div>
+    );
 
-    const SearchContent = styled.div`
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(12px);
-        border-radius: 24px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 2rem;
-        max-width: 600px;
-        width: 90%;
-        text-align: center;
-    `;
+    const SearchOverlay: React.FC<{ hasSearched: boolean; children: React.ReactNode }> = ({ hasSearched, children }) => (
+        <div 
+            className="fixed inset-0 z-10 flex items-center justify-center transition-opacity duration-300"
+            style={{
+                background: `${tokens.colors.background.overlay}80`,
+                backdropFilter: 'blur(12px)',
+                opacity: hasSearched ? 1 : 0,
+                pointerEvents: hasSearched ? 'auto' : 'none'
+            }}
+        >
+            {children}
+        </div>
+    );
 
     return (
         <>
@@ -383,38 +592,130 @@ const ScreenSearch: React.FC<ScreenSearchProps> = ({ apiKey, onSelectItem, onInv
                     <div className="relative -mt-20 z-10">
                         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                             <SearchContent className="mx-auto mb-12">
-                                <h1 className="text-4xl md:text-5xl font-bold mb-4 animate-glow" style={{ fontFamily: 'Inter, sans-serif', color: 'white' }}>ScreenScape</h1>
-                                <p className="text-slate-300 mb-6">Discover movies, TV shows, and cinematic journeys.</p>
+                                <motion.h1 
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="mb-2"
+                                    style={{
+                                        fontSize: 'clamp(2.5rem, 8vw, 4rem)',
+                                        fontFamily: tokens.typography.families.text,
+                                        fontWeight: tokens.typography.weights.bold,
+                                        color: tokens.colors.text.primary,
+                                        background: `linear-gradient(135deg, ${tokens.colors.accent.blue}, ${tokens.colors.accent.purple})`,
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        backgroundClip: 'text'
+                                    }}
+                                >
+                                    ChoiceForReels
+                                </motion.h1>
+                                <p 
+                                    className="mb-4"
+                                    style={{
+                                        color: tokens.colors.text.tertiary,
+                                        fontSize: tokens.typography.sizes.caption,
+                                        fontFamily: tokens.typography.families.text
+                                    }}
+                                >
+                                    By @jasonforreels
+                                </p>
+                                <p 
+                                    className="mb-6"
+                                    style={{
+                                        color: tokens.colors.text.secondary,
+                                        fontSize: tokens.typography.sizes.body,
+                                        fontFamily: tokens.typography.families.text
+                                    }}
+                                >
+                                    Discover movies, TV shows, and cinematic journeys.
+                                </p>
 
-                                <div className="flex justify-center gap-2 mb-4">
-                                    <button onClick={() => setSearchMode('media')} className={`px-4 py-2 rounded-full font-semibold transition-colors ${searchMode === 'media' ? 'bg-accent-500 text-primary' : 'bg-glass hover:bg-white/10'}`}>
+                                <div className="flex justify-center mb-4" style={{ gap: tokens.spacing.small }}>
+                                    <button 
+                                        onClick={() => setSearchMode('media')} 
+                                        onMouseEnter={applyHoverEffect}
+                                        onMouseDown={applyPressEffect}
+                                        className="rounded-full font-semibold transition-all duration-300"
+                                        style={{
+                                            padding: `${tokens.spacing.small} ${tokens.spacing.large}`,
+                                            background: searchMode === 'media' 
+                                                ? `linear-gradient(135deg, ${tokens.colors.accent.blue}, ${tokens.colors.accent.purple})`
+                                                : `linear-gradient(135deg, ${tokens.colors.background.secondary}80, ${tokens.colors.background.primary}80)`,
+                                            color: searchMode === 'media' ? tokens.colors.text.primary : tokens.colors.text.primary,
+                                            border: `1px solid ${tokens.colors.border.primary}`,
+                                            fontSize: tokens.typography.sizes.body,
+                                            fontFamily: tokens.typography.families.text
+                                        }}
+                                    >
                                         Search Media
                                     </button>
-                                    <button onClick={() => setSearchMode('path')} className={`px-4 py-2 rounded-full font-semibold transition-colors ${searchMode === 'path' ? 'bg-accent-500 text-primary' : 'bg-glass hover:bg-white/10'}`}>
+                                    <button 
+                                        onClick={() => setSearchMode('path')} 
+                                        onMouseEnter={applyHoverEffect}
+                                        onMouseDown={applyPressEffect}
+                                        className="rounded-full font-semibold transition-all duration-300"
+                                        style={{
+                                            padding: `${tokens.spacing.small} ${tokens.spacing.large}`,
+                                            background: searchMode === 'path' 
+                                                ? `linear-gradient(135deg, ${tokens.colors.accent.blue}, ${tokens.colors.accent.purple})`
+                                                : `linear-gradient(135deg, ${tokens.colors.background.secondary}80, ${tokens.colors.background.primary}80)`,
+                                            color: searchMode === 'path' ? tokens.colors.text.primary : tokens.colors.text.primary,
+                                            border: `1px solid ${tokens.colors.border.primary}`,
+                                            fontSize: tokens.typography.sizes.body,
+                                            fontFamily: tokens.typography.families.text
+                                        }}
+                                    >
                                         Create Watch Path
                                     </button>
                                 </div>
 
                                 <div className="relative">
-                                    <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                    <Search 
+                                        className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" 
+                                        style={{ color: tokens.colors.text.tertiary }}
+                                    />
                                     <input
                                         type="text"
                                         value={query}
                                         onChange={(e) => setQuery(e.target.value)}
                                         placeholder={searchMode === 'media' ? 'Search for a movie, TV show...' : "e.g., 'Marvel Cinematic Universe'"}
-                                        className="w-full bg-glass border border-glass-edge rounded-full py-3 pl-12 pr-10 text-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-accent-500 outline-none transition-shadow"
-                                        onFocus={() => setHasSearched(true)}
+                                        className="w-full rounded-full border backdrop-blur-xl transition-all duration-300 focus:outline-none"
+                                        style={{
+                                            background: `linear-gradient(135deg, ${tokens.colors.fill.quaternary}60, ${tokens.colors.fill.tertiary}60)`,
+                                            borderColor: tokens.colors.separator.opaque,
+                                            padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.micro[2]}px ${tokens.spacing.micro[2]}px 3rem`,
+                                            fontSize: `${tokens.typography.sizes.title3}px`,
+                                            color: tokens.colors.label.primary,
+                                            fontFamily: tokens.typography.families.text,
+                                            boxShadow: `0 0 0 2px transparent`,
+                                            transition: 'box-shadow 0.3s ease'
+                                        }}
+                                        onFocus={(e) => {
+                                            setHasSearched(true);
+                                            e.target.style.boxShadow = `0 0 0 2px ${tokens.colors.accent.blue}`;
+                                        }}
+                                        onBlur={(e) => {
+                                            e.target.style.boxShadow = '0 0 0 2px transparent';
+                                        }}
                                     />
                                     {query && (
-                                        <button onClick={() => setQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
-                                            <XIcon className="w-5 h-5"/>
+                                        <button 
+                                            onClick={() => setQuery('')} 
+                                            onMouseEnter={applyHoverEffect}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors duration-300"
+                                            style={{ color: tokens.colors.text.tertiary }}
+                                        >
+                                            <X className="w-5 h-5"/>
                                         </button>
                                     )}
                                 </div>
                             </SearchContent>
                         </div>
 
-                        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        <div 
+                            className="container mx-auto px-4 sm:px-6 lg:px-8"
+                            style={{ paddingTop: tokens.spacing.xlarge, paddingBottom: tokens.spacing.xlarge }}
+                        >
                             {renderContent()}
                         </div>
                     </div>
@@ -423,36 +724,93 @@ const ScreenSearch: React.FC<ScreenSearchProps> = ({ apiKey, onSelectItem, onInv
 
             <SearchOverlay hasSearched={hasSearched}>
                 <SearchContent>
-                    <div className="flex justify-center gap-2 mb-6">
-                        <button onClick={() => { setSearchMode('media'); setHasSearched(false); }} className={`px-4 py-2 rounded-full font-semibold transition-colors ${searchMode === 'media' ? 'bg-accent-500 text-primary' : 'bg-glass hover:bg-white/10'}`}>
+                    <div className="flex justify-center mb-6" style={{ gap: tokens.spacing.small }}>
+                        <button 
+                            onClick={() => { setSearchMode('media'); setHasSearched(false); }} 
+                            onMouseEnter={applyHoverEffect}
+                            onMouseDown={applyPressEffect}
+                            className="rounded-full font-semibold transition-all duration-300"
+                            style={{
+                                padding: `${tokens.spacing.small} ${tokens.spacing.large}`,
+                                background: searchMode === 'media' 
+                                    ? `linear-gradient(135deg, ${tokens.colors.accent.blue}, ${tokens.colors.accent.purple})`
+                                    : `linear-gradient(135deg, ${tokens.colors.background.secondary}80, ${tokens.colors.background.primary}80)`,
+                                color: searchMode === 'media' ? tokens.colors.text.primary : tokens.colors.text.primary,
+                                border: `1px solid ${tokens.colors.border.primary}`,
+                                fontSize: tokens.typography.sizes.body,
+                                fontFamily: tokens.typography.families.text
+                            }}
+                        >
                             Search Media
                         </button>
-                        <button onClick={() => { setSearchMode('path'); setHasSearched(false); }} className={`px-4 py-2 rounded-full font-semibold transition-colors ${searchMode === 'path' ? 'bg-accent-500 text-primary' : 'bg-glass hover:bg-white/10'}`}>
+                        <button 
+                            onClick={() => { setSearchMode('path'); setHasSearched(false); }} 
+                            onMouseEnter={applyHoverEffect}
+                            onMouseDown={applyPressEffect}
+                            className="rounded-full font-semibold transition-all duration-300"
+                            style={{
+                                padding: `${tokens.spacing.small} ${tokens.spacing.large}`,
+                                background: searchMode === 'path' 
+                                    ? `linear-gradient(135deg, ${tokens.colors.accent.blue}, ${tokens.colors.accent.purple})`
+                                    : `linear-gradient(135deg, ${tokens.colors.background.secondary}80, ${tokens.colors.background.primary}80)`,
+                                color: searchMode === 'path' ? tokens.colors.text.primary : tokens.colors.text.primary,
+                                border: `1px solid ${tokens.colors.border.primary}`,
+                                fontSize: tokens.typography.sizes.body,
+                                fontFamily: tokens.typography.families.text
+                            }}
+                        >
                             Create Watch Path
                         </button>
-                        <button onClick={() => { setQuery(''); setHasSearched(false); }} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-                            ✕
+                        <button 
+                            onClick={() => { setQuery(''); setHasSearched(false); }} 
+                            onMouseEnter={applyHoverEffect}
+                            className="absolute top-4 right-4 transition-colors duration-300"
+                            style={{ color: tokens.colors.text.tertiary }}
+                        >
+                            <X className="w-6 h-6" />
                         </button>
                     </div>
 
                     <div className="relative mb-6">
-                        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                        <Search 
+                            className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" 
+                            style={{ color: tokens.colors.text.tertiary }}
+                        />
                         <input
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             placeholder={searchMode === 'media' ? 'Search for a movie, TV show...' : "e.g., 'Marvel Cinematic Universe'"}
-                            className="w-full bg-glass border border-glass-edge rounded-full py-3 pl-12 pr-10 text-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-accent-500 outline-none transition-shadow"
+                            className="w-full rounded-full border backdrop-blur-xl transition-all duration-300 focus:outline-none"
                             autoFocus
+                            style={{
+                                background: `linear-gradient(135deg, ${tokens.colors.background.secondary}60, ${tokens.colors.background.primary}60)`,
+                                borderColor: tokens.colors.border.primary,
+                                padding: `${tokens.spacing.small} ${tokens.spacing.small} ${tokens.spacing.small} 3rem`,
+                                fontSize: tokens.typography.sizes.title3,
+                                color: tokens.colors.text.primary,
+                                fontFamily: tokens.typography.families.text
+                            }}
                         />
                         {query && (
-                            <button onClick={() => setQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
-                                <XIcon className="w-5 h-5"/>
+                            <button 
+                                onClick={() => setQuery('')} 
+                                onMouseEnter={applyHoverEffect}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors duration-300"
+                                style={{ color: tokens.colors.text.tertiary }}
+                            >
+                                <X className="w-5 h-5"/>
                             </button>
                         )}
                     </div>
 
-                    <div className="max-h-96 overflow-y-auto">
+                    <div 
+                        className="max-h-96 overflow-y-auto"
+                        style={{
+                            scrollbarWidth: 'thin',
+                            scrollbarColor: `${tokens.colors.border.primary} transparent`
+                        }}
+                    >
                         {renderContent()}
                     </div>
                 </SearchContent>

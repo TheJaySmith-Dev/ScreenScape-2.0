@@ -23,7 +23,7 @@ const DeviceSyncSelector: React.FC<DeviceSyncSelectorProps> = ({
         <div className="space-y-4">
           <button
             onClick={onGenerateClick}
-            className="w-full glass-button glass-button-primary py-6 rounded-xl font-semibold flex items-center justify-center gap-3 hover:scale-105 transition-transform"
+            className="w-full glass-button-sync glass-button-sync-primary py-6 rounded-xl font-semibold flex items-center justify-center gap-3 hover:scale-105 transition-transform"
           >
             <FaCodeBranch className="text-xl" />
             <div className="text-left">
@@ -34,7 +34,7 @@ const DeviceSyncSelector: React.FC<DeviceSyncSelectorProps> = ({
 
           <button
             onClick={onEnterClick}
-            className="w-full glass-button glass-button-secondary py-6 rounded-xl font-semibold flex items-center justify-center gap-3 hover:scale-105 transition-transform"
+            className="w-full glass-button-sync glass-button-sync-secondary py-6 rounded-xl font-semibold flex items-center justify-center gap-3 hover:scale-105 transition-transform"
           >
             <FaKeyboard className="text-xl" />
             <div className="text-left">
@@ -46,7 +46,7 @@ const DeviceSyncSelector: React.FC<DeviceSyncSelectorProps> = ({
 
         <button
           onClick={onBack}
-          className="w-full glass-button glass-button-secondary py-3 rounded-xl font-semibold mt-8"
+          className="w-full glass-button-sync glass-button-sync-secondary py-3 rounded-xl font-semibold mt-8"
         >
           Back
         </button>

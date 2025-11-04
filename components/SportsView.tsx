@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     getAllLeagues,
     getLeaguesByCountry,
@@ -9,11 +10,13 @@ import {
     Team,
     Event
 } from '../services/sportsService';
+import { useAppleTheme } from './AppleThemeProvider';
 import Loader from './Loader';
 
 interface SportsViewProps {}
 
 const SportsView: React.FC<SportsViewProps> = () => {
+    const { tokens } = useAppleTheme();
     const [leagues, setLeagues] = useState<League[]>([]);
     const [selectedLeague, setSelectedLeague] = useState<League | null>(null);
     const [teams, setTeams] = useState<Team[]>([]);
@@ -66,124 +69,459 @@ const SportsView: React.FC<SportsViewProps> = () => {
     }
 
     return (
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <h1 className="text-4xl font-bold mb-8 text-center">SportsScape</h1>
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+            style={{
+                minHeight: '100vh',
+                padding: `${tokens.spacing.macro[0]}px`,
+                background: `linear-gradient(135deg, ${tokens.colors.background.primary}CC, ${tokens.colors.background.secondary}99)`,
+                backdropFilter: 'blur(20px)',
+            }}
+        >
+            <motion.h1 
+                className="apple-title-1"
+                style={{
+                    fontSize: `${tokens.typography.sizes.title1}px`,
+                    fontWeight: tokens.typography.weights.bold,
+                    color: tokens.colors.label.primary,
+                    textAlign: 'center',
+                    marginBottom: `${tokens.spacing.macro[0]}px`,
+                    background: `linear-gradient(135deg, ${tokens.colors.system.blue}, ${tokens.colors.system.purple})`,
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                }}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+            >
+                SportsScape
+            </motion.h1>
 
-            {error && (
-                <div className="bg-red-900 border border-red-700 text-red-300 px-4 py-3 rounded-lg mb-6">
-                    {error}
-                </div>
-            )}
-
-            {!selectedLeague ? (
-                <div>
-                    <h2 className="text-2xl font-bold mb-6">Select a League</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {leagues.slice(0, 50).map((league) => (
-                            <div
-                                key={league.idLeague}
-                                onClick={() => fetchLeagueData(league)}
-                                className="bg-glass border border-slate-700 rounded-lg p-4 cursor-pointer hover:bg-slate-800/50 transition-colors"
-                            >
-                                <h3 className="font-bold text-lg mb-2">{league.strLeague}</h3>
-                                <p className="text-slate-400 text-sm mb-2">{league.strSport}</p>
-                                <p className="text-slate-300 text-sm">{league.strCountry}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ) : (
-                <div>
-                    <button
-                        onClick={() => setSelectedLeague(null)}
-                        className="mb-6 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors"
+            <AnimatePresence mode="wait">
+                {error && (
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        style={{
+                            background: `${tokens.colors.system.red}20`,
+                            border: `1px solid ${tokens.colors.system.red}40`,
+                            borderRadius: `${tokens.spacing.standard[1]}px`,
+                            padding: `${tokens.spacing.standard[1]}px`,
+                            marginBottom: `${tokens.spacing.macro[0]}px`,
+                            color: tokens.colors.system.red,
+                            backdropFilter: 'blur(10px)',
+                        }}
                     >
-                        ← Back to Leagues
-                    </button>
+                        {error}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-                    <div className="mb-8">
-                        <h2 className="text-3xl font-bold mb-2">{selectedLeague.strLeague}</h2>
-                        <p className="text-slate-400">{selectedLeague.strSport} • {selectedLeague.strCountry}</p>
-                        {selectedLeague.strDescriptionEN && (
-                            <p className="text-slate-300 mt-4">{selectedLeague.strDescriptionEN.substring(0, 300)}...</p>
-                        )}
-                    </div>
+            <AnimatePresence mode="wait">
+                {!selectedLeague ? (
+                    <motion.div
+                        key="leagues"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        transition={{ duration: 0.4 }}
+                    >
+                        <motion.h2 
+                            className="apple-title-2"
+                            style={{
+                                fontSize: `${tokens.typography.sizes.title2}px`,
+                                fontWeight: tokens.typography.weights.semibold,
+                                color: tokens.colors.label.primary,
+                                marginBottom: `${tokens.spacing.macro[0]}px`,
+                            }}
+                        >
+                            Select a League
+                        </motion.h2>
+                        <motion.div 
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                                gap: `${tokens.spacing.standard[1]}px`,
+                            }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.3, duration: 0.5 }}
+                        >
+                            {leagues.slice(0, 50).map((league, index) => (
+                                <motion.button
+                                    key={league.idLeague}
+                                    onClick={() => fetchLeagueData(league)}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: index * 0.05, duration: 0.4 }}
+                                    whileHover={{ 
+                                        scale: 1.02,
+                                        y: -2,
+                                        transition: { duration: 0.2 }
+                                    }}
+                                    whileTap={{ scale: 0.98 }}
+                                    style={{
+                                        background: `${tokens.colors.background.secondary}40`,
+                                        backdropFilter: `blur(${tokens.materials.glass.regular.blur}px)`,
+                                        border: `1px solid ${tokens.colors.separator.opaque}`,
+                                        borderRadius: `${tokens.spacing.standard[1]}px`,
+                                        padding: `${tokens.spacing.standard[1]}px`,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                                        textAlign: 'left',
+                                    }}
+                                >
+                                    <h3 style={{
+                                        fontSize: `${tokens.typography.sizes.headline}px`,
+                                        fontWeight: tokens.typography.weights.semibold,
+                                        color: tokens.colors.label.primary,
+                                        marginBottom: `${tokens.spacing.micro[2]}px`,
+                                    }}>
+                                        {league.strLeague}
+                                    </h3>
+                                    <p style={{
+                                        fontSize: `${tokens.typography.sizes.body}px`,
+                                        color: tokens.colors.label.secondary,
+                                        marginBottom: `${tokens.spacing.micro[2]}px`,
+                                    }}>
+                                        {league.strSport}
+                                    </p>
+                                    <p style={{
+                                        fontSize: `${tokens.typography.sizes.caption1}px`,
+                                        color: tokens.colors.label.tertiary,
+                                    }}>
+                                        {league.strCountry}
+                                    </p>
+                                </motion.button>
+                            ))}
+                        </motion.div>
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        key="league-detail"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.4 }}
+                    >
+                        <motion.button
+                            onClick={() => setSelectedLeague(null)}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            style={{
+                                marginBottom: `${tokens.spacing.macro[0]}px`,
+                                background: `${tokens.colors.background.secondary}40`,
+                                backdropFilter: `blur(${tokens.materials.glass.regular.blur}px)`,
+                                border: `1px solid ${tokens.colors.separator.opaque}`,
+                                borderRadius: `${tokens.spacing.standard[1]}px`,
+                                padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.standard[1]}px`,
+                                color: tokens.colors.label.primary,
+                                fontSize: `${tokens.typography.sizes.body}px`,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                            }}
+                        >
+                            ← Back to Leagues
+                        </motion.button>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* Teams */}
-                        <div>
-                            <h3 className="text-xl font-bold mb-4">Teams ({teams.length})</h3>
-                            <div className="space-y-2 max-h-96 overflow-y-auto">
-                                {teams.map((team) => (
-                                    <div key={team.idTeam} className="bg-glass border border-slate-700 rounded-lg p-3">
-                                        <div className="flex items-center gap-3">
-                                            {team.strBadge && (
-                                                <img
-                                                    src={team.strBadge}
-                                                    alt={team.strTeam}
-                                                    className="w-8 h-8 rounded-full object-cover"
-                                                />
-                                            )}
-                                            <span className="font-medium">{team.strTeam}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <motion.div 
+                            style={{ marginBottom: `${tokens.spacing.macro[1]}px` }}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2, duration: 0.5 }}
+                        >
+                            <h2 style={{
+                                fontSize: `${tokens.typography.sizes.largeTitle}px`,
+                                fontWeight: tokens.typography.weights.bold,
+                                color: tokens.colors.label.primary,
+                                marginBottom: `${tokens.spacing.micro[2]}px`,
+                            }}>
+                                {selectedLeague.strLeague}
+                            </h2>
+                            <p style={{
+                                fontSize: `${tokens.typography.sizes.headline}px`,
+                                color: tokens.colors.label.secondary,
+                                marginBottom: `${tokens.spacing.standard[1]}px`,
+                            }}>
+                                {selectedLeague.strSport} • {selectedLeague.strCountry}
+                            </p>
+                            {selectedLeague.strDescriptionEN && (
+                                <p style={{
+                                    fontSize: `${tokens.typography.sizes.body}px`,
+                                    color: tokens.colors.label.tertiary,
+                                    lineHeight: tokens.typography.lineHeights.body,
+                                }}>
+                                    {selectedLeague.strDescriptionEN.substring(0, 300)}...
+                                </p>
+                            )}
+                        </motion.div>
 
-                        {/* Next Events */}
-                        <div>
-                            <h3 className="text-xl font-bold mb-4">Upcoming Events</h3>
-                            <div className="space-y-3 max-h-96 overflow-y-auto">
-                                {nextEvents.slice(0, 10).map((event) => (
-                                    <div key={event.idEvent} className="bg-glass border border-slate-700 rounded-lg p-3">
-                                        <div className="text-sm text-slate-400 mb-1">{event.dateEvent} {event.strTime}</div>
-                                        <div className="font-medium">
-                                            <div className="truncate">{event.strHomeTeam}</div>
-                                            <div className="text-center text-slate-400">vs</div>
-                                            <div className="truncate">{event.strAwayTeam}</div>
-                                        </div>
-                                        {event.strVenue && (
-                                            <div className="text-xs text-slate-400 mt-1">{event.strVenue}</div>
-                                        )}
-                                    </div>
-                                ))}
-                                {nextEvents.length === 0 && (
-                                    <div className="text-slate-400 text-center py-8">No upcoming events</div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Last Results */}
-                        <div>
-                            <h3 className="text-xl font-bold mb-4">Recent Results</h3>
-                            <div className="space-y-3 max-h-96 overflow-y-auto">
-                                {lastEvents.slice(0, 10).map((event) => (
-                                    <div key={event.idEvent} className="bg-glass border border-slate-700 rounded-lg p-3">
-                                        <div className="text-sm text-slate-400 mb-1">{event.dateEvent}</div>
-                                        <div className="font-medium">
-                                            <div className="flex justify-between items-center">
-                                                <span className="truncate flex-1">{event.strHomeTeam}</span>
-                                                <span className="mx-2 font-bold text-lg">
-                                                    {event.intHomeScore}-{event.intAwayScore}
+                        <motion.div 
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+                                gap: `${tokens.spacing.macro[0]}px`,
+                            }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.4, duration: 0.5 }}
+                        >
+                            {/* Teams */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.5, duration: 0.4 }}
+                            >
+                                <h3 style={{
+                                    fontSize: `${tokens.typography.sizes.title3}px`,
+                                    fontWeight: tokens.typography.weights.semibold,
+                                    color: tokens.colors.label.primary,
+                                    marginBottom: `${tokens.spacing.standard[1]}px`,
+                                }}>
+                                    Teams ({teams.length})
+                                </h3>
+                                <motion.div 
+                                    style={{
+                                        maxHeight: '400px',
+                                        overflowY: 'auto',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: `${tokens.spacing.micro[2]}px`,
+                                    }}
+                                >
+                                    {teams.map((team, index) => (
+                                        <motion.div 
+                                            key={team.idTeam}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: index * 0.02, duration: 0.3 }}
+                                            whileHover={{ scale: 1.02 }}
+                                            style={{
+                                                background: `${tokens.colors.background.secondary}40`,
+                                                backdropFilter: `blur(${tokens.materials.glass.regular.blur}px)`,
+                                                border: `1px solid ${tokens.colors.separator.opaque}`,
+                                                borderRadius: `${tokens.spacing.micro[2]}px`,
+                                                padding: `${tokens.spacing.standard[1]}px`,
+                                                transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                                            }}
+                                        >
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: `${tokens.spacing.standard[1]}px`,
+                                            }}>
+                                                {team.strBadge && (
+                                                    <img
+                                                        src={team.strBadge}
+                                                        alt={team.strTeam}
+                                                        style={{
+                                                            width: '32px',
+                                                            height: '32px',
+                                                            borderRadius: '50%',
+                                                            objectFit: 'cover',
+                                                        }}
+                                                    />
+                                                )}
+                                                <span style={{
+                                                    fontSize: `${tokens.typography.sizes.body}px`,
+                                                    fontWeight: tokens.typography.weights.medium,
+                                                    color: tokens.colors.label.primary,
+                                                }}>
+                                                    {team.strTeam}
                                                 </span>
-                                                <span className="truncate flex-1 text-right">{event.strAwayTeam}</span>
                                             </div>
+                                        </motion.div>
+                                    ))}
+                                </motion.div>
+                            </motion.div>
+
+                            {/* Next Events */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.6, duration: 0.4 }}
+                            >
+                                <h3 style={{
+                                    fontSize: `${tokens.typography.sizes.title3}px`,
+                                    fontWeight: tokens.typography.weights.semibold,
+                                    color: tokens.colors.label.primary,
+                                    marginBottom: `${tokens.spacing.standard[1]}px`,
+                                }}>
+                                    Upcoming Events
+                                </h3>
+                                <motion.div 
+                                    style={{
+                                        maxHeight: '400px',
+                                        overflowY: 'auto',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: `${tokens.spacing.standard[1]}px`,
+                                    }}
+                                >
+                                    {nextEvents.slice(0, 10).map((event, index) => (
+                                        <motion.div 
+                                            key={event.idEvent}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: index * 0.03, duration: 0.3 }}
+                                            whileHover={{ scale: 1.02 }}
+                                            style={{
+                                                background: `${tokens.colors.background.secondary}40`,
+                                                backdropFilter: `blur(${tokens.materials.glass.regular.blur}px)`,
+                                                border: `1px solid ${tokens.colors.separator.opaque}`,
+                                                borderRadius: `${tokens.spacing.micro[2]}px`,
+                                                padding: `${tokens.spacing.standard[1]}px`,
+                                                transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                                            }}
+                                        >
+                                            <div style={{
+                                                fontSize: `${tokens.typography.sizes.caption1}px`,
+                                                color: tokens.colors.label.secondary,
+                                                marginBottom: `${tokens.spacing.micro[2]}px`,
+                                            }}>
+                                                {event.dateEvent} {event.strTime}
+                                            </div>
+                                            <div style={{
+                                                fontSize: `${tokens.typography.sizes.body}px`,
+                                                fontWeight: tokens.typography.weights.medium,
+                                                color: tokens.colors.label.primary,
+                                            }}>
+                                                <div style={{ marginBottom: `${tokens.spacing.micro[2]}px` }}>
+                                                    {event.strHomeTeam}
+                                                </div>
+                                                <div style={{
+                                                    textAlign: 'center',
+                                                    color: tokens.colors.label.secondary,
+                                                    fontSize: `${tokens.typography.sizes.caption1}px`,
+                                                    marginBottom: `${tokens.spacing.micro[2]}px`,
+                                                }}>
+                                                    vs
+                                                </div>
+                                                <div>{event.strAwayTeam}</div>
+                                            </div>
+                                            {event.strVenue && (
+                                                <div style={{
+                                                    fontSize: `${tokens.typography.sizes.caption1}px`,
+                                                    color: tokens.colors.label.tertiary,
+                                                    marginTop: `${tokens.spacing.micro[2]}px`,
+                                                }}>
+                                                    {event.strVenue}
+                                                </div>
+                                            )}
+                                        </motion.div>
+                                    ))}
+                                    {nextEvents.length === 0 && (
+                                        <div style={{
+                                            color: tokens.colors.label.secondary,
+                                            textAlign: 'center',
+                                            padding: `${tokens.spacing.macro[1]}px`,
+                                            fontSize: `${tokens.typography.sizes.body}px`,
+                                        }}>
+                                            No upcoming events
                                         </div>
-                                        {event.strVenue && (
-                                            <div className="text-xs text-slate-400 mt-1">{event.strVenue}</div>
-                                        )}
-                                    </div>
-                                ))}
-                                {lastEvents.length === 0 && (
-                                    <div className="text-slate-400 text-center py-8">No recent results</div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
+                                    )}
+                                </motion.div>
+                            </motion.div>
+
+                            {/* Last Results */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.7, duration: 0.4 }}
+                            >
+                                <h3 style={{
+                                    fontSize: `${tokens.typography.sizes.title3}px`,
+                                    fontWeight: tokens.typography.weights.semibold,
+                                    color: tokens.colors.label.primary,
+                                    marginBottom: `${tokens.spacing.standard[1]}px`,
+                                }}>
+                                    Recent Results
+                                </h3>
+                                <motion.div 
+                                    style={{
+                                        maxHeight: '400px',
+                                        overflowY: 'auto',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: `${tokens.spacing.standard[1]}px`,
+                                    }}
+                                >
+                                    {lastEvents.slice(0, 10).map((event, index) => (
+                                        <motion.div 
+                                            key={event.idEvent}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: index * 0.03, duration: 0.3 }}
+                                            whileHover={{ scale: 1.02 }}
+                                            style={{
+                                                background: `${tokens.colors.background.secondary}40`,
+                                                backdropFilter: `blur(${tokens.materials.glass.regular.blur}px)`,
+                                                border: `1px solid ${tokens.colors.separator.opaque}`,
+                                                borderRadius: `${tokens.spacing.micro[2]}px`,
+                                                padding: `${tokens.spacing.standard[1]}px`,
+                                                transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                                            }}
+                                        >
+                                            <div style={{
+                                                fontSize: `${tokens.typography.sizes.caption1}px`,
+                                                color: tokens.colors.label.secondary,
+                                                marginBottom: `${tokens.spacing.micro[2]}px`,
+                                            }}>
+                                                {event.dateEvent}
+                                            </div>
+                                            <div style={{
+                                                fontSize: `${tokens.typography.sizes.body}px`,
+                                                fontWeight: tokens.typography.weights.medium,
+                                                color: tokens.colors.label.primary,
+                                            }}>
+                                                <div style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                }}>
+                                                    <span style={{ flex: 1 }}>{event.strHomeTeam}</span>
+                                                    <span style={{
+                                                        margin: `0 ${tokens.spacing.standard[1]}px`,
+                                                        fontSize: `${tokens.typography.sizes.headline}px`,
+                                                        fontWeight: tokens.typography.weights.bold,
+                                                        color: tokens.colors.system.blue,
+                                                    }}>
+                                                        {event.intHomeScore}-{event.intAwayScore}
+                                                    </span>
+                                                    <span style={{ flex: 1, textAlign: 'right' }}>{event.strAwayTeam}</span>
+                                                </div>
+                                            </div>
+                                            {event.strVenue && (
+                                                <div style={{
+                                                    fontSize: `${tokens.typography.sizes.caption1}px`,
+                                                    color: tokens.colors.label.tertiary,
+                                                    marginTop: `${tokens.spacing.micro[2]}px`,
+                                                }}>
+                                                    {event.strVenue}
+                                                </div>
+                                            )}
+                                        </motion.div>
+                                    ))}
+                                    {lastEvents.length === 0 && (
+                                        <div style={{
+                                            color: tokens.colors.label.secondary,
+                                            textAlign: 'center',
+                                            padding: `${tokens.spacing.macro[1]}px`,
+                                            fontSize: `${tokens.typography.sizes.body}px`,
+                                        }}>
+                                            No recent results
+                                        </div>
+                                    )}
+                                </motion.div>
+                            </motion.div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </motion.div>
     );
 };
 

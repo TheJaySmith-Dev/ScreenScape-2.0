@@ -144,7 +144,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
             const controlTrailerAudioDeclaration: FunctionDeclaration = { name: 'controlTrailerAudio', description: 'Mutes or unmutes the trailer.', parameters: { type: Type.OBJECT, properties: { action: { type: Type.STRING, description: "'mute' or 'unmute'." } }, required: ['action'] }};
             const getMediaFactDeclaration: FunctionDeclaration = { name: 'getMediaFact', description: "Gets a fact (release date, director, cast, runtime, box office) about a movie/show.", parameters: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, fact_type: { type: Type.STRING, description: "'release_date', 'director', 'cast', 'runtime', 'box_office'." } }, required: ['title', 'fact_type'] }};
             const tools = [{ functionDeclarations: [selectMediaItemDeclaration, getMediaOverviewDeclaration, controlTrailerAudioDeclaration, getMediaFactDeclaration] }];
-            const systemInstruction = `You are ScreenScape AI, a friendly movie assistant. You can find movies, get summaries, and answer questions like 'Who directed Inception?'. Respond in ${language}. Keep spoken responses concise. You only call functions when the user explicitly asks for information that the functions provide. For conversational queries, you do not call any function.`;
+            const systemInstruction = `You are ChoiceForReels AI, a friendly movie assistant. You can find movies, get summaries, and answer questions like 'Who directed Inception?'. Respond in ${language}. Keep spoken responses concise. You only call functions when the user explicitly asks for information that the functions provide. For conversational queries, you do not call any function.`;
 
             let currentInputTranscription = '';
             let currentOutputTranscription = '';
@@ -208,7 +208,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ tmdbApiKey, setAiStatus }) =>
                                 
                                 if (!toolCalledThisTurn) {
                                     setIsThinking(true);
-                                    const prompt = `You are ScreenScape AI, a cinematic voice assistant who speaks with calm, elegant insight. Continue this conversation:\n${conversationMemory.current.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n")}`;
+                                    const prompt = `You are ChoiceForReels AI, a cinematic voice assistant who speaks with calm, elegant insight. Continue this conversation:\n${conversationMemory.current.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n")}`;
                                     const openRouterResponse = await queryOpenRouter(prompt);
                                     setIsThinking(false);
 

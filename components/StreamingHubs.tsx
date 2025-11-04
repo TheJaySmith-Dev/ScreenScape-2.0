@@ -4,6 +4,9 @@ import { useStreamingPreferences, availableProviders } from '../hooks/useStreami
 interface StreamingHubsProps {
     activeHub: number | null;
     setActiveHub: (id: number | null) => void;
+    onHoverProvider?: (name: string | null) => void;
+    onNavigateProvider?: (id: number, name: string) => void;
+    title?: string;
 }
 
 const providerGlowMap: { [key: string]: string } = {
@@ -15,7 +18,7 @@ const providerGlowMap: { [key: string]: string } = {
     'Hulu': 'brand-glow-hulu',
 };
 
-const StreamingHubs: React.FC<StreamingHubsProps> = ({ activeHub, setActiveHub }) => {
+const StreamingHubs: React.FC<StreamingHubsProps> = ({ activeHub, setActiveHub, onHoverProvider, onNavigateProvider, title = 'My Hubs' }) => {
     const { providerIds } = useStreamingPreferences();
     const selectedProviders = availableProviders.filter(p => providerIds.has(p.id));
 
@@ -23,8 +26,11 @@ const StreamingHubs: React.FC<StreamingHubsProps> = ({ activeHub, setActiveHub }
         return null;
     }
 
-    const handleHubClick = (id: number) => {
+    const handleHubClick = (id: number, name: string) => {
+        // Preserve existing local filtering behavior
         setActiveHub(activeHub === id ? null : id);
+        // Also allow navigation to dedicated provider page
+        if (onNavigateProvider) onNavigateProvider(id, name);
     };
 
     const handleShowAll = () => {
@@ -34,7 +40,7 @@ const StreamingHubs: React.FC<StreamingHubsProps> = ({ activeHub, setActiveHub }
     return (
         <div className="mb-6 animate-fade-in-up">
             <div className="flex items-center gap-4">
-                <h3 className="text-xl font-bold whitespace-nowrap">My Hubs</h3>
+                <h3 className="text-xl font-bold whitespace-nowrap">{title}</h3>
                 <div className="w-full h-px bg-glass-edge"></div>
             </div>
             <div className="flex items-center gap-4 mt-4 flex-wrap">
@@ -54,13 +60,15 @@ const StreamingHubs: React.FC<StreamingHubsProps> = ({ activeHub, setActiveHub }
                     return (
                         <button
                             key={provider.id}
-                            onClick={() => handleHubClick(provider.id)}
+                            onClick={() => handleHubClick(provider.id, provider.name)}
                             title={`Filter by ${provider.name}`}
-                            className={`w-12 h-12 flex items-center justify-center p-1 rounded-xl transition-all duration-300 transform hover:-translate-y-1 ${
+                            className={`w-20 h-20 sm:w-16 sm:h-16 flex items-center justify-center p-1 rounded-full streaming-circle transition-transform duration-200 ease-out transform hover:-translate-y-1 hover:scale-105 ${
                                 activeHub === provider.id ? 'ring-2 ring-white bg-white/20' : 'bg-glass'
                             } ${glowClass}`}
+                            onMouseEnter={() => onHoverProvider && onHoverProvider(provider.name)}
+                            onMouseLeave={() => onHoverProvider && onHoverProvider(null)}
                         >
-                           <img src={provider.imageUrl} alt={`${provider.name} logo`} className="w-full h-full object-cover rounded-md" />
+                           <img src={provider.imageUrl} alt={`${provider.name} logo`} className="w-full h-full object-cover rounded-full" />
                         </button>
                     );
                 })}

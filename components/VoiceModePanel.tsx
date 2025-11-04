@@ -24,7 +24,7 @@ const VoiceModePanel: React.FC<VoiceModePanelProps> = ({ messages, isThinking, o
             <div className="voice-panel" onClick={(e) => e.stopPropagation()}>
                 <div className="voice-panel-header">
                     <SparklesIcon className="w-5 h-5" />
-                    <span>ScreenScape AI Voice</span>
+                    <span>ChoiceForReels AI Voice</span>
                 </div>
                 <div className="voice-panel-messages">
                     {messages.map((msg, index) => (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { MediaItem, Movie } from '../types';
 import { FaHeart, FaThumbsDown } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,20 +15,42 @@ const LikesPage: React.FC<LikesPageProps> = ({ apiKey, onSelectItem, onInvalidAp
   const [likedMovies, setLikedMovies] = useState<MediaItem[]>([]);
   const [dislikedMovies, setDislikedMovies] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const fetchingRef = useRef(false);
 
   // Get movie IDs from content preferences
-  const contentPrefs = userSettings?.content_preferences || [];
+  const contentPrefs = useMemo(() => 
+    userSettings?.content_preferences || [], 
+    [userSettings?.content_preferences]
+  );
+  
   const likedMovieIds = useMemo(() =>
     contentPrefs.filter(p => p.preference === 'like').map(p => p.media_id),
     [contentPrefs]
   );
+  
   const dislikedMovieIds = useMemo(() =>
     contentPrefs.filter(p => p.preference === 'dislike').map(p => p.media_id),
     [contentPrefs]
   );
 
+  // Create stable string representations for useEffect dependencies
+  const likedMovieIdsString = useMemo(() => 
+    likedMovieIds.sort().join(','), 
+    [likedMovieIds]
+  );
+  
+  const dislikedMovieIdsString = useMemo(() => 
+    dislikedMovieIds.sort().join(','), 
+    [dislikedMovieIds]
+  );
+
   useEffect(() => {
     const fetchLikedMoviesData = async () => {
+      // Prevent multiple simultaneous fetches
+      if (fetchingRef.current) {
+        return;
+      }
+
       if (!likedMovieIds.length && !dislikedMovieIds.length) {
         setLikedMovies([]);
         setDislikedMovies([]);
@@ -37,6 +59,7 @@ const LikesPage: React.FC<LikesPageProps> = ({ apiKey, onSelectItem, onInvalidAp
       }
 
       try {
+        fetchingRef.current = true;
         setLoading(true);
         const likedMovieData: MediaItem[] = [];
         const dislikedMovieData: MediaItem[] = [];
@@ -114,15 +137,17 @@ const LikesPage: React.FC<LikesPageProps> = ({ apiKey, onSelectItem, onInvalidAp
         setLikedMovies(likedMovieData);
         setDislikedMovies(dislikedMovieData);
         setLoading(false);
+        fetchingRef.current = false;
 
       } catch (error) {
         console.error('Error loading likes/dislikes data:', error);
         setLoading(false);
+        fetchingRef.current = false;
       }
     };
 
     fetchLikedMoviesData();
-  }, [likedMovieIds, dislikedMovieIds]);
+  }, [likedMovieIdsString, dislikedMovieIdsString, apiKey]);
 
   if (loading) {
     return (
