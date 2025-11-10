@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ensureYouTubeApiIsReady } from '../services/youtubeService';
 import { isMobileDevice } from '../utils/deviceDetection';
+import { useAppleTheme } from './AppleThemeProvider';
+import { Volume2, VolumeX } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -67,6 +69,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
     const desiredMuteRef = useRef(isMuted);
     const lastVideoKeyRef = useRef<string | null>(null);
     const onEndRef = useRef(onEnd);
+    const { tokens } = useAppleTheme();
+
+    // Local, user-controlled mute state with persistence
+    const [muted, setMuted] = useState<boolean>(true);
+    const [policyMuted, setPolicyMuted] = useState<boolean>(false);
 
     const applyMuteState = useCallback((player: YT.Player | null, shouldMute: boolean) => {
         if (!player) return;
@@ -107,6 +114,31 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
         onEndRef.current = onEnd;
     }, [onEnd]);
 
+    // Initialize local mute state from localStorage or props
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem('trailerAudioMuted');
+            if (stored !== null) {
+                const prefMuted = stored === 'true';
+                setMuted(prefMuted);
+                desiredMuteRef.current = prefMuted;
+                initialMuteRef.current = prefMuted;
+            } else {
+                // Default to muted to ensure autoplay across browsers
+                const defaultMuted = true;
+                setMuted(defaultMuted);
+                desiredMuteRef.current = defaultMuted;
+                initialMuteRef.current = defaultMuted;
+            }
+        } catch {
+            // Fallback if localStorage not available
+            const defaultMuted = true;
+            setMuted(defaultMuted);
+            desiredMuteRef.current = defaultMuted;
+            initialMuteRef.current = defaultMuted;
+        }
+    }, []);
+
     useEffect(() => {
         if (!playerContainerRef.current) return;
 
@@ -116,9 +148,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
             if (!isMountedRef.current || !playerContainerRef.current || isCancelled) return;
             if (!window.YT || typeof window.YT.Player !== 'function') return;
 
-            // Force mute on mobile for autoplay compliance
-            const forceMute = isMobileDevice();
-            const muteValue = forceMute ? 1 : (initialMuteRef.current ? 1 : 0);
+            // Always start muted to comply with autoplay policies across browsers
+            const muteValue = 1;
 
             const playerVars: YT.PlayerOptions['playerVars'] = {
                 autoplay: 1,
@@ -144,7 +175,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
                             return;
                         }
 
+                        // Attempt to honor user preference on ready;
+                        // browsers may keep audio muted until user gesture
                         applyMuteState(event.target, desiredMuteRef.current);
+                        try {
+                            const actuallyMuted = event.target.isMuted();
+                            setPolicyMuted(actuallyMuted);
+                            setMuted(actuallyMuted);
+                        } catch {}
                         lastVideoKeyRef.current = null;
                         setIsPlayerReady(true);
                     },
@@ -198,14 +236,62 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
     useEffect(() => {
         if (!isPlayerReady || !playerRef.current) return;
 
-        // On mobile, always keep muted for autoplay compliance
+        // Always start muted for autoplay; honor local user toggle thereafter
         const player = playerRef.current;
-        const shouldMute = isMobileDevice() ? true : isMuted;
+        const shouldMute = muted;
         applyMuteState(player, shouldMute);
-    }, [applyMuteState, isPlayerReady, isMuted]);
+    }, [applyMuteState, isPlayerReady, muted]);
 
+    const handleToggleMute = useCallback(() => {
+        const player = playerRef.current;
+        if (!player) return;
 
-    return <div ref={playerContainerRef} className="w-full h-full" />;
+        const nextMuted = !muted;
+        setMuted(nextMuted);
+        try {
+            localStorage.setItem('trailerAudioMuted', String(nextMuted));
+        } catch {}
+        applyMuteState(player, nextMuted);
+
+        // Dispatch event to keep external listeners in sync
+        try {
+            const action = nextMuted ? 'mute' : 'unmute';
+            window.dispatchEvent(new CustomEvent('controlTrailerAudio', { detail: { action } }));
+        } catch {}
+    }, [muted, applyMuteState]);
+
+    return (
+        <div className="relative w-full h-full">
+            <div ref={playerContainerRef} className="w-full h-full" />
+            {/* Accessible Unmute/Mute Control Overlay */}
+            <button
+                type="button"
+                onClick={handleToggleMute}
+                aria-pressed={!muted}
+                aria-label={muted ? 'Unmute trailer audio' : 'Mute trailer audio'}
+                className="absolute left-3 bottom-3 flex items-center gap-2"
+                style={{
+                    background: tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.15)',
+                    backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(12px)',
+                    WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(12px)',
+                    borderColor: tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)',
+                    boxShadow: tokens?.shadows?.medium || '0 4px 16px rgba(0, 0, 0, 0.2)',
+                    color: tokens?.colors?.text?.primary || '#fff',
+                    borderWidth: 1,
+                    borderStyle: 'solid',
+                    borderRadius: tokens?.borderRadius?.pill || 9999,
+                    padding: `${tokens?.spacing?.xsmall || 6}px ${tokens?.spacing?.small || 10}px`,
+                    fontFamily: tokens?.typography?.families?.text,
+                    fontWeight: tokens?.typography?.weights?.medium,
+                    transition: tokens?.interactions?.transitions?.fast || 'all 0.2s ease-in-out',
+                    cursor: 'pointer'
+                }}
+            >
+                {muted ? <VolumeX size={16} aria-hidden="true" /> : <Volume2 size={16} aria-hidden="true" />}
+                <span>{muted ? (policyMuted ? 'Muted. Tap to unmute' : 'Muted') : 'Sound on'}</span>
+            </button>
+        </div>
+    );
 };
 
 export default VideoPlayer;

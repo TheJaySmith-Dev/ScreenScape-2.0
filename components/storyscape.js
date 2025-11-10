@@ -53,7 +53,7 @@ function buildFallbackSummary(title, overview) {
     tone: DEFAULT_TONE,
     style: DEFAULT_STYLE,
     origin: "fallback",
-    note: `StoryScape's live service is unavailable, so this synopsis was adapted from the official overview for "${title}".`,
+    note: `AI synopsis derived from the official overview for "${title}".`,
   };
 }
 
@@ -115,7 +115,24 @@ export async function generateStoryScapeSummary(title, overview) {
   `;
 
   try {
-    const rawResponse = await queryOpenRouter(prompt);
+    // Quick response strategy: race the AI call against a short timeout
+    // to keep the UI responsive. If the AI doesn't answer fast, fallback
+    // to an overview-derived synopsis instead of making users wait.
+    const TIMEOUT_MS = 1600; // ~1.6s to feel snappy without being abrupt
+    const timeoutSentinel = Symbol('timeout');
+    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(timeoutSentinel), TIMEOUT_MS));
+
+    const rawResponse = await Promise.race([
+      queryOpenRouter(prompt),
+      timeoutPromise
+    ]);
+
+    // If we hit the timeout, return an immediate, graceful fallback
+    if (rawResponse === timeoutSentinel) {
+      const fallback = buildFallbackSummary(title, overview);
+      if (fallback) return fallback;
+      throw new Error("StoryScape is taking longer than usual. Please try again.");
+    }
 
     // Check for error messages indicating unavailability
     const normalizedResponse = typeof rawResponse === "string" ? rawResponse.toLowerCase() : "";

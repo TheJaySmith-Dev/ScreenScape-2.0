@@ -40,6 +40,8 @@ export interface LiquidGlassWrapperProps {
   effect?: 'clear' | 'regular' | 'none';
   tintColor?: string;
   enableEffects?: boolean;
+  /** Force-enable liquid effects, bypassing capability and accessibility gating */
+  forceRenderEffects?: boolean;
   mouseContainer?: React.RefObject<HTMLDivElement>;
   className?: string;
   style?: React.CSSProperties;
@@ -67,6 +69,7 @@ export const LiquidGlassWrapper: React.FC<LiquidGlassWrapperProps> = ({
   effect = 'regular',
   tintColor,
   enableEffects = true,
+  forceRenderEffects = false,
   mouseContainer,
   className,
   style,
@@ -119,6 +122,7 @@ export const LiquidGlassWrapper: React.FC<LiquidGlassWrapperProps> = ({
 
   // Determine if effects should be enabled based on all factors
   const shouldRenderEffects = useMemo(() => {
+    if (forceRenderEffects) return true;
     // Avoid hard toggles: keep effects on, but degrade quality when perf dips.
     // Only fully disable if device is intrinsically low-performance AND perf is low.
     const mustDisableForPerf = performanceMetrics.isLowPerformance && deviceCapabilities.performanceLevel === 'low';
@@ -136,7 +140,8 @@ export const LiquidGlassWrapper: React.FC<LiquidGlassWrapperProps> = ({
     accessibilityPreferences,
     isNearViewport,
     performanceMetrics.isLowPerformance,
-    deviceCapabilities.performanceLevel
+    deviceCapabilities.performanceLevel,
+    forceRenderEffects
   ]);
 
   // Get liquid glass configuration with all optimizations applied

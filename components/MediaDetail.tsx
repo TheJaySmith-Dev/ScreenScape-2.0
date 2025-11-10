@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, RefObject } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MediaItem, Movie, MovieDetails, TVShowDetails, WatchProvider, WatchProviderCountry } from '../types';
-import { getMovieDetails as getTMDbMovieDetails, getTVShowDetails as getTMDbTVShowDetails, getMovieCredits, getTVShowCredits } from '../services/tmdbService';
+import { getMovieDetails as getTMDbMovieDetails, getTVShowDetails as getTMDbTVShowDetails, getMovieCredits, getTVShowCredits, getMovieImages, getTVShowImages } from '../services/tmdbService';
 import { getMovieRecommendations } from '../services/tmdbService';
-import { getMovieWatchProviders, getTVShowWatchProviders, getMovieVideos, getTVShowVideos } from '../services/tmdbService';
-import { getOMDbFromTMDBDetails, OMDbMovieDetails, extractRottenTomatoesRating, extractRottenTomatoesConsensus } from '../services/omdbService';
+import { getMovieWatchProviders, getTVShowWatchProviders, getMovieVideos, getTVShowVideos, getTVSeasonDetails, filterImaxVideos } from '../services/tmdbService';
+import { isCuratedImaxTitle, getCuratedTrailerKeyForItem } from '../services/imaxCuratedService';
+import { getOMDbFromTMDBDetails, OMDbMovieDetails, extractRottenTomatoesRating, extractRottenTomatoesConsensus, hasOMDbKey } from '../services/omdbService';
+import { fetchRtCriticReviews, RtCriticReview } from '../services/rottenTomatoesService';
 import RottenTomatoesRating from '../components/RottenTomatoesRating';
-import { generateFactsAI, generateReviewsAI } from './openrouter.js';
+import { generateFactsAI, generateReviewsAIWithSources } from './openrouter.js';
 import { generateStoryScapeSummary } from './storyscape.js';
 import { generatePersonalizedRecommendations } from '../services/recommendationService';
 // TrailerManager is no longer used for main trailer in detail view
@@ -25,6 +27,7 @@ import {
     hasAvailability,
 } from '../utils/streamingAvailability';
 import MediaTitleLogo from './MediaTitleLogo';
+// FanArt removed: backdrops resolved via TMDb image APIs
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 
@@ -200,6 +203,8 @@ interface MediaDetailProps {
     onClose: () => void;
     onSelectItem: (item: MediaItem) => void;
     onInvalidApiKey: () => void;
+    // When true, prefer IMAX trailer variants if available
+    preferImaxTrailer?: boolean;
 }
 
 interface WhereToWatchProps {
@@ -367,11 +372,11 @@ const WhereToWatch: React.FC<WhereToWatchProps> = ({ providers, providerIds }) =
 
 
 // --- Apple Design System Components ---
-const BackgroundHeader: React.FC<{ backdropPath: string }> = ({ backdropPath }) => (
+const BackgroundHeader: React.FC<{ backdropUrl: string }> = ({ backdropUrl }) => (
     <div 
         className="absolute inset-0 rounded-t-3xl overflow-hidden"
         style={{
-            backgroundImage: `url('${IMAGE_BASE_URL}original${backdropPath}')`,
+            backgroundImage: `url('${backdropUrl}')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
@@ -714,7 +719,7 @@ const LikeDislikeButtons: React.FC<{
 };
 
 // --- Main Component ---
-const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSelectItem, onInvalidApiKey }) => {
+const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSelectItem, onInvalidApiKey, preferImaxTrailer }) => {
     const { tokens } = useAppleTheme();
     const { applyHoverEffect, applyPressEffect } = useAppleAnimationEffects();
     
@@ -723,7 +728,7 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         return null;
     }
     
-    const [activeTab, setActiveTab] = useState<'overview' | 'cast' | 'reviews'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'cast' | 'reviews' | 'episodes'>('overview');
     const [showTrailerModal, setShowTrailerModal] = useState(false);
     const [details, setDetails] = useState<MovieDetails | TVShowDetails | null>(null);
     const [storyScape, setStoryScape] = useState<{
@@ -746,12 +751,31 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     const [isFactsAILoading, setIsFactsAILoading] = useState(false);
     const [factsAIError, setFactsAIError] = useState<string | null>(null);
 
+    // Episodes / Seasons state (TV only)
+    const [selectedSeasonNumber, setSelectedSeasonNumber] = useState<number | null>(null);
+    const [seasonDetails, setSeasonDetails] = useState<any | null>(null);
+    const [isSeasonLoading, setIsSeasonLoading] = useState(false);
+    const [seasonError, setSeasonError] = useState<string | null>(null);
+
+    // AI reviews grounded by critic sources
+    const [reviewsAI, setReviewsAI] = useState<string | null>(null);
+    const [isReviewsAILoading, setIsReviewsAILoading] = useState(false);
+    const [reviewsAIError, setReviewsAIError] = useState<string | null>(null);
+
     const [omdbData, setOmdbData] = useState<OMDbMovieDetails | null>(null);
     const [isOmdbLoading, setIsOmdbLoading] = useState(false);
+    const [omdbError, setOmdbError] = useState<string | null>(null);
 
-    const [aiReviews, setAiReviews] = useState<string | null>(null);
-    const [isAiReviewsLoading, setIsAiReviewsLoading] = useState(false);
-    const [aiReviewsError, setAiReviewsError] = useState<string | null>(null);
+    // Reviews: Replace AI with real RT/IMDb review views backed by OMDb
+    const [showRTReviews, setShowRTReviews] = useState<boolean>(false);
+    const [rtView, setRtView] = useState<'critics' | 'audience'>('critics');
+    const [showIMDBReviews, setShowIMDBReviews] = useState<boolean>(false);
+    // Rotten Tomatoes direct reviews state
+    const [rtReviews, setRtReviews] = useState<RtCriticReview[] | null>(null);
+    const [rtSourceUrl, setRtSourceUrl] = useState<string | null>(null);
+    const [isRtLoading, setIsRtLoading] = useState(false);
+    const [rtError, setRtError] = useState<string | null>(null);
+    const [backdropUrl, setBackdropUrl] = useState<string | null>(null);
 
     // Refs for dynamic background detection
     const contentPanelRef = useRef<HTMLDivElement>(null);
@@ -824,6 +848,18 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                     : await getTVShowVideos(apiKey, item.id);
                 (fetchedDetails as any).videos = videos;
 
+                // Default season selection for TV shows
+                if (item.media_type === 'tv' && Array.isArray((fetchedDetails as any).seasons)) {
+                    const seasonsArr = (fetchedDetails as any).seasons as Array<any>;
+                    const latest = seasonsArr
+                        .filter(s => typeof s?.season_number === 'number')
+                        .sort((a, b) => a.season_number - b.season_number)
+                        .slice(-1)[0];
+                    setSelectedSeasonNumber(latest?.season_number ?? seasonsArr[0]?.season_number ?? 1);
+                } else {
+                    setSelectedSeasonNumber(null);
+                }
+
                 if (!isMounted) return;
                 setDetails(fetchedDetails as any);
 
@@ -841,6 +877,7 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
                     // Fetch OMDb data for extended movie information
                     setIsOmdbLoading(true);
+                    setOmdbError(null);
                     try {
                         const omdbInfo = await getOMDbFromTMDBDetails(fetchedDetails);
                         if (isMounted && omdbInfo) {
@@ -848,6 +885,10 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                         }
                     } catch (omdbError) {
                         console.warn('OMDb data not available:', omdbError);
+                        if (isMounted) {
+                            const msg = omdbError instanceof Error ? omdbError.message : 'Unable to load OMDb data';
+                            setOmdbError(msg);
+                        }
                     } finally {
                         if (isMounted) setIsOmdbLoading(false);
                     }
@@ -872,6 +913,48 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         fetchDetails();
         return () => { isMounted = false; };
     }, [item.id, item.media_type, apiKey, onInvalidApiKey, country.code]);
+
+    // Resolve backdrop using TMDb images and set fallback immediately
+    useEffect(() => {
+        let cancelled = false;
+        const resolveBackdrop = async () => {
+            if (!details) return;
+            // Set TMDb fallback immediately
+            const tmdbFallback = details.backdrop_path ? `${IMAGE_BASE_URL}original${details.backdrop_path}` : '';
+            if (!cancelled) setBackdropUrl(tmdbFallback);
+
+            try {
+                if (item.media_type === 'movie') {
+                    const images = await getMovieImages(apiKey, item.id);
+                    const backdrops = Array.isArray(images?.backdrops) ? images.backdrops : [];
+                    if (backdrops.length > 0) {
+                        const pick = backdrops
+                            .slice()
+                            .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
+                        if (pick?.file_path && !cancelled) {
+                            setBackdropUrl(`${IMAGE_BASE_URL}original${pick.file_path}`);
+                        }
+                    }
+                } else {
+                    const images = await getTVShowImages(apiKey, item.id);
+                    const backdrops = Array.isArray(images?.backdrops) ? images.backdrops : [];
+                    if (backdrops.length > 0) {
+                        const pick = backdrops
+                            .slice()
+                            .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
+                    
+                        if (pick?.file_path && !cancelled) {
+                            setBackdropUrl(`${IMAGE_BASE_URL}original${pick.file_path}`);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('Failed to resolve backdrop; using TMDb fallback:', err);
+            }
+        };
+        resolveBackdrop();
+        return () => { cancelled = true; };
+    }, [details, item.media_type, item.id, apiKey]);
 
     const handleGenerateStoryScape = async () => {
         if (!details) return;
@@ -917,8 +1000,70 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         }
     };
 
+    const handleGenerateAIReviews = async () => {
+        if (!details) return;
+        setIsReviewsAILoading(true);
+        setReviewsAIError(null);
+        setReviewsAI(null);
+        try {
+            const title = 'title' in details ? details.title : details.name;
+            const overview = details.overview || '';
+            const rating = details.vote_average || 0;
+            const genres = (details.genres || []).map(g => g?.name).filter(Boolean) as string[];
+
+            let sources: string[] = [];
+            try {
+                if (item.media_type === 'movie') {
+                    let reviews = rtReviews;
+                    if (!reviews || reviews.length === 0) {
+                        const releaseDate = 'release_date' in details ? details.release_date : undefined;
+                        const year = releaseDate ? new Date(releaseDate).getFullYear() : undefined;
+                        const tomatoURL = (omdbData as any)?.tomatoURL as string | undefined;
+                        const fetched = await fetchRtCriticReviews({ title, year, tomatoURL });
+                        reviews = fetched.reviews;
+                        if (!rtReviews && fetched.reviews) setRtReviews(fetched.reviews);
+                        if (!rtSourceUrl && fetched.sourceUrl) setRtSourceUrl(fetched.sourceUrl);
+                    }
+                    sources = (reviews || [])
+                        .map(r => {
+                            const who = r.critic?.name ? `${r.critic.name}` : 'Critic';
+                            const pub = r.source ? ` @ ${r.source}` : '';
+                            const quote = r.quote ? `: "${r.quote}"` : '';
+                            return `${who}${pub}${quote}`.trim();
+                        })
+                        .filter(s => s.length > 0)
+                        .slice(0, 8);
+                }
+            } catch {
+                // ignore source fetch errors; we'll fall back below
+            }
+
+            if (sources.length === 0) {
+                const consensus = omdbData ? extractRottenTomatoesConsensus(omdbData) : null;
+                if (consensus) sources.push(`Critics Consensus: ${consensus}`);
+                if (omdbData?.imdbRating && omdbData.imdbRating !== 'N/A') {
+                    sources.push(`IMDb Rating: ${omdbData.imdbRating}/10`);
+                }
+            }
+
+            const aiReviews = await generateReviewsAIWithSources(title, overview, rating, genres, sources);
+            setReviewsAI(typeof aiReviews === 'string' ? aiReviews : String(aiReviews));
+        } catch (err: any) {
+            setReviewsAIError(err?.message || 'Failed to generate AI reviews');
+        } finally {
+            setIsReviewsAILoading(false);
+        }
+    };
+
     const [mainTrailerKey, setMainTrailerKey] = useState<string | null>(null);
     useEffect(() => {
+        // Prefer curated trailer key for curated IMAX titles
+        const curatedKey = getCuratedTrailerKeyForItem(item);
+        if (curatedKey) {
+            setMainTrailerKey(curatedKey);
+            return;
+        }
+
         // Derive the main YouTube trailer key from TMDb videos in details
         if (!details || !(details as any).videos || !Array.isArray((details as any).videos.results)) {
             setMainTrailerKey(null);
@@ -926,13 +1071,46 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         }
         const videos = (details as any).videos.results as Array<any>;
         const pick = (predicate: (v: any) => boolean) => videos.find(predicate);
-        const primary =
-            pick(v => v.site === 'YouTube' && v.type === 'Trailer' && v.official) ||
-            pick(v => v.site === 'YouTube' && v.type === 'Trailer') ||
-            pick(v => v.site === 'YouTube' && v.type === 'Teaser') ||
-            pick(v => v.site === 'YouTube');
+        // If IMAX mode is enabled, attempt to select an IMAX-specific trailer first
+        let primary: any = null;
+        const imaxCandidates = filterImaxVideos(videos as any);
+        if (Array.isArray(imaxCandidates) && imaxCandidates.length > 0 && preferImaxTrailer) {
+            primary = imaxCandidates[0];
+        }
+        // Fallback to standard selection if no IMAX match or not in IMAX mode
+        if (!primary) {
+            primary =
+                pick(v => v.site === 'YouTube' && v.type === 'Trailer' && v.official) ||
+                pick(v => v.site === 'YouTube' && v.type === 'Trailer') ||
+                pick(v => v.site === 'YouTube' && v.type === 'Teaser') ||
+                pick(v => v.site === 'YouTube');
+        }
         setMainTrailerKey(primary?.key ?? null);
-    }, [details]);
+    }, [item, details, preferImaxTrailer]);
+
+    // Load season details when a season is selected (TV only)
+    useEffect(() => {
+        let cancelled = false;
+        const loadSeason = async () => {
+            if (item.media_type !== 'tv' || !selectedSeasonNumber) {
+                setSeasonDetails(null);
+                setSeasonError(null);
+                return;
+            }
+            setIsSeasonLoading(true);
+            setSeasonError(null);
+            try {
+                const sd = await getTVSeasonDetails(apiKey, item.id, selectedSeasonNumber);
+                if (!cancelled) setSeasonDetails(sd);
+            } catch (err: any) {
+                if (!cancelled) setSeasonError(err?.message || 'Failed to load season details');
+            } finally {
+                if (!cancelled) setIsSeasonLoading(false);
+            }
+        };
+        loadSeason();
+        return () => { cancelled = true; };
+    }, [apiKey, item.id, item.media_type, selectedSeasonNumber]);
 
     const providersForCountry = useMemo(
         () => details?.['watch/providers']?.results?.[country.code],
@@ -964,28 +1142,39 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         setShowTrailerModal(false);
     };
 
-    const handleGenerateReviewsAI = async () => {
-        if (!details) return;
-        setIsAiReviewsLoading(true);
-        setAiReviewsError(null);
-        setAiReviews(null);
+    // RT/IMDb review toggles
+    const handleViewRTReviews = () => {
+        setShowRTReviews(true);
+        setShowIMDBReviews(false);
+        // Prefetch RT critics reviews when toggling on
+        if (!isRtLoading && !rtReviews && item.media_type === 'movie') {
+            loadRtCriticReviews();
+        }
+    };
+    const handleViewIMDBReviews = () => {
+        setShowIMDBReviews(true);
+        setShowRTReviews(false);
+    };
+
+    // Load Rotten Tomatoes critic reviews for the current movie
+    const loadRtCriticReviews = async () => {
+        if (!details || item.media_type !== 'movie') return;
         try {
-            const genres = details.genres?.map(g => g.name).filter(Boolean) || [];
-            const reviews = await generateReviewsAI(
-                'title' in details ? details.title : details.name,
-                details.overview,
-                details.vote_average,
-                genres
-            );
-            setAiReviews(reviews);
-        } catch (err) {
-            if (err instanceof Error) {
-                setAiReviewsError(err.message);
-            } else {
-                setAiReviewsError("Reviews are still being generated. Try again in a moment.");
-            }
+            setIsRtLoading(true);
+            setRtError(null);
+            setRtReviews(null);
+            const title = 'title' in details ? details.title : details.name;
+            const releaseDate = 'release_date' in details ? details.release_date : details.first_air_date;
+            const year = releaseDate ? new Date(releaseDate).getFullYear() : undefined;
+            const tomatoURL = (omdbData as any)?.tomatoURL as string | undefined;
+            const { reviews, sourceUrl } = await fetchRtCriticReviews({ title, year, tomatoURL });
+            setRtReviews(reviews);
+            setRtSourceUrl(sourceUrl || null);
+        } catch (err: any) {
+            const msg = err?.message || 'Failed to load Rotten Tomatoes reviews';
+            setRtError(msg);
         } finally {
-            setIsAiReviewsLoading(false);
+            setIsRtLoading(false);
         }
     };
 
@@ -1339,6 +1528,201 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                         </div>
                     </div>
                 );
+            case 'episodes':
+                return (
+                    <div>
+                        <h3 
+                            style={{
+                                fontSize: tokens.typography.sizes.title3,
+                                fontWeight: tokens.typography.weights.bold,
+                                marginBottom: tokens.spacing.medium,
+                                color: tokens.colors.text.primary,
+                                fontFamily: tokens.typography.families.text
+                            }}
+                        >
+                            Seasons & Episodes
+                        </h3>
+                        {item.media_type !== 'tv' ? (
+                            <div className="rounded-xl border p-3" style={{
+                                borderColor: tokens.colors.border.primary,
+                                background: `${tokens.colors.background.secondary}80`,
+                                color: tokens.colors.text.secondary
+                            }}>
+                                Episodes are available for TV shows only.
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: tokens.spacing.large }}>
+                                <div className="rounded-xl backdrop-blur-xl border" style={{
+                                    background: `linear-gradient(135deg, ${tokens.colors.background.secondary}80, ${tokens.colors.background.primary}80)`,
+                                    borderColor: tokens.colors.border.primary,
+                                    padding: tokens.spacing.medium
+                                }}>
+                                    <div className="flex items-center" style={{ gap: tokens.spacing.small }}>
+                                        <label htmlFor="season-select" style={{
+                                            fontWeight: tokens.typography.weights.semibold,
+                                            color: tokens.colors.text.primary,
+                                            fontFamily: tokens.typography.families.text
+                                        }}>
+                                            Select Season
+                                        </label>
+                                        <select
+                                            id="season-select"
+                                            value={selectedSeasonNumber ?? ''}
+                                            onChange={(e) => setSelectedSeasonNumber(Number(e.target.value))}
+                                            className="rounded-xl backdrop-blur-xl border"
+                                            style={{
+                                                padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.medium}`,
+                                                background: `${tokens.colors.background.secondary}60`,
+                                                borderColor: tokens.colors.border.primary,
+                                                color: tokens.colors.text.primary,
+                                                fontFamily: tokens.typography.families.text,
+                                                fontSize: tokens.typography.sizes.body
+                                            }}
+                                        >
+                                            <option value="" disabled>Select a season</option>
+                                            {((details as TVShowDetails)?.seasons ?? []).map((s) => (
+                                                <option key={s.season_number} value={s.season_number}>
+                                                    Season {s.season_number} {s.name && s.name !== `Season ${s.season_number}` ? `— ${s.name}` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-xl backdrop-blur-xl border" style={{
+                                    background: `linear-gradient(135deg, ${tokens.colors.background.secondary}80, ${tokens.colors.background.primary}80)`,
+                                    borderColor: tokens.colors.border.primary,
+                                    padding: tokens.spacing.medium
+                                }}>
+                                    <h4 
+                                        style={{
+                                            fontWeight: tokens.typography.weights.semibold,
+                                            color: tokens.colors.system.blue,
+                                            marginBottom: tokens.spacing.small,
+                                            fontFamily: tokens.typography.families.text,
+                                            fontSize: tokens.typography.sizes.body
+                                        }}
+                                    >
+                                        Where to Watch this Season
+                                    </h4>
+                                    <WhereToWatch providers={providersForCountry} providerIds={providerIds} />
+                                </div>
+
+                                <div className="rounded-xl backdrop-blur-xl border" style={{
+                                    background: `${tokens.colors.background.secondary}CC`,
+                                    borderColor: tokens.colors.border.primary,
+                                    padding: tokens.spacing.medium
+                                }}>
+                                    <h4 
+                                        style={{
+                                            fontWeight: tokens.typography.weights.semibold,
+                                            color: tokens.colors.text.primary,
+                                            marginBottom: tokens.spacing.small,
+                                            fontFamily: tokens.typography.families.text,
+                                            fontSize: tokens.typography.sizes.body
+                                        }}
+                                    >
+                                        {selectedSeasonNumber ? `Episodes in Season ${selectedSeasonNumber}` : 'Episodes'}
+                                    </h4>
+                                    {isSeasonLoading && (
+                                        <div className="mt-2">
+                                            <Loader />
+                                        </div>
+                                    )}
+                                    {seasonError && (
+                                        <div className="rounded-xl border p-3" style={{
+                                            borderColor: tokens.colors.border.primary,
+                                            background: `${tokens.colors.background.secondary}80`,
+                                            color: tokens.colors.text.secondary
+                                        }}>
+                                            {seasonError}
+                                        </div>
+                                    )}
+                                    {!isSeasonLoading && !seasonError && (!seasonDetails || !seasonDetails.episodes || seasonDetails.episodes.length === 0) && (
+                                        <div className="rounded-xl border p-3" style={{
+                                            borderColor: tokens.colors.border.primary,
+                                            background: `${tokens.colors.background.secondary}80`,
+                                            color: tokens.colors.text.secondary
+                                        }}>
+                                            {selectedSeasonNumber ? 'No episode information available for this season.' : 'Select a season to view episodes.'}
+                                        </div>
+                                    )}
+                                    {!isSeasonLoading && !seasonError && seasonDetails?.episodes && seasonDetails.episodes.length > 0 && (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: tokens.spacing.medium }}>
+                                            {seasonDetails.episodes.map((ep) => (
+                                                <div key={ep.id} className="rounded-xl backdrop-blur-xl border" style={{
+                                                    background: `${tokens.colors.background.secondary}80`,
+                                                    borderColor: tokens.colors.border.primary,
+                                                    padding: tokens.spacing.small
+                                                }}>
+                                                    <div className="flex items-start" style={{ gap: tokens.spacing.small }}>
+                                                        {ep.still_path ? (
+                                                            <img
+                                                                src={`${IMAGE_BASE_URL}w300${ep.still_path}`}
+                                                                alt={ep.name}
+                                                                className="w-24 h-24 object-cover rounded-lg"
+                                                                style={{ border: `1px solid ${tokens.colors.separator.opaque}` }}
+                                                            />
+                                                        ) : null}
+                                                        <div className="flex-1">
+                                                            <h5 style={{
+                                                                fontWeight: tokens.typography.weights.semibold,
+                                                                color: tokens.colors.text.primary,
+                                                                fontFamily: tokens.typography.families.text,
+                                                                fontSize: tokens.typography.sizes.body
+                                                            }}>
+                                                                S{selectedSeasonNumber}E{ep.episode_number}: {ep.name}
+                                                            </h5>
+                                                            <div style={{ color: tokens.colors.text.tertiary, fontSize: tokens.typography.sizes.caption2 }}>
+                                                                {ep.air_date ? new Date(ep.air_date).toLocaleDateString() : 'Unknown air date'}
+                                                                {typeof ep.runtime === 'number' && ep.runtime > 0 ? ` • ${ep.runtime}m` : ''}
+                                                            </div>
+                                                            {ep.overview && (
+                                                                <p style={{ color: tokens.colors.text.secondary, fontFamily: tokens.typography.families.text, marginTop: tokens.spacing.micro[2] }}>
+                                                                    {ep.overview}
+                                                                </p>
+                                                            )}
+                                                            {hasStreamingAvailability && (
+                                                                <div className="flex flex-wrap" style={{ gap: tokens.spacing.micro[1], marginTop: tokens.spacing.small }}>
+                                                                    {availabilityDescriptors.slice(0, 3).map(descriptor => (
+                                                                        <span
+                                                                            key={descriptor.type}
+                                                                            className="rounded-full backdrop-blur-xl border"
+                                                                            style={{
+                                                                                background: `${tokens.colors.background.secondary}80`,
+                                                                                borderColor: tokens.colors.border.primary,
+                                                                                padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.small}`,
+                                                                                fontSize: tokens.typography.sizes.caption2,
+                                                                                fontFamily: tokens.typography.families.text
+                                                                            }}
+                                                                        >
+                                                                            <span 
+                                                                                style={{
+                                                                                    fontWeight: tokens.typography.weights.semibold,
+                                                                                    color: tokens.colors.text.primary,
+                                                                                    marginRight: tokens.spacing.micro[1]
+                                                                                }}
+                                                                            >
+                                                                                {descriptor.type}:
+                                                                            </span>
+                                                                            <span style={{ color: tokens.colors.text.secondary }}>
+                                                                                {descriptor.text}
+                                                                            </span>
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
             case 'reviews':
                 return (
                     <div>
@@ -1373,6 +1757,26 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                     Generate AI Summary
                 </button>
             )}
+
+                            {!reviewsAI && !isReviewsAILoading && !reviewsAIError && (
+                                <button
+                                    onClick={handleGenerateAIReviews}
+                                    onMouseEnter={applyHoverEffect}
+                                    onMouseDown={applyPressEffect}
+                                    className="rounded-xl backdrop-blur-xl border transition-all duration-300"
+                                    style={{
+                                        padding: `${tokens.spacing.small} ${tokens.spacing.large}`,
+                                        background: `linear-gradient(135deg, ${tokens.colors.system.blue}, ${tokens.colors.system.blue}E6)`,
+                                        borderColor: tokens.colors.border.primary,
+                                        color: tokens.colors.text.primary,
+                                        fontFamily: tokens.typography.families.text,
+                                        fontWeight: tokens.typography.weights.bold,
+                                        fontSize: tokens.typography.sizes.body
+                                    }}
+                                >
+                                    Generate AI Reviews
+                                </button>
+                            )}
 
                             {storyScape && (
                                 <div 
@@ -1438,81 +1842,384 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                                 </div>
                             )}
 
-                            {!aiReviews && !isAiReviewsLoading && !aiReviewsError && (
-                                <button 
-                                    onClick={handleGenerateReviewsAI} 
-                                    onMouseEnter={applyHoverEffect}
-                                    onMouseDown={applyPressEffect}
-                                    className="rounded-xl backdrop-blur-xl border transition-all duration-300"
-                                    style={{
-                                        padding: `${tokens.spacing.small} ${tokens.spacing.large}`,
-                                        background: `linear-gradient(135deg, ${tokens.colors.system.blue}, ${tokens.colors.system.blue}E6)`,
-                                        borderColor: tokens.colors.border.primary,
-                                        color: tokens.colors.text.primary,
-                                        fontFamily: tokens.typography.families.text,
-                                        fontWeight: tokens.typography.weights.bold,
-                                        fontSize: tokens.typography.sizes.body
-                                    }}
-                                >
-                                    Generate AI Reviews
-                                </button>
-                            )}
-
-                            {isAiReviewsLoading && (
-                                <div className="text-center" style={{ padding: tokens.spacing.medium }}>
-                                    <div className="spinner mx-auto" style={{ marginBottom: tokens.spacing.small }}></div>
-                                    <p style={{ color: tokens.colors.text.tertiary, fontFamily: tokens.typography.families.text }}>
-                                        Generating AI reviews...
-                                    </p>
+                            {isReviewsAILoading && (
+                                <div className="mt-2">
+                                    <Loader />
                                 </div>
                             )}
-
-                            {aiReviewsError && (
-                                <div 
-                                    className="rounded-xl border"
-                                    style={{
-                                        background: `${tokens.colors.system.red}20`,
-                                        borderColor: `${tokens.colors.system.red}50`,
-                                        padding: tokens.spacing.medium
-                                    }}
-                                >
-                                    <p style={{ color: tokens.colors.system.red, fontFamily: tokens.typography.families.text }}>
-                                        Error generating reviews: {aiReviewsError}
-                                    </p>
+                            {reviewsAIError && (
+                                <div className="rounded-xl border p-3" style={{
+                                    borderColor: tokens.colors.border.primary,
+                                    background: `${tokens.colors.background.secondary}80`,
+                                    color: tokens.colors.text.secondary
+                                }}>
+                                    {reviewsAIError}
                                 </div>
                             )}
-
-                            {aiReviews && (
+                            {reviewsAI && (
                                 <div 
                                     className="rounded-xl backdrop-blur-xl border"
                                     style={{
-                                        background: `${tokens.colors.system.blue}10`,
+                                        background: `${tokens.colors.background.secondary}CC`,
                                         borderColor: tokens.colors.border.primary,
-                                        padding: tokens.spacing.large
+                                        padding: tokens.spacing.medium
                                     }}
                                 >
                                     <h4 
                                         style={{
                                             fontWeight: tokens.typography.weights.semibold,
                                             color: tokens.colors.system.blue,
-                                            marginBottom: tokens.spacing.medium,
+                                            marginBottom: tokens.spacing.small,
                                             fontFamily: tokens.typography.families.text,
                                             fontSize: tokens.typography.sizes.body
                                         }}
                                     >
-                                        AI-Generated Reviews
+                                        AI Reviews
                                     </h4>
-                                    <div 
+                                    {reviewsAI.split('\n\n').map((para, idx) => (
+                                        <p key={idx} style={{ color: tokens.colors.text.primary, fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.body, marginBottom: tokens.spacing.small }}>
+                                            {para}
+                                        </p>
+                                    ))}
+                                </div>
+                            )}
+
+                            {item.media_type === 'movie' && (
+                                <div className="flex flex-wrap items-center" style={{ gap: tokens.spacing.small }}>
+                                    <button
+                                        onClick={handleViewRTReviews}
+                                        onMouseEnter={applyHoverEffect}
+                                        onMouseDown={applyPressEffect}
+                                        className="rounded-xl backdrop-blur-xl border transition-all duration-300"
                                         style={{
+                                            padding: `${tokens.spacing.small} ${tokens.spacing.large}`,
+                                            background: `linear-gradient(135deg, ${tokens.colors.system.red}, ${tokens.colors.system.red}E6)`,
+                                            borderColor: tokens.colors.border.primary,
                                             color: tokens.colors.text.primary,
-                                            whiteSpace: 'pre-line',
-                                            lineHeight: '1.6',
+                                            fontFamily: tokens.typography.families.text,
+                                            fontWeight: tokens.typography.weights.bold,
+                                            fontSize: tokens.typography.sizes.body
+                                        }}
+                                    >
+                                        View RT Reviews
+                                    </button>
+                                    <button
+                                        onClick={handleViewIMDBReviews}
+                                        onMouseEnter={applyHoverEffect}
+                                        onMouseDown={applyPressEffect}
+                                        className="rounded-xl backdrop-blur-xl border transition-all duration-300"
+                                        style={{
+                                            padding: `${tokens.spacing.small} ${tokens.spacing.large}`,
+                                            background: `linear-gradient(135deg, ${tokens.colors.system.blue}, ${tokens.colors.system.blue}E6)`,
+                                            borderColor: tokens.colors.border.primary,
+                                            color: tokens.colors.text.primary,
+                                            fontFamily: tokens.typography.families.text,
+                                            fontWeight: tokens.typography.weights.bold,
+                                            fontSize: tokens.typography.sizes.body
+                                        }}
+                                    >
+                                        View IMDb Reviews
+                                    </button>
+                                    {isOmdbLoading && (
+                                        <div className="ml-2">
+                                            <Loader />
+                                        </div>
+                                    )}
+                                    {!isOmdbLoading && !omdbData && (
+                                        <div className="mt-2 w-full">
+                                            {!hasOMDbKey() ? (
+                                                <div className="rounded-xl border p-3" style={{
+                                                    borderColor: tokens.colors.border.primary,
+                                                    background: `${tokens.colors.background.secondary}80`,
+                                                    color: tokens.colors.text.secondary
+                                                }}>
+                                                    OMDb key not set. Add `omdb_api_key` in localStorage or `VITE_OMDB_API_KEY` in your env to enable reviews.
+                                                </div>
+                                            ) : omdbError ? (
+                                                <div className="rounded-xl border p-3" style={{
+                                                    borderColor: tokens.colors.border.primary,
+                                                    background: `${tokens.colors.background.secondary}80`,
+                                                    color: tokens.colors.text.secondary
+                                                }}>
+                                                    Couldn’t load OMDb reviews ({omdbError}). This may be due to network restrictions in the preview environment.
+                                                </div>
+                                            ) : (
+                                                <div className="rounded-xl border p-3" style={{
+                                                    borderColor: tokens.colors.border.primary,
+                                                    background: `${tokens.colors.background.secondary}80`,
+                                                    color: tokens.colors.text.secondary
+                                                }}>
+                                                    No OMDb review data found for this title.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {(omdbData && item.media_type === 'movie' && showRTReviews) && (
+                                <div 
+                                    className="rounded-xl backdrop-blur-xl border"
+                                    style={{
+                                        background: `${tokens.colors.background.secondary}CC`,
+                                        borderColor: tokens.colors.border.primary,
+                                        padding: tokens.spacing.medium
+                                    }}
+                                >
+                                    <div className="flex items-center" style={{ gap: tokens.spacing.small, marginBottom: tokens.spacing.small }}>
+                                        <button
+                                            onClick={() => setRtView('critics')}
+                                            className="rounded-xl backdrop-blur-xl border transition-all duration-300"
+                                            style={{
+                                                padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.medium}`,
+                                                background: rtView === 'critics' ? `${tokens.colors.system.red}E6` : `${tokens.colors.background.primary}80`,
+                                                borderColor: tokens.colors.border.primary,
+                                                color: tokens.colors.text.primary,
+                                                fontFamily: tokens.typography.families.text,
+                                                fontWeight: tokens.typography.weights.semibold,
+                                                fontSize: tokens.typography.sizes.caption1
+                                            }}
+                                        >
+                                            Critics
+                                        </button>
+                                        <button
+                                            onClick={() => setRtView('audience')}
+                                            className="rounded-xl backdrop-blur-xl border transition-all duration-300"
+                                            style={{
+                                                padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.medium}`,
+                                                background: rtView === 'audience' ? `${tokens.colors.system.green}E6` : `${tokens.colors.background.primary}80`,
+                                                borderColor: tokens.colors.border.primary,
+                                                color: tokens.colors.text.primary,
+                                                fontFamily: tokens.typography.families.text,
+                                                fontWeight: tokens.typography.weights.semibold,
+                                                fontSize: tokens.typography.sizes.caption1
+                                            }}
+                                        >
+                                            Audience
+                                        </button>
+                                    </div>
+
+                                    {rtView === 'critics' && (() => {
+                                        const rtRating = extractRottenTomatoesRating(omdbData);
+                                        const consensus = extractRottenTomatoesConsensus(omdbData);
+                                        const tomatoUrl = (omdbData as any).tomatoURL || `https://www.rottentomatoes.com/search?search=${encodeURIComponent('title' in details ? details.title : details.name)}`;
+                                        return (
+                                            <div>
+                                                {rtRating && (
+                                                    <RottenTomatoesRating rating={rtRating} size="lg" showLabel={true} />
+                                                )}
+                                                {consensus && (
+                                                    <p style={{
+                                                        marginTop: tokens.spacing.small,
+                                                        color: tokens.colors.text.secondary,
+                                                        fontFamily: tokens.typography.families.text
+                                                    }}>
+                                                        <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>Critics Consensus:</span> {consensus}
+                                                    </p>
+                                                )}
+                                                {/* Direct Rotten Tomatoes critic reviews */}
+                                                {isRtLoading && (
+                                                    <div className="mt-3">
+                                                        <Loader />
+                                                    </div>
+                                                )}
+                                                {rtError && (
+                                                    <div className="rounded-xl border p-3 mt-3" style={{
+                                                        borderColor: tokens.colors.border.primary,
+                                                        background: `${tokens.colors.background.secondary}80`,
+                                                        color: tokens.colors.text.secondary
+                                                    }}>
+                                                        Couldn’t load Rotten Tomatoes reviews ({rtError}).
+                                                    </div>
+                                                )}
+                                                {rtReviews && rtReviews.length > 0 && (
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: tokens.spacing.small, marginTop: tokens.spacing.small }}>
+                                                        {rtReviews.slice(0, 8).map((review, index) => (
+                                                            <div
+                                                                key={(review as any).id ?? (review as any).reviewId ?? `${review.url || ''}-${index}`}
+                                                                className="rounded-xl backdrop-blur-xl border"
+                                                                style={{
+                                                                    background: `${tokens.colors.background.secondary}80`,
+                                                                    borderColor: tokens.colors.border.primary,
+                                                                    padding: tokens.spacing.small
+                                                                }}
+                                                            >
+                                                                <div className="flex items-center" style={{ gap: tokens.spacing.micro[1], marginBottom: tokens.spacing.micro[2] }}>
+                                                                    <span style={{ fontWeight: tokens.typography.weights.semibold, color: tokens.colors.text.primary }}>
+                                                                        {review.critic?.name || 'Critic'}
+                                                                    </span>
+                                                                    {review.source && (
+                                                                        <span style={{ color: tokens.colors.text.tertiary }}>
+                                                                            @ {review.source}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {review.score !== undefined && review.score !== null && (
+                                                                    <p style={{ color: tokens.colors.text.secondary, fontSize: tokens.typography.sizes.caption1 }}>
+                                                                        <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>Score:</span> {review.score}
+                                                                    </p>
+                                                                )}
+                                                                {review.quote && (
+                                                                    <p style={{ color: tokens.colors.text.secondary, fontFamily: tokens.typography.families.text }}>
+                                                                        “{review.quote}”
+                                                                    </p>
+                                                                )}
+                                                                {review.date && (
+                                                                    <p style={{ color: tokens.colors.text.tertiary, fontSize: tokens.typography.sizes.caption2, marginTop: tokens.spacing.micro[1] }}>
+                                                                        {new Date(review.date).toLocaleDateString()}
+                                                                    </p>
+                                                                )}
+                                                                {review.url && (
+                                                                    <a
+                                                                        href={review.url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="inline-block rounded-xl backdrop-blur-xl border mt-2"
+                                                                        style={{
+                                                                            padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.medium}`,
+                                                                            background: `${tokens.colors.background.secondary}60`,
+                                                                            borderColor: tokens.colors.border.primary,
+                                                                            color: tokens.colors.text.primary,
+                                                                            fontFamily: tokens.typography.families.text,
+                                                                            fontSize: tokens.typography.sizes.caption1
+                                                                        }}
+                                                                    >
+                                                                        View Source
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                <div className="grid grid-cols-1 sm:grid-cols-3" style={{ gap: tokens.spacing.small, marginTop: tokens.spacing.small, fontSize: tokens.typography.sizes.caption1 }}>
+                                                    {omdbData.tomatoReviews && omdbData.tomatoReviews !== 'N/A' && (
+                                                        <p style={{ color: tokens.colors.text.secondary }}>
+                                                            <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>Reviews:</span> {omdbData.tomatoReviews}
+                                                        </p>
+                                                    )}
+                                                    {omdbData.tomatoFresh && omdbData.tomatoFresh !== 'N/A' && (
+                                                        <p style={{ color: tokens.colors.text.secondary }}>
+                                                            <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>Fresh:</span> {omdbData.tomatoFresh}
+                                                        </p>
+                                                    )}
+                                                    {omdbData.tomatoRotten && omdbData.tomatoRotten !== 'N/A' && (
+                                                        <p style={{ color: tokens.colors.text.secondary }}>
+                                                            <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>Rotten:</span> {omdbData.tomatoRotten}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <a
+                                                    href={rtSourceUrl || tomatoUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-block rounded-xl backdrop-blur-xl border mt-3"
+                                                    style={{
+                                                        padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.medium}`,
+                                                        background: `${tokens.colors.background.secondary}80`,
+                                                        borderColor: tokens.colors.border.primary,
+                                                        color: tokens.colors.text.primary,
+                                                        fontFamily: tokens.typography.families.text,
+                                                        fontSize: tokens.typography.sizes.caption1
+                                                    }}
+                                                >
+                                                    Open Rotten Tomatoes
+                                                </a>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {rtView === 'audience' && (
+                                        <div>
+                                            <div className="flex items-center" style={{ gap: tokens.spacing.small }}>
+                                                {omdbData.tomatoUserMeter && omdbData.tomatoUserMeter !== 'N/A' && (
+                                                    <span style={{
+                                                        color: tokens.colors.system.green,
+                                                        fontWeight: tokens.typography.weights.semibold,
+                                                        fontFamily: tokens.typography.families.text
+                                                    }}>
+                                                        Audience Score: {omdbData.tomatoUserMeter}%
+                                                    </span>
+                                                )}
+                                                {omdbData.tomatoUserRating && omdbData.tomatoUserRating !== 'N/A' && (
+                                                    <span style={{ color: tokens.colors.text.secondary }}>
+                                                        Avg Rating: {omdbData.tomatoUserRating}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {omdbData.tomatoUserReviews && omdbData.tomatoUserReviews !== 'N/A' && (
+                                                <p style={{ color: tokens.colors.text.secondary, marginTop: tokens.spacing.micro[2], fontFamily: tokens.typography.families.text }}>
+                                                    <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>Audience Reviews:</span> {omdbData.tomatoUserReviews}
+                                                </p>
+                                            )}
+                                            <a
+                                                href={rtSourceUrl || (omdbData as any).tomatoURL || `https://www.rottentomatoes.com/search?search=${encodeURIComponent('title' in details ? details.title : details.name)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-block rounded-xl backdrop-blur-xl border mt-3"
+                                                style={{
+                                                    padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.medium}`,
+                                                    background: `${tokens.colors.background.secondary}80`,
+                                                    borderColor: tokens.colors.border.primary,
+                                                    color: tokens.colors.text.primary,
+                                                    fontFamily: tokens.typography.families.text,
+                                                    fontSize: tokens.typography.sizes.caption1
+                                                }}
+                                            >
+                                                Open Rotten Tomatoes
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {(omdbData && item.media_type === 'movie' && showIMDBReviews) && (
+                                <div 
+                                    className="rounded-xl backdrop-blur-xl border"
+                                    style={{
+                                        background: `${tokens.colors.background.secondary}CC`,
+                                        borderColor: tokens.colors.border.primary,
+                                        padding: tokens.spacing.medium
+                                    }}
+                                >
+                                    <h4 
+                                        style={{
+                                            fontWeight: tokens.typography.weights.semibold,
+                                            color: tokens.colors.text.primary,
+                                            marginBottom: tokens.spacing.small,
                                             fontFamily: tokens.typography.families.text,
                                             fontSize: tokens.typography.sizes.body
                                         }}
                                     >
-                                        {aiReviews}
+                                        IMDb Reviews
+                                    </h4>
+                                    <div style={{ color: tokens.colors.text.secondary, fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.caption1 }}>
+                                        {omdbData.imdbRating && omdbData.imdbRating !== 'N/A' && (
+                                            <p>
+                                                <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>IMDb Rating:</span> {omdbData.imdbRating}/10
+                                            </p>
+                                        )}
+                                        {omdbData.imdbVotes && omdbData.imdbVotes !== 'N/A' && (
+                                            <p>
+                                                <span style={{ fontWeight: tokens.typography.weights.medium, color: tokens.colors.text.tertiary }}>Votes:</span> {omdbData.imdbVotes}
+                                            </p>
+                                        )}
                                     </div>
+                                    <a
+                                        href={`https://www.imdb.com/title/${omdbData.imdbID}/reviews`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-block rounded-xl backdrop-blur-xl border mt-3"
+                                        style={{
+                                            padding: `${tokens.spacing.micro[2]}px ${tokens.spacing.medium}`,
+                                            background: `${tokens.colors.background.secondary}80`,
+                                            borderColor: tokens.colors.border.primary,
+                                            color: tokens.colors.text.primary,
+                                            fontFamily: tokens.typography.families.text,
+                                            fontSize: tokens.typography.sizes.caption1
+                                        }}
+                                    >
+                                        Open IMDb Reviews
+                                    </a>
                                 </div>
                             )}
 
@@ -1593,7 +2300,7 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     return (
         <>
             <DetailContainer>
-                <BackgroundHeader backdropPath={details.backdrop_path!} />
+                <BackgroundHeader backdropUrl={backdropUrl || (details?.backdrop_path ? `${IMAGE_BASE_URL}original${details.backdrop_path}` : '')} />
                 <PanelOverlay />
                 
                 <button
@@ -1626,16 +2333,35 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
                 <HeaderSection>
                     <div className="mb-4">
-                        <MediaTitleLogo
-                            media={item}
-                            apiKey={apiKey}
-                            size="large"
-                            className="leading-tight"
-                            style={{
-                                textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
-                            }}
-                            fallbackToText={true}
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: tokens.spacing.small }}>
+                            {(() => {
+                                const showImaxLogo = preferImaxTrailer || isCuratedImaxTitle(item);
+                                return (
+                                    <MediaTitleLogo
+                                        media={item}
+                                        apiKey={apiKey}
+                                        size={showImaxLogo ? 'medium' : 'large'}
+                                        maxHeightPx={showImaxLogo ? 28 : undefined}
+                                        className="leading-tight"
+                                        style={{
+                                            textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
+                                        }}
+                                        fallbackToText={true}
+                                    />
+                                );
+                            })()}
+                            {(preferImaxTrailer || isCuratedImaxTitle(item)) && (
+                                <>
+                                    <span style={{ opacity: 0.7 }}>|</span>
+                                    <img
+                                        src={'https://i.ibb.co/G47CHyhg/toppng-com-imax-michael-jackson-thriller-imax-445x87.png'}
+                                        alt="IMAX"
+                                        style={{ height: '28px', width: 'auto' }}
+                                        loading="lazy"
+                                    />
+                                </>
+                            )}
+                        </div>
                     </div>
                     
                     <div 
@@ -1716,6 +2442,11 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                     <TabButton active={activeTab === 'reviews'} onClick={() => setActiveTab('reviews')}>
                         Reviews
                     </TabButton>
+                    {item.media_type === 'tv' && (
+                        <TabButton active={activeTab === 'episodes'} onClick={() => setActiveTab('episodes')}>
+                            Episodes
+                        </TabButton>
+                    )}
                 </TabsContainer>
 
                 <AnimatePresence mode="wait">

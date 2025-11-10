@@ -257,6 +257,34 @@ export const appleTokens = {
         },
       },
     },
+    // Depth layers for glass effects used by components like GlassPillButton
+    depth: {
+      layer1: {
+        shadowOffset: { x: 0, y: 8 },
+        shadowBlur: 24,
+        shadowOpacity: 0.10,
+      },
+      layer2: {
+        shadowOffset: { x: 0, y: 12 },
+        shadowBlur: 32,
+        shadowOpacity: 0.14,
+      },
+    },
+  },
+  // Core animation tokens used across components
+  animations: {
+    easeInOut: {
+      duration: 0.2, // seconds
+      easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)'
+    },
+    easeOut: {
+      duration: 0.2,
+      easing: 'cubic-bezier(0.0, 0.0, 0.2, 1)'
+    },
+    easeIn: {
+      duration: 0.2,
+      easing: 'cubic-bezier(0.4, 0.0, 1, 1)'
+    }
   },
   // Enhanced interaction tokens
   interactions: {

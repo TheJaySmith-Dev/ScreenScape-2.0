@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { MediaItem } from '../types';
 import HeroCarousel from './HeroCarousel';
+import GlassHero from './GlassHero';
 import MediaRow from './MediaRow';
-import { getTrending, searchMulti, getMovieWatchProviders, getTVShowWatchProviders, normalizeMovie, normalizeTVShow, getPopularMovies, getPopularTVShows, getUpcomingMovies, getTopRatedMovies, getTopRatedTVShows } from "../services/tmdbService";
+import { getTrending, searchMulti, searchMovies, searchTVShows, searchKeywords, getMovieWatchProviders, getTVShowWatchProviders, normalizeMovie, normalizeTVShow, getPopularMovies, getPopularTVShows, getUpcomingMovies, getTopRatedMovies, getTopRatedTVShows } from "../services/tmdbService";
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import { useGeolocation } from '../hooks/useGeolocation';
 import StreamingHubs from './StreamingHubs';
 import Loader from './Loader';
 import { Star, Play, Plus, Info, Search } from 'lucide-react';
 import { isMobileDevice } from '../utils/deviceDetection';
+import GlassPosterCard from './GlassPosterCard';
 import { useAppleTheme } from './AppleThemeProvider';
+import { computeMatchScore } from '../utils/searchRanking';
 
 
 interface ExploreViewProps {
@@ -373,6 +376,7 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
     const [searchResults, setSearchResults] = useState<MediaItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchLoading, setSearchLoading] = useState(false);
+    const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [internalSearchQuery, setInternalSearchQuery] = useState('');
     const [activeHub, setActiveHub] = useState<number | null>(null);
@@ -467,24 +471,45 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
             const query = searchQuery || internalSearchQuery;
             if (!query.trim() || !apiKey) {
                 setSearchResults([]);
+                setSearchSuggestions([]);
                 return;
             }
 
             try {
                 setSearchLoading(true);
                 const searchData = await searchMulti(apiKey, query);
-                
+                let combined: MediaItem[] = [];
                 if (searchData.results) {
-                    const normalizedResults = searchData.results
+                    combined = searchData.results
                         .filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv')
-                        .map((item: any) => {
-                            if (item.media_type === 'movie') {
-                                return normalizeMovie(item);
-                            } else {
-                                return normalizeTVShow(item);
-                            }
-                        });
-                    setSearchResults(normalizedResults);
+                        .map((item: any) => (item.media_type === 'movie' ? normalizeMovie(item) : normalizeTVShow(item)));
+                }
+
+                if (combined.length === 0) {
+                    const [mr, tr] = await Promise.all([
+                        searchMovies(apiKey, query),
+                        searchTVShows(apiKey, query),
+                    ]);
+                    combined = ([...(mr.results || []), ...(tr.results || [])] as MediaItem[]);
+                }
+
+                const ranked = combined
+                    .map((item) => ({ item, score: computeMatchScore((item as any).title || (item as any).name || '', query) }))
+                    .sort((a, b) => b.score - a.score);
+                const positive = ranked.filter(r => r.score > 0).map(r => r.item);
+                const finalResults = (positive.length > 0 ? positive : combined);
+                setSearchResults(finalResults);
+
+                if (finalResults.length === 0) {
+                    try {
+                        const kw = await searchKeywords(apiKey, query);
+                        const names = (kw.results || []).map((k: any) => k.name);
+                        const curated = ['Iron Man (2008)', 'Iron Man 2', 'Iron Man 3', 'Tony Stark', 'Avengers'];
+                        const sugg = Array.from(new Set([...(names || []).slice(0, 6), ...curated])).slice(0, 8);
+                        setSearchSuggestions(sugg);
+                    } catch {}
+                } else {
+                    setSearchSuggestions([]);
                 }
             } catch (err: any) {
                 console.error('Error searching:', err);
@@ -680,10 +705,10 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
                             marginBottom: `${tokens.spacing.standard[2]}px`
                         }}>
                             {searchResults.slice(0, 20).map((item) => (
-                                <SearchResultCard
+                                <GlassPosterCard
                                     key={`${item.id}-${item.media_type}`}
-                                    item={item}
-                                    onClick={onSelectItem}
+                                    item={item as any}
+                                    onClick={(it) => onSelectItem(it as any)}
                                 />
                             ))}
                         </div>
@@ -696,6 +721,27 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
                             <p className="apple-body" style={{ color: tokens.colors.label.secondary, margin: 0 }}>
                                 No results found for "{currentSearchQuery}"
                             </p>
+                            {searchSuggestions.length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: tokens.spacing.micro[1], justifyContent: 'center', marginTop: tokens.spacing.standard[0] }}>
+                                    {searchSuggestions.map((s) => (
+                                        <button
+                                            key={s}
+                                            onClick={() => handleInternalSearch(s)}
+                                            className="apple-glass-regular"
+                                            style={{
+                                                borderRadius: '16px',
+                                                border: '1px solid rgba(255,255,255,0.2)',
+                                                padding: `${tokens.spacing.micro[1]}px ${tokens.spacing.standard[0]}px`,
+                                                color: tokens.colors.label.primary,
+                                                cursor: 'pointer',
+                                                background: 'rgba(255,255,255,0.08)'
+                                            }}
+                                        >
+                                            {s}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -704,11 +750,11 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
             {/* Hero Carousel - Only show when not searching */}
             {!currentSearchQuery && (
                 <div style={{ marginBottom: `${tokens.spacing.standard[2]}px` }}>
-                    <HeroCarousel
-                        apiKey={apiKey}
-                        onSelectItem={onSelectItem}
-                        onInvalidApiKey={onInvalidApiKey}
-                    />
+        <GlassHero
+          apiKey={apiKey}
+          onSelectItem={onSelectItem}
+          onInvalidApiKey={onInvalidApiKey}
+        />
                 </div>
             )}
 

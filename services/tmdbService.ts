@@ -1,4 +1,4 @@
-import { PaginatedResponse, Movie, TVShow, Video, WatchProviderResponse, MediaItem, MovieDetails, PersonMovieCredit, Person, CastMember, CrewMember } from '../types';
+import { PaginatedResponse, Movie, TVShow, Video, WatchProviderResponse, MediaItem, MovieDetails, PersonMovieCredit, Person, CastMember, CrewMember, WatchProviderCountry, WatchProvider } from '../types';
 
 const API_BASE_URL = 'https://api.themoviedb.org/3';
 
@@ -58,12 +58,50 @@ const apiFetch = async <T>(
 };
 
 // STREAMING AVAILABILITY FUNCTIONS (Only kept functions)
-export const getMovieWatchProviders = (apiKey: string, movieId: number, region: string): Promise<WatchProviderResponse> => {
-  return apiFetch(apiKey, `/movie/${movieId}/watch/providers`);
+const DISNEY_PLUS_ID = 337;
+
+const mergeUniqueByProviderId = (base: WatchProvider[] = [], adds: WatchProvider[] = []): WatchProvider[] => {
+  const ids = new Set(base.map(p => p.provider_id));
+  const merged = base.slice();
+  for (const p of adds) {
+    if (!ids.has(p.provider_id)) merged.push(p);
+  }
+  return merged;
 };
 
-export const getTVShowWatchProviders = (apiKey: string, tvId: number, region: string): Promise<WatchProviderResponse> => {
-  return apiFetch(apiKey, `/tv/${tvId}/watch/providers`);
+const applyRegionOverridesToProviders = (resp: WatchProviderResponse, region: string): WatchProviderResponse => {
+  try {
+    if (region === 'ZA' && resp?.results) {
+      const gb = resp.results['GB'];
+      if (!gb) return resp;
+      const za = resp.results['ZA'] || { link: gb.link, flatrate: [], rent: [], buy: [] } as WatchProviderCountry;
+
+      const disneyFlatGB = (gb.flatrate || []).filter(p => p.provider_id === DISNEY_PLUS_ID);
+      const disneyRentGB = (gb.rent || []).filter(p => p.provider_id === DISNEY_PLUS_ID);
+      const disneyBuyGB = (gb.buy || []).filter(p => p.provider_id === DISNEY_PLUS_ID);
+
+      resp.results['ZA'] = {
+        ...za,
+        flatrate: mergeUniqueByProviderId(za.flatrate || [], disneyFlatGB),
+        rent: mergeUniqueByProviderId(za.rent || [], disneyRentGB),
+        buy: mergeUniqueByProviderId(za.buy || [], disneyBuyGB),
+        link: za.link || gb.link,
+      };
+    }
+  } catch (_) {
+    // ignore mapping errors
+  }
+  return resp;
+};
+
+export const getMovieWatchProviders = async (apiKey: string, movieId: number, region: string): Promise<WatchProviderResponse> => {
+  const resp = await apiFetch<WatchProviderResponse>(apiKey, `/movie/${movieId}/watch/providers`);
+  return applyRegionOverridesToProviders(resp, region);
+};
+
+export const getTVShowWatchProviders = async (apiKey: string, tvId: number, region: string): Promise<WatchProviderResponse> => {
+  const resp = await apiFetch<WatchProviderResponse>(apiKey, `/tv/${tvId}/watch/providers`);
+  return applyRegionOverridesToProviders(resp, region);
 };
 
 // VIDEO/TRAILER FUNCTIONS (kept for fallback)
@@ -75,10 +113,165 @@ export const getTVShowVideos = (apiKey: string, tvId: number): Promise<{results:
   return apiFetch(apiKey, `/tv/${tvId}/videos`);
 };
 
+// IMAX-only video helpers and cache
+type ImaxCacheEntry = { results: Video[]; ts: number };
+const IMAX_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const imaxMemoryCache = new Map<string, ImaxCacheEntry>();
+
+const IMAX_CACHE_STORAGE_KEY = 'imaxVideoCacheV3';
+
+const readImaxLocalCache = (): Record<string, ImaxCacheEntry> => {
+  try {
+    const raw = localStorage.getItem(IMAX_CACHE_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'object' && parsed ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+};
+
+const writeImaxLocalCache = (cacheObj: Record<string, ImaxCacheEntry>) => {
+  try {
+    localStorage.setItem(IMAX_CACHE_STORAGE_KEY, JSON.stringify(cacheObj));
+  } catch (_) {
+    // ignore quota or serialization errors
+  }
+};
+
+export const filterImaxVideos = (videos: Video[] = []): Video[] => {
+  const toLower = (s?: string) => (s || '').toLowerCase();
+
+  // Broaden IMAX detection to capture common marketing phrases
+  const isImaxNamed = (name?: string) => {
+    const n = toLower(name);
+    if (!n) return false;
+    const markers = [
+      'imax',
+      'imax®',
+      'exclusive look',
+      'extended look',
+      'sneak peek',
+      'special look',
+      'experience it in imax',
+      'in imax',
+      'expanded aspect ratio',
+      'imax expanded',
+      'imax exclusive'
+    ];
+    return markers.some(m => n.includes(m));
+  };
+
+  // Accept YouTube videos explicitly mentioning IMAX or common IMAX phrasing.
+  // Prefer Trailer, but allow Teaser/Clip/Featurette to reduce false negatives.
+  const primary = videos.filter(v =>
+    v.site === 'YouTube' &&
+    isImaxNamed(v.name) &&
+    (v.type === 'Trailer' || v.type === 'Teaser' || v.type === 'Clip' || v.type === 'Featurette')
+  );
+
+  // Conservative fallback: Trailer that hints at IMAX expanded ratio even if not caught above.
+  const fallbackExpanded = primary.length > 0 ? [] : videos.filter(v =>
+    v.site === 'YouTube' &&
+    v.type === 'Trailer' &&
+    toLower(v.name).includes('expanded') && (toLower(v.name).includes('ratio') || toLower(v.name).includes('imax'))
+  );
+
+  const pickFrom = primary.length > 0 ? primary : fallbackExpanded;
+
+  // Sort to prefer official first, then titles with "official", then higher resolution
+  const sorted = pickFrom.slice().sort((a, b) => {
+    const aOfficial = a.official ? 1 : 0;
+    const bOfficial = b.official ? 1 : 0;
+    if (aOfficial !== bOfficial) return bOfficial - aOfficial;
+    const aNameOfficial = toLower(a.name).includes('official') ? 1 : 0;
+    const bNameOfficial = toLower(b.name).includes('official') ? 1 : 0;
+    if (aNameOfficial !== bNameOfficial) return bNameOfficial - aNameOfficial;
+    return (b.size || 0) - (a.size || 0);
+  });
+
+  return sorted;
+};
+
+export const getMovieVideosImaxOnly = async (apiKey: string, movieId: number): Promise<{ results: Video[] }> => {
+  const key = `imax:v2:movie:${movieId}`;
+  // Check memory cache first
+  const memHit = imaxMemoryCache.get(key);
+  const now = Date.now();
+  if (memHit && (now - memHit.ts) < IMAX_CACHE_TTL_MS) {
+    return { results: filterImaxVideos(memHit.results) };
+  }
+  // Check localStorage cache
+  const localCache = readImaxLocalCache();
+  const localHit = localCache[key];
+  if (localHit && (now - localHit.ts) < IMAX_CACHE_TTL_MS) {
+    imaxMemoryCache.set(key, localHit);
+    return { results: filterImaxVideos(localHit.results) };
+  }
+  // Fetch and filter
+  const resp = await getMovieVideos(apiKey, movieId);
+  const filtered = filterImaxVideos(resp.results);
+  // Cache RAW TMDb results to allow future heuristics to re-evaluate
+  const entry: ImaxCacheEntry = { results: resp.results, ts: now };
+  imaxMemoryCache.set(key, entry);
+  localCache[key] = entry;
+  writeImaxLocalCache(localCache);
+  return { results: filtered };
+};
+
+export const getTVShowVideosImaxOnly = async (apiKey: string, tvId: number): Promise<{ results: Video[] }> => {
+  const key = `imax:v2:tv:${tvId}`;
+  // Check memory cache first
+  const memHit = imaxMemoryCache.get(key);
+  const now = Date.now();
+  if (memHit && (now - memHit.ts) < IMAX_CACHE_TTL_MS) {
+    return { results: filterImaxVideos(memHit.results) };
+  }
+  // Check localStorage cache
+  const localCache = readImaxLocalCache();
+  const localHit = localCache[key];
+  if (localHit && (now - localHit.ts) < IMAX_CACHE_TTL_MS) {
+    imaxMemoryCache.set(key, localHit);
+    return { results: filterImaxVideos(localHit.results) };
+  }
+  // Fetch and filter
+  const resp = await getTVShowVideos(apiKey, tvId);
+  const filtered = filterImaxVideos(resp.results);
+  // Cache RAW TMDb results to allow future heuristics to re-evaluate
+  const entry: ImaxCacheEntry = { results: resp.results, ts: now };
+  imaxMemoryCache.set(key, entry);
+  localCache[key] = entry;
+  writeImaxLocalCache(localCache);
+  return { results: filtered };
+};
+
+// EXTERNAL IDS (bridge to OMDb and FanArt)
+export const getMovieExternalIds = (apiKey: string, movieId: number): Promise<{
+  id: number;
+  imdb_id: string | null;
+}> => {
+  return apiFetch(apiKey, `/movie/${movieId}/external_ids`);
+};
+
+export const getTVExternalIds = (apiKey: string, tvId: number): Promise<{
+  id: number;
+  imdb_id: string | null;
+  tvdb_id: number | null;
+}> => {
+  return apiFetch(apiKey, `/tv/${tvId}/external_ids`);
+};
+
 // RECOMMENDATIONS
 export const getMovieRecommendations = async (apiKey: string, movieId: number): Promise<PaginatedResponse<Movie>> => {
     const response = await apiFetch<PaginatedResponse<Movie>>(apiKey, `/movie/${movieId}/recommendations`);
     response.results = response.results.map(movie => ({ ...movie, media_type: 'movie' }));
+    return response;
+};
+
+// TV SHOW RECOMMENDATIONS
+export const getTVShowRecommendations = async (apiKey: string, tvId: number): Promise<PaginatedResponse<TVShow>> => {
+    const response = await apiFetch<PaginatedResponse<TVShow>>(apiKey, `/tv/${tvId}/recommendations`);
+    response.results = response.results.map(tv => ({ ...tv, media_type: 'tv' }));
     return response;
 };
 
@@ -143,7 +336,8 @@ export const getMovieImages = (apiKey: string, movieId: number): Promise<{
     vote_count: number;
   }>;
 }> => {
-  return apiFetch(apiKey, `/movie/${movieId}/images`);
+  // Restrict to English-labeled images to ensure posters are in English
+  return apiFetch(apiKey, `/movie/${movieId}/images`, { include_image_language: 'en' });
 };
 
 // TV SHOW IMAGES
@@ -177,7 +371,8 @@ export const getTVShowImages = (apiKey: string, tvId: number): Promise<{
     vote_count: number;
   }>;
 }> => {
-  return apiFetch(apiKey, `/tv/${tvId}/images`);
+  // Restrict to English-labeled images to ensure posters are in English
+  return apiFetch(apiKey, `/tv/${tvId}/images`, { include_image_language: 'en' });
 };
 
 // PERSON SEARCH AND CREDITS
@@ -249,6 +444,30 @@ export const getPersonMovieCredits = (apiKey: string, personId: number): Promise
   return apiFetch(apiKey, `/person/${personId}/movie_credits`);
 };
 
+// PERSON TV CREDITS
+export const getPersonTVCredits = (apiKey: string, personId: number): Promise<{
+  id: number;
+  cast: (TVShow & { character: string })[];
+  crew: (TVShow & { job: string })[];
+}> => {
+  return apiFetch(apiKey, `/person/${personId}/tv_credits`);
+};
+
+// PERSON COMBINED CREDITS (cast and crew across movies and TV)
+export const getPersonCombinedCredits = (apiKey: string, personId: number): Promise<{
+  id: number;
+  cast: Array<(
+    (Movie & { media_type: 'movie' }) |
+    (TVShow & { media_type: 'tv' })
+  ) & { character?: string }>
+  crew: Array<(
+    (Movie & { media_type: 'movie' }) |
+    (TVShow & { media_type: 'tv' })
+  ) & { job?: string }>
+}> => {
+  return apiFetch(apiKey, `/person/${personId}/combined_credits`);
+};
+
 // MOVIE DETAILS (for collections)
 export const getMovieDetailsForCollections = (apiKey: string, movieId: number): Promise<MovieDetails> => {
   return apiFetch(apiKey, `/movie/${movieId}`);
@@ -273,6 +492,29 @@ export const searchMulti = async (apiKey: string, query: string, page: number = 
     return item;
   });
   return response;
+};
+
+// MOVIE SEARCH (explicit)
+export const searchMovies = async (apiKey: string, query: string, page: number = 1): Promise<PaginatedResponse<MediaItem>> => {
+  const response = await apiFetch<PaginatedResponse<any>>(apiKey, '/search/movie', { query, page });
+  response.results = (response.results || []).map((m: any) => normalizeMovie(m));
+  return response as PaginatedResponse<MediaItem>;
+};
+
+// TV SHOW SEARCH (explicit)
+export const searchTVShows = async (apiKey: string, query: string, page: number = 1): Promise<PaginatedResponse<MediaItem>> => {
+  const response = await apiFetch<PaginatedResponse<any>>(apiKey, '/search/tv', { query, page });
+  response.results = (response.results || []).map((t: any) => normalizeTVShow(t));
+  return response as PaginatedResponse<MediaItem>;
+};
+
+// KEYWORD SEARCH (for suggestions)
+export const searchKeywords = async (
+  apiKey: string,
+  query: string,
+  page: number = 1
+): Promise<PaginatedResponse<{ id: number; name: string }>> => {
+  return apiFetch(apiKey, '/search/keyword', { query, page });
 };
 
 // TV SHOW DETAILS
@@ -319,6 +561,30 @@ export const getTVShowDetails = (apiKey: string, tvId: number): Promise<{
   };
 }> => {
   return apiFetch(apiKey, `/tv/${tvId}`);
+};
+
+// TV SEASON DETAILS
+export const getTVSeasonDetails = (apiKey: string, tvId: number, seasonNumber: number): Promise<{
+  _id: string;
+  id: number;
+  air_date: string | null;
+  name: string;
+  overview: string;
+  poster_path: string | null;
+  season_number: number;
+  episodes: Array<{
+    air_date: string | null;
+    episode_number: number;
+    id: number;
+    name: string;
+    overview: string;
+    runtime?: number | null;
+    still_path?: string | null;
+    vote_average: number;
+    vote_count: number;
+  }>;
+}> => {
+  return apiFetch(apiKey, `/tv/${tvId}/season/${seasonNumber}`);
 };
 
 // MOVIE RELEASE DATES

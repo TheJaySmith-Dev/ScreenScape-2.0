@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getTrending } from '../services/tmdbService';
+import { getTrending, getMovieExternalIds, getMovieImages, getTVShowImages } from '../services/tmdbService';
+// FanArt removed: posters now resolved via TMDb images with OMDb fallback for movies
+import * as omdbService from '../services/omdbService';
 import { MediaItem, TVShow } from '../types';
 import { ChevronLeftIcon, ChevronRightIcon } from './Icons';
 
@@ -13,6 +15,7 @@ interface TrendingStripProps {
 
 const TrendingStrip: React.FC<TrendingStripProps> = ({ apiKey, onSelectItem, onInvalidApiKey }) => {
     const [trendingItems, setTrendingItems] = useState<MediaItem[]>([]);
+    const [posterMap, setPosterMap] = useState<Record<number, string | null>>({});
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -20,9 +23,10 @@ const TrendingStrip: React.FC<TrendingStripProps> = ({ apiKey, onSelectItem, onI
             try {
                 const response = await getTrending(apiKey, 'week');
                 const validItems = response.results.filter(item => 
-                    (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path
+                    (item.media_type === 'movie' || item.media_type === 'tv')
                 ).slice(0, 15); // Get top 15
                 setTrendingItems(validItems);
+                setPosterMap({});
             } catch (error) {
                 console.error("Failed to fetch trending items:", error);
                 if (error instanceof Error && error.message.includes("Invalid API Key")) {
@@ -32,6 +36,56 @@ const TrendingStrip: React.FC<TrendingStripProps> = ({ apiKey, onSelectItem, onI
         };
         fetchTrending();
     }, [apiKey, onInvalidApiKey]);
+
+    useEffect(() => {
+        let cancelled = false;
+        const resolvePosters = async () => {
+            const updates: Record<number, string | null> = {};
+            for (const it of trendingItems) {
+                try {
+                    let url: string | null = null;
+                    if (it.media_type === 'movie') {
+                        const images = await getMovieImages(apiKey, it.id);
+                        if (images?.posters?.length) {
+                            const poster = images.posters
+                                .slice()
+                                .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
+                            if (poster?.file_path) {
+                                url = `${IMAGE_BASE_URL}${poster.file_path}`;
+                            }
+                        }
+                        // OMDb fallback if TMDb posters missing
+                        if (!url) {
+                            const ext = await getMovieExternalIds(apiKey, it.id);
+                            const imdbId = ext?.imdb_id || null;
+                            if (imdbId) {
+                                const omdb = await omdbService.omdbService.getMovieById(imdbId);
+                                if (omdb && omdb.Poster && omdb.Poster !== 'N/A') {
+                                    url = omdb.Poster;
+                                }
+                            }
+                        }
+                    } else if (it.media_type === 'tv') {
+                        const images = await getTVShowImages(apiKey, it.id);
+                        if (images?.posters?.length) {
+                            const poster = images.posters
+                                .slice()
+                                .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
+                            if (poster?.file_path) {
+                                url = `${IMAGE_BASE_URL}${poster.file_path}`;
+                            }
+                        }
+                    }
+                    updates[it.id] = url || null;
+                } catch {
+                    updates[it.id] = null;
+                }
+            }
+            if (!cancelled) setPosterMap(prev => ({ ...prev, ...updates }));
+        };
+        if (trendingItems.length > 0) resolvePosters();
+        return () => { cancelled = true; };
+    }, [trendingItems, apiKey]);
 
     const scroll = (direction: 'left' | 'right') => {
         if (scrollRef.current) {
@@ -57,7 +111,7 @@ const TrendingStrip: React.FC<TrendingStripProps> = ({ apiKey, onSelectItem, onI
                         title={item.media_type === 'movie' ? item.title : (item as TVShow).name}
                     >
                         <img
-                            src={`${IMAGE_BASE_URL}${item.poster_path}`}
+                            src={(posterMap[item.id] || (item.poster_path ? `${IMAGE_BASE_URL}${item.poster_path}` : ''))}
                             alt="Trending Poster"
                             className="w-full h-full object-cover"
                             loading="lazy"

@@ -20,16 +20,13 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = ({
   onError,
   className = ''
 }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
-  const [showControls, setShowControls] = useState(false);
+  // Iframe-based embed, so local play/mute controls are not needed
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [shouldAutoplay, setShouldAutoplay] = useState(false);
   
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const autoplayTimeoutRef = useRef<NodeJS.Timeout>();
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>();
   const { tokens } = useAppleTheme();
 
   // Extract video ID from YouTube URL
@@ -44,7 +41,7 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = ({
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }, []);
 
-  // Handle autoplay with delay
+  // Handle autoplay with delay; only render iframe once autoplay should start
   useEffect(() => {
     if (isVisible && trailerUrl && !prefersReducedMotion()) {
       autoplayTimeoutRef.current = setTimeout(() => {
@@ -64,86 +61,34 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = ({
     };
   }, [isVisible, trailerUrl, autoplayDelay, prefersReducedMotion]);
 
-  // Handle video play/pause
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !shouldAutoplay) return;
+  // Mark loaded on iframe load
+  const handleIframeLoad = useCallback(() => {
+    setIsLoaded(true);
+    setHasError(false);
+    onLoad?.();
+  }, [onLoad]);
 
-    const playVideo = async () => {
-      try {
-        await video.play();
-        setIsPlaying(true);
-        onLoad?.();
-      } catch (error) {
-        console.warn('Autoplay failed:', error);
+  // Soft error detection: if iframe hasn't loaded after 5s
+  useEffect(() => {
+    if (!isVisible || !shouldAutoplay || !trailerUrl) return;
+    const t = setTimeout(() => {
+      if (!isLoaded) {
         setHasError(true);
         onError?.();
       }
-    };
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [isVisible, shouldAutoplay, trailerUrl, isLoaded, onError]);
 
-    if (isLoaded && shouldAutoplay) {
-      playVideo();
-    }
-  }, [isLoaded, shouldAutoplay, onLoad, onError]);
-
-  // Handle video events
-  const handleVideoLoad = useCallback(() => {
-    setIsLoaded(true);
-    setHasError(false);
-  }, []);
-
-  const handleVideoError = useCallback(() => {
-    setHasError(true);
-    setIsLoaded(false);
-    onError?.();
-  }, [onError]);
-
-  const handlePlayPause = useCallback(async () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    try {
-      if (isPlaying) {
-        video.pause();
-        setIsPlaying(false);
-      } else {
-        await video.play();
-        setIsPlaying(true);
-      }
-    } catch (error) {
-      console.warn('Play/pause failed:', error);
-    }
-  }, [isPlaying]);
-
-  const handleMuteToggle = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    video.muted = !isMuted;
-    setIsMuted(!isMuted);
-  }, [isMuted]);
-
-  const handleMouseEnter = useCallback(() => {
-    setShowControls(true);
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    controlsTimeoutRef.current = setTimeout(() => {
-      setShowControls(false);
-    }, 2000);
-  }, []);
+  // No interactive controls for iframe hover
+  const handleMouseEnter = useCallback(() => {}, []);
+  const handleMouseLeave = useCallback(() => {}, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (autoplayTimeoutRef.current) {
         clearTimeout(autoplayTimeoutRef.current);
-      }
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
       }
     };
   }, []);
@@ -166,29 +111,20 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = ({
           onMouseLeave={handleMouseLeave}
           style={{ zIndex: 10 }}
         >
-          {/* Video Element */}
-          <video
-            ref={videoRef}
-            className="w-full h-full object-cover"
-            muted={isMuted}
-            loop
-            playsInline
-            preload="metadata"
-            onLoadedData={handleVideoLoad}
-            onError={handleVideoError}
-            style={{
-              filter: 'brightness(0.8) contrast(1.1)',
-            }}
-          >
-            <source 
-              src={`https://www.youtube.com/watch?v=${videoId}`} 
-              type="video/mp4" 
+          {/* YouTube Iframe Embed using nocookie domain */}
+          {shouldAutoplay && (
+            <iframe
+              ref={iframeRef}
+              className="w-full h-full"
+              src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${videoId}`}
+              title="YouTube video player"
+              frameBorder={0}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+              onLoad={handleIframeLoad}
             />
-            {/* Fallback for browsers that don't support video */}
-            <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-              <Play className="w-12 h-12 text-white opacity-50" />
-            </div>
-          </video>
+          )}
 
           {/* Loading Overlay */}
           {!isLoaded && !hasError && (
@@ -209,99 +145,10 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = ({
             </motion.div>
           )}
 
-          {/* Controls Overlay */}
-          <AnimatePresence>
-            {showControls && isLoaded && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="absolute inset-0 flex items-center justify-center"
-                style={{
-                  background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0.6) 100%)'
-                }}
-              >
-                {/* Play/Pause Button */}
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handlePlayPause}
-                  className="p-3 rounded-full"
-                  style={{
-                    background: tokens ?
-                      `rgba(${tokens.colors.background.primary.replace('#', '').match(/.{2}/g)?.map(hex => parseInt(hex, 16)).join(',') || '0,0,0'}, 0.7)` :
-                      'rgba(0,0,0,0.7)',
-                    backdropFilter: 'blur(10px)',
-                    WebkitBackdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255,255,255,0.2)'
-                  }}
-                  aria-label={isPlaying ? 'Pause video' : 'Play video'}
-                >
-                  {isPlaying ? (
-                    <Pause className="w-6 h-6 text-white" />
-                  ) : (
-                    <Play className="w-6 h-6 text-white ml-1" />
-                  )}
-                </motion.button>
-
-                {/* Bottom Controls */}
-                <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-                  {/* Mute Toggle */}
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleMuteToggle}
-                    className="p-2 rounded-full"
-                    style={{
-                      background: tokens ?
-                        `rgba(${tokens.colors.background.primary.replace('#', '').match(/.{2}/g)?.map(hex => parseInt(hex, 16)).join(',') || '0,0,0'}, 0.7)` :
-                        'rgba(0,0,0,0.7)',
-                      backdropFilter: 'blur(10px)',
-                      WebkitBackdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255,255,255,0.2)'
-                    }}
-                    aria-label={isMuted ? 'Unmute video' : 'Mute video'}
-                  >
-                    {isMuted ? (
-                      <VolumeX className="w-4 h-4 text-white" />
-                    ) : (
-                      <Volume2 className="w-4 h-4 text-white" />
-                    )}
-                  </motion.button>
-
-                  {/* Fullscreen Button */}
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => {
-                      if (videoRef.current?.requestFullscreen) {
-                        videoRef.current.requestFullscreen();
-                      }
-                    }}
-                    className="p-2 rounded-full"
-                    style={{
-                      background: tokens ?
-                        `rgba(${tokens.colors.background.primary.replace('#', '').match(/.{2}/g)?.map(hex => parseInt(hex, 16)).join(',') || '0,0,0'}, 0.7)` :
-                        'rgba(0,0,0,0.7)',
-                      backdropFilter: 'blur(10px)',
-                      WebkitBackdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255,255,255,0.2)'
-                    }}
-                    aria-label="Enter fullscreen"
-                  >
-                    <Maximize2 className="w-4 h-4 text-white" />
-                  </motion.button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Controls overlay omitted for iframe embed */}
 
           {/* Accessibility: Screen reader info */}
-          <div className="sr-only">
-            {isPlaying ? 'Video is playing' : 'Video is paused'}
-            {isMuted ? ', muted' : ', unmuted'}
-          </div>
+          <div className="sr-only">Trailer video iframe embedded</div>
         </motion.div>
       )}
     </AnimatePresence>

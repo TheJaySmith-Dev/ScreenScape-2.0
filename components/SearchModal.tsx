@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X } from 'lucide-react';
 import { MediaItem } from '../types';
-import { searchMulti, normalizeMovie, normalizeTVShow } from '../services/tmdbService';
+import { searchMulti, searchMovies, searchTVShows, searchKeywords, normalizeMovie, normalizeTVShow } from '../services/tmdbService';
+import { computeMatchScore } from '../utils/searchRanking';
 import { useAppleTheme } from './AppleThemeProvider';
 import MediaRow from './MediaRow';
 import Loader from './Loader';
+import { getAutocompleteSuggestions } from '../services/autocompleteService';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -27,8 +29,12 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [results, setResults] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [autoSuggestions, setAutoSuggestions] = useState<string[]>([]);
+  const [reportStatus, setReportStatus] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const autoTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Focus input when modal opens
   useEffect(() => {
@@ -48,22 +54,45 @@ const SearchModal: React.FC<SearchModalProps> = ({
     try {
       setLoading(true);
       setHasSearched(true);
+      setSuggestions([]);
+      setReportStatus(null);
       
       const searchData = await searchMulti(apiKey, searchQuery);
-      
+      let combined: MediaItem[] = [];
       if (searchData.results) {
-        const normalizedResults = searchData.results
+        combined = searchData.results
           .filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv')
-          .map((item: any) => {
-            if (item.media_type === 'movie') {
-              return normalizeMovie(item);
-            } else {
-              return normalizeTVShow(item);
-            }
-          })
-          .slice(0, 20);
-        
-        setResults(normalizedResults);
+          .map((item: any) => (item.media_type === 'movie' ? normalizeMovie(item) : normalizeTVShow(item)));
+      }
+
+      if (combined.length === 0) {
+        const [mr, tr] = await Promise.all([
+          searchMovies(apiKey, searchQuery),
+          searchTVShows(apiKey, searchQuery),
+        ]);
+        combined = ([...(mr.results || []), ...(tr.results || [])] as MediaItem[]);
+      }
+
+      // Rank results by query relevance
+      const ranked = combined
+        .map((item) => ({
+          item,
+          score: computeMatchScore((item as any).title || (item as any).name || '', searchQuery),
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      const positive = ranked.filter((r) => r.score > 0).map((r) => r.item);
+      const finalResults = (positive.length > 0 ? positive : combined).slice(0, 20);
+      setResults(finalResults);
+
+      if (finalResults.length === 0) {
+        try {
+          const kw = await searchKeywords(apiKey, searchQuery);
+          const names = (kw.results || []).map((k: any) => k.name);
+          const curated = ['Iron Man (2008)', 'Iron Man 2', 'Iron Man 3', 'Tony Stark', 'Avengers'];
+          const sugg = Array.from(new Set([...(names || []).slice(0, 6), ...curated])).slice(0, 8);
+          setSuggestions(sugg);
+        } catch {}
       }
     } catch (error: any) {
       console.error('Search error:', error);
@@ -86,10 +115,42 @@ const SearchModal: React.FC<SearchModalProps> = ({
       clearTimeout(searchTimeoutRef.current);
     }
 
+    // Debounced autocomplete suggestions (OMDb first, TMDb fallback)
+    if (autoTimeoutRef.current) {
+      clearTimeout(autoTimeoutRef.current);
+    }
+    autoTimeoutRef.current = setTimeout(async () => {
+      try {
+        const sugg = await getAutocompleteSuggestions(apiKey, value, 8);
+        setAutoSuggestions(sugg);
+      } catch {
+        setAutoSuggestions([]);
+      }
+    }, 200);
+
     // Set new timeout for debounced search
     searchTimeoutRef.current = setTimeout(() => {
       performSearch(value);
-    }, 300);
+  }, 300);
+  };
+
+  const handleSuggestionClick = (s: string) => {
+    setQuery(s);
+    performSearch(s);
+  };
+
+  const reportMissing = async () => {
+    try {
+      setReportStatus('Sending…');
+      const resp = await fetch('/api/reportMissingContent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, source: 'SearchModal' }),
+      });
+      setReportStatus(resp.ok ? 'Thanks! We’ll look into it.' : 'Could not send report.');
+    } catch {
+      setReportStatus('Could not send report.');
+    }
   };
 
   // Handle item selection
@@ -263,6 +324,32 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 </motion.button>
               </div>
 
+              {autoSuggestions.length > 0 && (
+                <div style={{ marginBottom: `${tokens.spacing.standard[1]}px` }}>
+                  <div style={{ color: tokens.colors.text.tertiary, marginBottom: `${tokens.spacing.micro[1]}px` }}>
+                    Suggestions
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: `${tokens.spacing.micro[1]}px` }}>
+                    {autoSuggestions.map((s) => (
+                      <button
+                        key={`auto-${s}`}
+                        className="apple-glass-thin"
+                        onClick={() => handleSuggestionClick(s)}
+                        style={{
+                          border: 'none',
+                          borderRadius: `${tokens.borderRadius.medium}px`,
+                          padding: `${tokens.spacing.micro[1]}px ${tokens.spacing.standard[0]}px`,
+                          cursor: 'pointer',
+                          color: tokens.colors.label.primary
+                        }}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Content */}
               <div
                 style={{
@@ -298,7 +385,51 @@ const SearchModal: React.FC<SearchModalProps> = ({
                       fontFamily: tokens.typography.families.text
                     }}
                   >
-                    No results found for "{query}"
+                    <div style={{ marginBottom: tokens.spacing.standard[1] }}>
+                      No results found for "{query}".
+                    </div>
+                    {suggestions.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: tokens.spacing.micro[1], justifyContent: 'center', marginBottom: tokens.spacing.standard[0] }}>
+                        {suggestions.map((s) => (
+                          <button
+                            key={s}
+                            onClick={() => handleSuggestionClick(s)}
+                            className="apple-glass-regular"
+                            style={{
+                              borderRadius: '16px',
+                              border: '1px solid rgba(255,255,255,0.2)',
+                              padding: `${tokens.spacing.micro[1]}px ${tokens.spacing.standard[0]}px`,
+                              color: tokens.colors.label.primary,
+                              cursor: 'pointer',
+                              background: 'rgba(255,255,255,0.08)'
+                            }}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div>
+                      <button
+                        onClick={reportMissing}
+                        className="apple-glass-regular"
+                        style={{
+                          borderRadius: '16px',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          padding: `${tokens.spacing.micro[1]}px ${tokens.spacing.standard[0]}px`,
+                          color: tokens.colors.label.primary,
+                          cursor: 'pointer',
+                          background: 'rgba(255,255,255,0.08)'
+                        }}
+                      >
+                        Report missing content
+                      </button>
+                      {reportStatus && (
+                        <div style={{ marginTop: tokens.spacing.micro[1], color: tokens.colors.text.tertiary }}>
+                          {reportStatus}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 

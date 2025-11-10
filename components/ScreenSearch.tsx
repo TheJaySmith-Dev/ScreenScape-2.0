@@ -8,6 +8,7 @@ import { SearchIcon, StarIcon, XIcon } from './Icons';
 import { useAppleTheme } from './AppleThemeProvider';
 import Loader from './Loader';
 import TrendingStrip from './TrendingStrip';
+import GlassPosterCard from './GlassPosterCard';
 import HeroCarousel from './HeroCarousel';
 import { Search, Star, X, Play, Share, Copy } from 'lucide-react';
 
@@ -511,7 +512,7 @@ const ScreenSearch: React.FC<ScreenSearchProps> = ({ apiKey, onSelectItem, onInv
                     style={{ gap: tokens.spacing.medium }}
                 >
                     {mediaResults.map(item => (
-                        <SearchResultCard key={`${item.id}-${item.media_type}`} item={item} onClick={onSelectItem} />
+                        <GlassPosterCard key={`${item.id}-${item.media_type}`} item={item as any} onClick={(it) => onSelectItem(it as any)} />
                     ))}
                 </motion.div>
             );

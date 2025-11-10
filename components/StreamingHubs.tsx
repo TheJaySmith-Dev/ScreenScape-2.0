@@ -1,5 +1,7 @@
 import React from 'react';
 import { useStreamingPreferences, availableProviders } from '../hooks/useStreamingPreferences';
+import { useGeolocation } from '../hooks/useGeolocation';
+import { getRegionServiceFilter, normalizeProviderName } from '../utils/regionServiceMap';
 
 interface StreamingHubsProps {
     activeHub: number | null;
@@ -16,10 +18,15 @@ const providerGlowMap: { [key: string]: string } = {
     'Max': 'brand-glow-max',
     'Apple TV+': 'brand-glow-appletvplus',
     'Hulu': 'brand-glow-hulu',
+    'Paramount+': 'brand-glow-paramountplus',
+    'Showmax': 'brand-glow-showmax',
 };
 
 const StreamingHubs: React.FC<StreamingHubsProps> = ({ activeHub, setActiveHub, onHoverProvider, onNavigateProvider, title = 'My Hubs' }) => {
     const { providerIds } = useStreamingPreferences();
+    const { country } = useGeolocation();
+    const filter = country ? getRegionServiceFilter(country.code) : null;
+    const includeSet = filter ? new Set(filter.include.map(normalizeProviderName)) : null;
     const selectedProviders = availableProviders.filter(p => providerIds.has(p.id));
 
     if (selectedProviders.length === 0) {
@@ -57,19 +64,31 @@ const StreamingHubs: React.FC<StreamingHubsProps> = ({ activeHub, setActiveHub, 
 
                 {selectedProviders.map(provider => {
                     const glowClass = providerGlowMap[provider.name] || '';
+                    const normalizedName = normalizeProviderName(provider.name);
+                    const isAllowed = !includeSet || includeSet.has(normalizedName);
                     return (
-                        <button
-                            key={provider.id}
-                            onClick={() => handleHubClick(provider.id, provider.name)}
-                            title={`Filter by ${provider.name}`}
-                            className={`w-20 h-20 sm:w-16 sm:h-16 flex items-center justify-center p-1 rounded-full streaming-circle transition-transform duration-200 ease-out transform hover:-translate-y-1 hover:scale-105 ${
-                                activeHub === provider.id ? 'ring-2 ring-white bg-white/20' : 'bg-glass'
-                            } ${glowClass}`}
-                            onMouseEnter={() => onHoverProvider && onHoverProvider(provider.name)}
-                            onMouseLeave={() => onHoverProvider && onHoverProvider(null)}
-                        >
-                           <img src={provider.imageUrl} alt={`${provider.name} logo`} className="w-full h-full object-cover rounded-full" />
-                        </button>
+                        <div key={provider.id} className="relative">
+                            <button
+                                onClick={() => {
+                                    if (!isAllowed) return; // Gate navigation/filtering when unavailable in region
+                                    handleHubClick(provider.id, provider.name);
+                                }}
+                                title={`Filter by ${provider.name}${isAllowed ? '' : ' (unavailable in region)'}`}
+                                className={`w-20 h-20 sm:w-16 sm:h-16 flex items-center justify-center p-1 rounded-full streaming-circle transition-transform duration-200 ease-out transform ${
+                                    isAllowed ? 'hover:-translate-y-1 hover:scale-105' : 'cursor-not-allowed'
+                                } ${
+                                    activeHub === provider.id ? 'ring-2 ring-white bg-white/20' : 'bg-glass'
+                                } ${glowClass} ${isAllowed ? '' : 'opacity-50'}`}
+                                onMouseEnter={() => onHoverProvider && onHoverProvider(provider.name)}
+                                onMouseLeave={() => onHoverProvider && onHoverProvider(null)}
+                                aria-disabled={!isAllowed}
+                            >
+                               <img src={provider.imageUrl} alt={`${provider.name} logo`} className="w-full h-full object-cover rounded-full" />
+                            </button>
+                            {!isAllowed && (
+                                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[10px] text-red-400 whitespace-nowrap">Unavailable</span>
+                            )}
+                        </div>
                     );
                 })}
             </div>
