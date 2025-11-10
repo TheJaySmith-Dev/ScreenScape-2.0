@@ -12,6 +12,9 @@ export const availableProviders = [
     { id: 1899, name: 'Max', imageUrl: 'https://pbs.twimg.com/profile_images/1942950903616565248/kpdYwNGJ_400x400.jpg' },
     { id: 2, name: 'Apple TV+', imageUrl: 'https://pbs.twimg.com/profile_images/1763709816566841344/fVdFS0gD_400x400.jpg' },
     { id: 15, name: 'Hulu', imageUrl: 'https://nextgen.teamwass.com/wp-content/uploads/2020/05/hulu0-square.jpg' },
+    // New additions
+    { id: 1770, name: 'Paramount+', imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Paramount%2B_logo.svg/256px-Paramount%2B_logo.svg.png' },
+    { id: 55, name: 'Showmax', imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Showmax_logo.svg/256px-Showmax_logo.svg.png' },
 ];
 
 const getStoredSet = (): Set<number> => {

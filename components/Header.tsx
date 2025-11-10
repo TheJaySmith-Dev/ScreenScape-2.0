@@ -5,6 +5,7 @@ import { ViewType } from '../App';
 import { useImageGenerator } from '../contexts/ImageGeneratorContext';
 import { useDeviceSync } from '../hooks/useDeviceSync';
 import { searchMulti, normalizeMovie, normalizeTVShow } from '../services/tmdbService';
+import { getAutocompleteSuggestions } from '../services/autocompleteService';
 import { MediaItem, Movie, TVShow, Person } from '../types';
 import Loader from './Loader';
 import { useAppleTheme } from './AppleDesignSystem';
@@ -158,9 +159,11 @@ const Header: React.FC<HeaderProps> = ({
   const [searchResults, setSearchResults] = useState<(Movie | TVShow | Person)[]>([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<number | null>(null);
+  const autoTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -200,12 +203,36 @@ const Header: React.FC<HeaderProps> = ({
       setSearchResults([]);
       setShowSearchResults(false);
       setIsSearchLoading(false);
+      setAutocompleteSuggestions([]);
     }
 
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
+      if (autoTimeoutRef.current) {
+        clearTimeout(autoTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, apiKey]);
+
+  // Debounced autocomplete suggestions (OMDb first, TMDb fallback)
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    if (autoTimeoutRef.current) {
+      clearTimeout(autoTimeoutRef.current);
+    }
+    autoTimeoutRef.current = window.setTimeout(async () => {
+      try {
+        const sugg = await getAutocompleteSuggestions(apiKey, searchQuery, 8);
+        setAutocompleteSuggestions(sugg);
+      } catch {
+        setAutocompleteSuggestions([]);
+      }
+    }, 200);
+
+    return () => {
+      if (autoTimeoutRef.current) clearTimeout(autoTimeoutRef.current);
     };
   }, [searchQuery, apiKey]);
 
@@ -273,9 +300,9 @@ const Header: React.FC<HeaderProps> = ({
               }}
             />
             
-            {/* Search Results Dropdown */}
+            {/* Search Results & Autocomplete Dropdown */}
             <AnimatePresence>
-              {showSearchResults && searchResults.length > 0 && (
+              {showSearchResults && (searchResults.length > 0 || autocompleteSuggestions.length > 0) && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -296,6 +323,29 @@ const Header: React.FC<HeaderProps> = ({
                     zIndex: 1000,
                   }}
                 >
+                  {autocompleteSuggestions.length > 0 && (
+                    <div style={{ padding: tokens.spacing.standard[1], borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                      <div style={{ color: tokens.colors.label.secondary, marginBottom: tokens.spacing.micro[0] }}>Suggestions</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: tokens.spacing.micro[1] }}>
+                        {autocompleteSuggestions.map((s) => (
+                          <button
+                            key={`header-auto-${s}`}
+                            onClick={() => setSearchQuery(s)}
+                            style={{
+                              border: 'none',
+                              borderRadius: '12px',
+                              padding: `${tokens.spacing.micro[1]}px ${tokens.spacing.standard[0]}px`,
+                              background: 'rgba(255, 255, 255, 0.1)',
+                              color: tokens.colors.label.primary,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {searchResults.map((result, index) => (
                     <div
                       key={`${result.id}-${result.media_type}`}

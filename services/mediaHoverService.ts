@@ -1,5 +1,6 @@
 import { MediaItem } from '../types';
 import { getMovieImages, getTVShowImages, getMovieVideos, getTVShowVideos } from './tmdbService';
+// FanArt removed: hover backdrops resolved via TMDb images only
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w780';
 
@@ -154,16 +155,25 @@ class MediaHoverService {
 
   private async fetchBackdrop(item: MediaItem, apiKey: string): Promise<string | null> {
     try {
+      // Resolve backdrop using TMDb images
       const images = item.media_type === 'movie'
         ? await getMovieImages(apiKey, item.id)
         : await getTVShowImages(apiKey, item.id);
 
-      if (images.backdrops && images.backdrops.length > 0) {
-        // Get the highest rated backdrop
-        const backdrop = images.backdrops
-          .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))[0];
-        
-        return `${IMAGE_BASE_URL}${backdrop.file_path}`;
+      const backdrops = Array.isArray(images?.backdrops) ? images.backdrops : [];
+      if (backdrops.length > 0) {
+        const pick = backdrops
+          .slice()
+          .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
+        if (pick?.file_path) {
+          return `${IMAGE_BASE_URL}${pick.file_path}`;
+        }
+      }
+
+      // Fallback to item's backdrop_path if available
+      const fallbackPath = (item as any).backdrop_path;
+      if (fallbackPath) {
+        return fallbackPath.startsWith('http') ? fallbackPath : `${IMAGE_BASE_URL}${fallbackPath}`;
       }
 
       return null;

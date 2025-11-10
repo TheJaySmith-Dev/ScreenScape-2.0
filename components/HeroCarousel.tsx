@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { MediaItem, TVShow, WatchProviderCountry } from '../types';
-import { getTrending, getMovieWatchProviders, getTVShowWatchProviders } from '../services/tmdbService';
+import { getTrending, getMovieWatchProviders, getTVShowWatchProviders, getMovieImages, getTVShowImages } from '../services/tmdbService';
+// FanArt removed: backdrops resolved via TMDb images
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import { useAppleTheme } from './AppleThemeProvider';
@@ -27,6 +28,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
     const [availabilityMap, setAvailabilityMap] = useState<Record<number, WatchProviderCountry | null>>({});
+    const [tmdbBackdrops, setTmdbBackdrops] = useState<Record<number, string | null>>({});
     const intervalRef = useRef<number | null>(null);
     const { country } = useGeolocation();
     const { providerIds } = useStreamingPreferences();
@@ -43,6 +45,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                 if (isMounted) {
                     setItems(filteredItems);
                     setAvailabilityMap({});
+                    setTmdbBackdrops({});
                 }
             } catch (error) {
                 console.error(error);
@@ -54,6 +57,48 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
         fetchTrending();
         return () => { isMounted = false; };
     }, [apiKey, onInvalidApiKey]);
+
+    // Resolve TMDb backdrops for items
+    useEffect(() => {
+        let cancelled = false;
+        const resolveBackdrops = async () => {
+            const updates: Record<number, string | null> = {};
+            for (const it of items) {
+                try {
+                    let url: string | null = null;
+                    if (it.media_type === 'movie') {
+                        const images = await getMovieImages(apiKey, it.id);
+                        const backdrops = Array.isArray(images?.backdrops) ? images.backdrops : [];
+                        if (backdrops.length > 0) {
+                            const pick = backdrops
+                                .slice()
+                                .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
+                            if (pick?.file_path) {
+                                url = `${IMAGE_BASE_URL}${pick.file_path}`;
+                            }
+                        }
+                    } else if (it.media_type === 'tv') {
+                        const images = await getTVShowImages(apiKey, it.id);
+                        const backdrops = Array.isArray(images?.backdrops) ? images.backdrops : [];
+                        if (backdrops.length > 0) {
+                            const pick = backdrops
+                                .slice()
+                                .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
+                            if (pick?.file_path) {
+                                url = `${IMAGE_BASE_URL}${pick.file_path}`;
+                            }
+                        }
+                    }
+                    updates[it.id] = url || null;
+                } catch {
+                    updates[it.id] = null;
+                }
+            }
+            if (!cancelled) setTmdbBackdrops(prev => ({ ...prev, ...updates }));
+        };
+        if (items.length > 0) resolveBackdrops();
+        return () => { cancelled = true; };
+    }, [items, apiKey]);
 
     useEffect(() => {
         if (items.length === 0) return;
@@ -158,11 +203,22 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                     >
                         {/* Background Image */}
                         <div className="absolute inset-0">
-                            <img
-                                src={`https://image.tmdb.org/t/p/original${item.backdrop_path}`}
-                                alt={item.media_type === 'movie' ? item.title : (item as TVShow).name}
-                                className="w-full h-full object-cover"
-                            />
+                            {(() => {
+                                const fa = tmdbBackdrops[item.id];
+                                const fallback = item.backdrop_path
+                                    ? (item.backdrop_path.startsWith('http')
+                                        ? item.backdrop_path
+                                        : `${IMAGE_BASE_URL}${item.backdrop_path}`)
+                                    : '';
+                                const backdropSrc = fa || fallback;
+                                return (
+                                    <img
+                                        src={backdropSrc}
+                                        alt={item.media_type === 'movie' ? item.title : (item as TVShow).name}
+                                        className="w-full h-full object-cover"
+                                    />
+                                );
+                            })()}
                             {/* Subtle overlay for better text readability */}
                             <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
                         </div>

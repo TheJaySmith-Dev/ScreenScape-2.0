@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { MediaItem } from '../types';
 import { getMovieImages, getTVShowImages } from '../services/tmdbService';
+// FanArt removed: logos now resolved via TMDb image APIs
 import { useAppleTheme } from './AppleThemeProvider';
 
-const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
+const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
 
 interface MediaTitleLogoProps {
   media: MediaItem;
@@ -12,6 +13,9 @@ interface MediaTitleLogoProps {
   className?: string;
   style?: React.CSSProperties;
   fallbackToText?: boolean;
+  overrideUrl?: string;
+  maxHeightPx?: number;
+  maxWidthPx?: number;
 }
 
 interface LogoImage {
@@ -30,7 +34,10 @@ const MediaTitleLogo: React.FC<MediaTitleLogoProps> = ({
   size = 'medium',
   className = '',
   style = {},
-  fallbackToText = true
+  fallbackToText = true,
+  overrideUrl,
+  maxHeightPx,
+  maxWidthPx
 }) => {
   const { tokens } = useAppleTheme();
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -63,6 +70,14 @@ const MediaTitleLogo: React.FC<MediaTitleLogoProps> = ({
 
   useEffect(() => {
     const fetchLogo = async () => {
+      // Use override URL if provided
+      if (overrideUrl) {
+        setLogoUrl(overrideUrl);
+        setIsLoading(false);
+        setHasError(false);
+        return;
+      }
+
       if (!apiKey || !media.id) {
         setIsLoading(false);
         return;
@@ -72,56 +87,36 @@ const MediaTitleLogo: React.FC<MediaTitleLogoProps> = ({
         setIsLoading(true);
         setHasError(false);
 
-        let images;
+        let url: string | null = null;
         if (media.media_type === 'movie') {
-          images = await getMovieImages(apiKey, media.id);
+          const images = await getMovieImages(apiKey, media.id);
+          const logos = Array.isArray(images?.logos) ? images.logos : [];
+          if (logos.length > 0) {
+            const preferred = logos
+              .filter((l: any) => l && (l.iso_639_1 === 'en' || l.iso_639_1 === null))
+              .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
+            const pick = preferred || logos[0];
+            if (pick?.file_path) url = `${IMAGE_BASE_URL}${pick.file_path}`;
+          }
         } else if (media.media_type === 'tv') {
-          images = await getTVShowImages(apiKey, media.id);
-        } else {
-          setIsLoading(false);
-          return;
+          const images = await getTVShowImages(apiKey, media.id);
+          const logos = Array.isArray(images?.logos) ? images.logos : [];
+          if (logos.length > 0) {
+            const preferred = logos
+              .filter((l: any) => l && (l.iso_639_1 === 'en' || l.iso_639_1 === null))
+              .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
+            const pick = preferred || logos[0];
+            if (pick?.file_path) url = `${IMAGE_BASE_URL}${pick.file_path}`;
+          }
         }
 
-        // Filter logos and find the best one
-        const logos = images.logos || [];
-        
-        if (logos.length === 0) {
-          setIsLoading(false);
-          return;
-        }
-
-        // Prefer English logos, then highest rated, then highest resolution
-        const bestLogo = logos
-          .filter((logo: LogoImage) => logo.file_path)
-          .sort((a: LogoImage, b: LogoImage) => {
-            // Prefer English logos
-            if (a.iso_639_1 === 'en' && b.iso_639_1 !== 'en') return -1;
-            if (b.iso_639_1 === 'en' && a.iso_639_1 !== 'en') return 1;
-            
-            // Then by vote average
-            if (b.vote_average !== a.vote_average) {
-              return b.vote_average - a.vote_average;
-            }
-            
-            // Then by resolution (width * height)
-            return (b.width * b.height) - (a.width * a.height);
-          })[0];
-
-        if (bestLogo) {
-          // Use w500 for better quality while maintaining reasonable file size
-          setLogoUrl(`${IMAGE_BASE_URL}w500${bestLogo.file_path}`);
-        }
-        
+        if (url) setLogoUrl(url);
         setIsLoading(false);
       } catch (error) {
-        // Silently handle network errors - they're expected when API is unavailable
-        // Only log non-network errors for debugging
         if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-          // Network error - fail silently and show fallback
           setHasError(true);
           setIsLoading(false);
         } else {
-          // Other errors - log for debugging
           console.error('Error fetching logo:', error);
           setHasError(true);
           setIsLoading(false);
@@ -130,7 +125,7 @@ const MediaTitleLogo: React.FC<MediaTitleLogoProps> = ({
     };
 
     fetchLogo();
-  }, [apiKey, media.id, media.media_type]);
+  }, [apiKey, media.id, media.media_type, overrideUrl]);
 
   const handleImageError = () => {
     setHasError(true);
@@ -146,8 +141,8 @@ const MediaTitleLogo: React.FC<MediaTitleLogoProps> = ({
         className={`flex items-center justify-center ${className}`}
         style={{
           ...style,
-          height: config.maxHeight,
-          maxWidth: config.maxWidth
+          height: maxHeightPx ?? config.maxHeight,
+          maxWidth: maxWidthPx ?? config.maxWidth
         }}
       >
         <div 
@@ -173,8 +168,8 @@ const MediaTitleLogo: React.FC<MediaTitleLogoProps> = ({
         className={`object-contain ${className}`}
         style={{
           ...style,
-          maxHeight: config.maxHeight,
-          maxWidth: config.maxWidth,
+          maxHeight: maxHeightPx ?? config.maxHeight,
+          maxWidth: maxWidthPx ?? config.maxWidth,
           height: 'auto',
           width: 'auto'
         }}
@@ -195,7 +190,7 @@ const MediaTitleLogo: React.FC<MediaTitleLogoProps> = ({
           fontWeight: config.fontWeight,
           fontFamily: tokens.typography.families.display,
           color: tokens.colors.text.primary,
-          maxWidth: config.maxWidth,
+          maxWidth: maxWidthPx ?? config.maxWidth,
           lineHeight: 1.2
         }}
         title={title}

@@ -6,11 +6,15 @@ import { useAppleTheme } from './AppleThemeProvider';
 interface TopNavigationProps {
   onSettingsClick: () => void;
   onSyncClick: () => void;
+  onImaxClick?: () => void;
+  preferPerformance?: boolean;
 }
 
 const TopNavigation: React.FC<TopNavigationProps> = ({
   onSettingsClick,
-  onSyncClick
+  onSyncClick,
+  onImaxClick,
+  preferPerformance = false
 }) => {
   const { tokens } = useAppleTheme();
 
@@ -18,7 +22,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
     <motion.div
       initial={{ y: -50, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ 
+      transition={preferPerformance ? { type: 'tween', duration: 0.16 } : { 
         type: "spring", 
         stiffness: 300, 
         damping: 30,
@@ -41,14 +45,39 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
           gap: `${tokens.spacing.micro[1]}px`,
           padding: `${tokens.spacing.micro[1]}px`,
           borderRadius: '20px',
-          background: `rgba(255, 255, 255, ${tokens.materials.glass.prominent.opacity})`,
-          backdropFilter: `blur(${tokens.materials.glass.prominent.blur}px)`,
-          WebkitBackdropFilter: `blur(${tokens.materials.glass.prominent.blur}px)`,
-          border: `1px solid rgba(255, 255, 255, ${tokens.materials.glass.prominent.borderOpacity})`,
-          boxShadow: `0 8px 32px rgba(0, 0, 0, ${tokens.materials.glass.prominent.shadowIntensity})`,
+          background: preferPerformance ? 'rgba(255,255,255,0.88)' : `rgba(255, 255, 255, ${tokens.materials.glass.prominent.opacity})`,
+          backdropFilter: preferPerformance ? 'none' : `blur(${tokens.materials.glass.prominent.blur}px)`,
+          WebkitBackdropFilter: preferPerformance ? 'none' : `blur(${tokens.materials.glass.prominent.blur}px)`,
+          border: preferPerformance ? '1px solid rgba(255,255,255,0.66)' : `1px solid rgba(255, 255, 255, ${tokens.materials.glass.prominent.borderOpacity})`,
+          boxShadow: preferPerformance ? '0 4px 14px rgba(0,0,0,0.18)' : `0 8px 32px rgba(0, 0, 0, ${tokens.materials.glass.prominent.shadowIntensity})`,
           pointerEvents: 'auto'
         }}
       >
+        {/* IMAX logo (optional) */}
+        {onImaxClick && (
+          <button
+            onClick={onImaxClick}
+            aria-label="IMAX"
+            title="IMAX"
+            style={{
+              border: 'none',
+              background: 'transparent',
+              padding: 0,
+              marginRight: `${tokens.spacing.micro[1]}px`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer'
+            }}
+          >
+            <img
+              src={'https://i.ibb.co/G47CHyhg/toppng-com-imax-michael-jackson-thriller-imax-445x87.png'}
+              alt="IMAX"
+              loading="lazy"
+              style={{ height: '20px', width: 'auto' }}
+            />
+          </button>
+        )}
         {/* Sync Button */}
         <motion.button
           onClick={onSyncClick}
@@ -63,10 +92,10 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
             width: '44px',
             height: '44px',
             borderRadius: `${tokens.borderRadius.large}px`,
-            background: `rgba(255, 255, 255, ${tokens.materials.glass.regular.opacity})`,
-            backdropFilter: `blur(${tokens.materials.glass.regular.blur}px)`,
-            WebkitBackdropFilter: `blur(${tokens.materials.glass.regular.blur}px)`,
-            border: `1px solid rgba(255, 255, 255, ${tokens.materials.glass.regular.borderOpacity})`,
+            background: preferPerformance ? 'rgba(255,255,255,0.9)' : `rgba(255, 255, 255, ${tokens.materials.glass.regular.opacity})`,
+            backdropFilter: preferPerformance ? 'none' : `blur(${tokens.materials.glass.regular.blur}px)`,
+            WebkitBackdropFilter: preferPerformance ? 'none' : `blur(${tokens.materials.glass.regular.blur}px)`,
+            border: preferPerformance ? '1px solid rgba(255,255,255,0.66)' : `1px solid rgba(255, 255, 255, ${tokens.materials.glass.regular.borderOpacity})`,
             cursor: 'pointer',
             color: tokens.colors.label.primary,
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
@@ -89,10 +118,10 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
             width: '44px',
             height: '44px',
             borderRadius: `${tokens.borderRadius.large}px`,
-            background: `rgba(255, 255, 255, ${tokens.materials.glass.regular.opacity})`,
-            backdropFilter: `blur(${tokens.materials.glass.regular.blur}px)`,
-            WebkitBackdropFilter: `blur(${tokens.materials.glass.regular.blur}px)`,
-            border: `1px solid rgba(255, 255, 255, ${tokens.materials.glass.regular.borderOpacity})`,
+            background: preferPerformance ? 'rgba(255,255,255,0.9)' : `rgba(255, 255, 255, ${tokens.materials.glass.regular.opacity})`,
+            backdropFilter: preferPerformance ? 'none' : `blur(${tokens.materials.glass.regular.blur}px)`,
+            WebkitBackdropFilter: preferPerformance ? 'none' : `blur(${tokens.materials.glass.regular.blur}px)`,
+            border: preferPerformance ? '1px solid rgba(255,255,255,0.66)' : `1px solid rgba(255, 255, 255, ${tokens.materials.glass.regular.borderOpacity})`,
             cursor: 'pointer',
             color: tokens.colors.label.primary,
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'

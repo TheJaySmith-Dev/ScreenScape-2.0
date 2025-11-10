@@ -7,10 +7,11 @@
 import React, { useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { Search, Home, Tv, Gamepad2, Heart, Settings as SettingsIcon, RefreshCw } from 'lucide-react';
+import { Search, Home, Tv, Gamepad2, Heart, Settings as SettingsIcon, RefreshCw, Tag } from 'lucide-react';
 import { ViewType } from '../App';
 import { useAppleTheme } from './AppleThemeProvider';
 import { LiquidGlassWrapper } from './LiquidGlassWrapper';
+import FluidCanvasLayer from './FluidCanvasLayer';
 import { defaultLiquidVisualTuning } from '../utils/liquidGlassUserTuning';
 import { useScrollVelocity } from '../utils/useScrollVelocity';
 import { useOcclusionTracker } from '../utils/useOcclusionTracker';
@@ -41,7 +42,7 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
   const occlusion = useOcclusionTracker(
     containerRef,
     ['img', '.poster', '.MediaRow', '.NetflixView', '.GlassCard', '[data-occlude]'],
-    50
+    16 // faster sampling for more real-time refraction
   );
 
   // Map scroll physics and occlusion to PhysicalRefractionParams
@@ -77,6 +78,16 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
     };
   }, [occlusion?.panelCoverageRatio, velocityY]);
 
+  // Adaptive refraction quality based on motion and coverage
+  const refractionQuality = useMemo(() => {
+    const coverage = occlusion?.panelCoverageRatio ?? 0;
+    const speed = Math.min(2000, Math.abs(velocityY));
+    const speed01 = Math.min(1, speed / 1200);
+    if (speed01 > 0.6 || coverage > 0.5) return 'ultra';
+    if (speed01 > 0.3 || coverage > 0.25) return 'high';
+    return 'balanced';
+  }, [occlusion?.panelCoverageRatio, velocityY]);
+
   // Aggressive, dynamic visual tuning driven by occlusion and scroll
   const aggressiveTuning = useMemo(() => {
     const coverage = occlusion?.panelCoverageRatio ?? 0; // 0..1 portion of pill bar covered
@@ -91,21 +102,21 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
     const refractionFactor = 1.58 + coverage * 0.06 + speed01 * 0.05; // ~1.58-1.69
 
     // Max out dispersion gain multiplier (wrapper clamps internally)
-    const dispersionGain = 18.0 * (0.7 + 0.3 * speed01);
+    const dispersionGain = 20.0 * (0.7 + 0.3 * speed01);
 
     // Little to no frost: keep blur near zero
-    const blurRadius = 0.04;
+    const blurRadius = 0.02;
 
     return {
       ...defaultLiquidVisualTuning,
       thickness,
-      refractionFactor,
+      refractionFactor: Math.max(refractionFactor, 1.72),
       dispersionGain,
       blurRadius,
-      glareIntensity: 88.0,
-      fresnelIntensity: 42.0,
+      glareIntensity: 92.0,
+      fresnelIntensity: 48.0,
       tint: '#ffffff00',
-      shadowIntensity: 10.0,
+      shadowIntensity: 8.0,
     };
   }, [occlusion?.panelCoverageRatio, velocityY]);
 
@@ -113,24 +124,25 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
   const underlayTuning = useMemo(() => {
     return {
       ...defaultLiquidVisualTuning,
-      // Match Liquid Glass Studio reference (clear, non‑frosted but highly liquid)
-      thickness: 20.6,
-      refractionFactor: 1.39,
-      dispersionGain: 10.3,
-      fresnelSize: 35.0,
-      fresnelHardness: 20.0,
-      fresnelIntensity: 100.0,
-      glareSize: 30.0,
+      // High-impact, clear liquid tuning for visible refraction
+      thickness: 58.0,
+      refractionFactor: 1.68,
+      dispersionGain: 22.0,
+      fresnelSize: 36.0,
+      fresnelHardness: 18.0,
+      fresnelIntensity: 80.0,
+      glareSize: 34.0,
       glareHardness: 20.0,
-      glareIntensity: 45.0,
+      glareIntensity: 65.0,
       glareConvergence: 50.0,
       glareOppositeSide: 80.0,
-      glareAngle: 45.0,
-      blurRadius: 1.0,
-      tint: '#ffffff10',
-      shadowExpand: 25.0,
-      shadowIntensity: 25.0,
-      shadowPosition: { x: 4.76, y: -7.64 },
+      glareAngle: 30.0,
+      blurRadius: 0.03,
+      tint: '#ffffff00',
+      // Soften and reposition shadow to avoid upper-left artifact
+      shadowExpand: 18.0,
+      shadowIntensity: 16.0,
+      shadowPosition: { x: 0, y: 10 },
     };
   }, []);
 
@@ -140,8 +152,7 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
     { id: 'live' as ViewType, icon: Tv, label: 'Live Channels' },
     { id: 'likes' as ViewType, icon: Heart, label: 'Likes' },
     { id: 'game' as ViewType, icon: Gamepad2, label: 'Games' },
-    { id: 'settings' as ViewType, icon: SettingsIcon, label: 'Settings' },
-    { id: 'sync' as ViewType, icon: RefreshCw, label: 'Sync' },
+    { id: 'genres' as ViewType, icon: Tag, label: 'Genres' },
   ];
 
   // Enhanced navigation handler with haptic feedback
@@ -158,19 +169,19 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
       ref={containerRef}
       initial={{ y: 100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ 
+      transition={enableLiquidEffects ? { 
         type: "spring",
         stiffness: 360,
         damping: 30,
         mass: 0.6,
         delay: 0.08
-      }}
+      } : { type: 'tween', duration: 0.16 }}
       style={{
         position: 'fixed',
         bottom: 0,
         left: 0,
         right: 0,
-        zIndex: 999,
+        zIndex: 10000,
         pointerEvents: 'none',
         display: 'flex',
         justifyContent: 'center',
@@ -188,7 +199,7 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
           pointerEvents: 'auto'
         }}
       >
-        {/* Non-frosted container */}
+        {/* Navigation container */}
         <div
           style={{
             display: 'flex',
@@ -201,37 +212,126 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
             minHeight: '56px',
             width: 'auto',
             maxWidth: 'min(800px, calc(100vw - 24px))',
-            background: 'transparent',
-            backdropFilter: 'none',
-            WebkitBackdropFilter: 'none',
+            background: enableLiquidEffects ? 'transparent' : 'rgba(0,0,0,0.06)',
+            backdropFilter: enableLiquidEffects ? 'none' : 'none',
+            WebkitBackdropFilter: enableLiquidEffects ? 'none' : 'none',
             // Remove subtle border to avoid pill-shaped outline glitches
             border: 'none',
-            boxShadow: '0 12px 28px rgba(0, 0, 0, 0.08)',
+            boxShadow: enableLiquidEffects ? '0 18px 40px rgba(0, 0, 0, 0.16)' : '0 6px 16px rgba(0,0,0,0.18)',
             willChange: 'transform'
           }}
         >
-          {/* Subtle liquid underlay behind the pill menu */}
-          <LiquidGlassWrapper
-            componentType="navigation"
-            intensity="medium"
-            mode={refractionMode}
-            effect="clear"
-            enableEffects={enableLiquidEffects}
-            mouseContainer={containerRef}
-            refractionParams={refractionParams}
-            refractionQuality="high"
-            artifactReduction="none"
-            visualTuning={underlayTuning}
+          {enableLiquidEffects && (
+            <LiquidGlassWrapper
+              componentType="navigation"
+              intensity="medium"
+              mode={refractionMode}
+              effect="clear"
+              enableEffects={enableLiquidEffects}
+              mouseContainer={containerRef}
+              // Drive refraction with live physics + aggressive tuning
+              refractionParams={refractionParams}
+              refractionQuality={refractionQuality}
+              visualTuning={aggressiveTuning}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: '28px',
+                pointerEvents: 'none',
+                zIndex: 0
+              }}
+            >
+              <div />
+            </LiquidGlassWrapper>
+          )}
+
+          {/* CPU-based canvas liquid layer */}
+          {enableLiquidEffects && (
+            <FluidCanvasLayer
+              containerRef={containerRef as React.RefObject<HTMLElement>}
+              strength={1.2}
+              resolutionScale={0.8}
+            />
+          )}
+
+          {/* Backdrop refraction layer: distorts content behind the pill bar */}
+          {enableLiquidEffects && (
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: '28px',
+                pointerEvents: 'none',
+                // Use backdrop-filter for optical refraction-like effect on underlying content
+                backdropFilter: 'blur(4px) saturate(1.08) contrast(1.01)',
+                WebkitBackdropFilter: 'blur(4px) saturate(1.08) contrast(1.01)',
+                // Slight inner vignette to mimic curvature focusing
+                background: 'radial-gradient(120% 90% at 50% 50%, rgba(255,255,255,0.06), rgba(255,255,255,0.00))',
+                zIndex: 0,
+              }}
+            />
+          )}
+
+          {/* Material capsule for proper depth (non‑frosted) */}
+          <div
+            aria-hidden
             style={{
               position: 'absolute',
               inset: 0,
               borderRadius: '28px',
-              pointerEvents: 'none',
-              zIndex: 0
+              // Layered gradients: inner highlight + rim lighting
+              background: enableLiquidEffects
+                ? [
+                    'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02))',
+                    'radial-gradient(120% 80% at 20% 0%, rgba(255,255,255,0.08), rgba(255,255,255,0.00))',
+                  ].join(',')
+                : 'rgba(255,255,255,0.06)',
+              border: enableLiquidEffects ? '1px solid rgba(148,163,184,0.18)' : '1px solid rgba(148,163,184,0.16)',
+              boxShadow: enableLiquidEffects
+                ? [
+                    'inset 0 1px 0 rgba(255,255,255,0.22)',
+                    '0 8px 24px rgba(0,0,0,0.20)',
+                    '0 2px 8px rgba(0,0,0,0.12)',
+                  ].join(', ')
+                : '0 4px 12px rgba(0,0,0,0.16)',
+              zIndex: 0,
             }}
-          >
-            <div />
-          </LiquidGlassWrapper>
+          />
+
+          {/* Ambient occlusion ring for slab read */}
+          {enableLiquidEffects && (
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: '28px',
+                background: 'radial-gradient(140% 60% at 50% 110%, rgba(0,0,0,0.12), rgba(0,0,0,0.00))',
+                zIndex: 0,
+                pointerEvents: 'none'
+              }}
+            />
+          )}
+
+          {/* Floor glow below pill for extra depth */}
+          {enableLiquidEffects && (
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                left: '8%',
+                right: '8%',
+                bottom: -14,
+                height: 30,
+                borderRadius: 30,
+                background: 'radial-gradient(60% 60% at 50% 0%, rgba(255,255,255,0.10), rgba(255,255,255,0.00))',
+                filter: 'blur(12px)',
+                zIndex: 0,
+                pointerEvents: 'none'
+              }}
+            />
+          )}
           {/* Navigation Items */}
           <nav 
             role="tablist"
@@ -246,11 +346,12 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
             }}
           >
             {navigationItems.map((item) => {
-              const Icon = item.icon;
+              const Icon = (item as any).icon;
               const isActive = view === item.id;
               
               return (
                   <motion.button
+                    key={item.id}
                     onClick={() => {
                       if ((item as any).isSearchButton && onSearchClick) {
                         onSearchClick();
@@ -294,15 +395,24 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
                         : 'none'
                     }}
                   >
-                    <Icon 
-                      size={18} 
-                      strokeWidth={isActive ? 2.5 : 2}
-                      style={{
-                        filter: isActive 
-                          ? 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2))'
-                          : 'none'
-                      }}
-                    />
+                    {Icon ? (
+                      <Icon 
+                        size={18} 
+                        strokeWidth={isActive ? 2.5 : 2}
+                        style={{
+                          filter: isActive 
+                            ? 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2))'
+                            : 'none'
+                        }}
+                      />
+                    ) : (
+                      <img
+                        src={(item as any).imageUrl}
+                        alt={item.label}
+                        loading="lazy"
+                        style={{ height: '18px', width: 'auto', filter: isActive ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' : 'none' }}
+                      />
+                    )}
                     <span style={{
                       fontSize: `${tokens.typography.sizes.caption2}px`,
                       fontWeight: isActive ? tokens.typography.weights.semibold : tokens.typography.weights.medium,

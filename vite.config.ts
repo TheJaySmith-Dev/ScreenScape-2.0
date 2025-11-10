@@ -5,10 +5,25 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     const geminiApiKey = env.GEMINI_API_KEY || 'AIzaSyAkRoZKZG2lOMS9_vzlIeHsOJAK5dFAGkA';
-    return {
+  return {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        proxy: {
+          '/mdblist': {
+            target: 'https://api.mdblist.com',
+            changeOrigin: true,
+            secure: true,
+            rewrite: (path) => path.replace(/^\/mdblist/, ''),
+          },
+          // Proxy to the public mdblist.com site for JSON fallback
+          '/mdblist_public': {
+            target: 'https://mdblist.com',
+            changeOrigin: true,
+            secure: true,
+            rewrite: (path) => path.replace(/^\/mdblist_public/, ''),
+          },
+        },
       },
       plugins: [react()],
       define: {

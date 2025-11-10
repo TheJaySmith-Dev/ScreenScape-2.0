@@ -1,5 +1,6 @@
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || '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';
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_MODEL = import.meta.env.VITE_OPENROUTER_MODEL || null;
 
 /**
  * Sends a prompt to the OpenRouter API using a free model and returns a cinematic response.
@@ -8,8 +9,10 @@ const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
  */
 export async function queryOpenRouter(prompt) {
   try {
-    // Try multiple models in order of preference
-    const models = [
+    // If a specific model is configured, try that first and exclusively
+    const configuredModel = OPENROUTER_MODEL && typeof OPENROUTER_MODEL === 'string' ? OPENROUTER_MODEL.trim() : null;
+    // Fallback models if none configured
+    const fallbackModels = [
       "microsoft/wizardlm-2-8x22b:free",
       "mistralai/mistral-7b-instruct:free",
       "huggingface/zephyr-7b-beta:free",
@@ -18,7 +21,8 @@ export async function queryOpenRouter(prompt) {
 
     let lastError = null;
 
-    for (const model of models) {
+    const tryModels = configuredModel ? [configuredModel] : fallbackModels;
+    for (const model of tryModels) {
       try {
         console.log(`Attempting to use model: ${model}`);
 
@@ -120,6 +124,39 @@ Format as a series of separate reviews, clearly separated. Don't add any introdu
   if (reviews.includes("AI services are currently experiencing") ||
       reviews.includes("experiencing connectivity issues") ||
       reviews.includes("currently unavailable")) {
+    return `"${title}" offers a compelling ${genres.includes('Drama') ? 'dramatic' : 'entertaining'} experience that resonates with audiences seeking meaningful storytelling. The ${Math.round(rating)}/10 rating reflects its ability to blend ${overview.length > 150 ? 'complex themes with accessible pacing' : 'heart and substance effectively'}. While not groundbreaking, it delivers solid performances and a narrative that's both engaging and thought-provoking.
+
+A thoroughly enjoyable ${genreList.toLowerCase()} piece that understands its audience well. The story moves at a comfortable pace without wasting time, delivering genuine emotional moments that feel earned rather than forced. Some plot decisions feel predictable, but the overall execution makes this a worthwhile watch that doesn't overstay its welcome.`;
+  }
+
+  return reviews;
+}
+
+/**
+ * Generates AI-powered reviews using real critic/source snippets for grounding.
+ * @param {string} title The title of the movie or TV show.
+ * @param {string} overview A brief overview or synopsis of the title.
+ * @param {number} rating The TMDB rating out of 10.
+ * @param {string[]} genres Array of genre names.
+ * @param {string[]} sources Array of short real-world review snippets (critic quotes, publication notes).
+ * @returns {Promise<string>} Generated grounded reviews or an error message.
+ */
+export async function generateReviewsAIWithSources(title, overview, rating, genres = [], sources = []) {
+  const genreList = genres.length > 0 ? genres.join(', ') : 'various genres';
+  const sourceContext = sources && sources.length > 0
+    ? `Here are real critic/source snippets to ground your reviews:\n- ${sources.join('\n- ')}`
+    : 'No external sources available; rely on the synopsis and general film literacy.';
+
+  const prompt = `You are a film critic synthesizer. Write 2-3 grounded reviews for "${title}" (rated ${rating}/10, genres: ${genreList}).\n\nUse the following synopsis as context:\n"${overview}"\n\n${sourceContext}\n\nEach review should:\n- Be 2-4 sentences\n- Sound like distinct real critics or viewers\n- Balance strengths and weaknesses\n- Reference specific elements (direction, performances, pacing, visual style)\n\nOutput the reviews directly, separated by a blank line; no headers or extra commentary.`;
+
+  const reviews = await queryOpenRouter(prompt);
+
+  // If AI failed to generate content and returned a fallback message, provide static reviews
+  if (typeof reviews === 'string' && (
+    reviews.includes("AI services are currently experiencing") ||
+    reviews.includes("experiencing connectivity issues") ||
+    reviews.includes("currently unavailable")
+  )) {
     return `"${title}" offers a compelling ${genres.includes('Drama') ? 'dramatic' : 'entertaining'} experience that resonates with audiences seeking meaningful storytelling. The ${Math.round(rating)}/10 rating reflects its ability to blend ${overview.length > 150 ? 'complex themes with accessible pacing' : 'heart and substance effectively'}. While not groundbreaking, it delivers solid performances and a narrative that's both engaging and thought-provoking.
 
 A thoroughly enjoyable ${genreList.toLowerCase()} piece that understands its audience well. The story moves at a comfortable pace without wasting time, delivering genuine emotional moments that feel earned rather than forced. Some plot decisions feel predictable, but the overall execution makes this a worthwhile watch that doesn't overstay its welcome.`;

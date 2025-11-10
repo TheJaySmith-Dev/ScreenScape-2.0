@@ -46,6 +46,7 @@ export interface OMDbMovieDetails extends OMDbMovieData {
   tomatoConsensus?: string; // critics consensus string
   tomatoUserRating?: string; // e.g., "4.2"
   tomatoUserReviews?: string; // e.g., "100000"
+  tomatoURL?: string; // direct Rotten Tomatoes URL if provided
 }
 
 export interface RottenTomatoesRating {
@@ -61,6 +62,21 @@ export interface TrailerResult {
   source: 'omdb' | 'kinocheck' | 'tmdb';
   error?: string;
   cached?: boolean;
+}
+
+export interface OMDbSearchListItem {
+  Title: string;
+  Year: string;
+  imdbID: string;
+  Type: string;
+  Poster: string;
+}
+
+export interface OMDbSearchResponse {
+  Search?: OMDbSearchListItem[];
+  totalResults?: string;
+  Response: string;
+  Error?: string;
 }
 
 export class OMDbService {
@@ -101,6 +117,34 @@ export class OMDbService {
     } catch (error) {
       console.error('OMDb search error:', error);
       return null;
+    }
+  }
+
+  /**
+   * Autocomplete-style search for titles using OMDb's `s` endpoint
+   * Returns a list of lightweight search items suitable for suggestions.
+   */
+  async searchTitles(query: string, type?: 'movie' | 'series' | 'episode', year?: string, page: number = 1): Promise<OMDbSearchListItem[]> {
+    try {
+      const params = new URLSearchParams({
+        apikey: this.apiKey,
+        s: query,
+        page: String(page)
+      });
+      if (type) params.append('type', type);
+      if (year) params.append('y', year);
+
+      const response = await this.makeRequest(`${this.baseUrl}?${params}`) as OMDbSearchResponse;
+
+      if (response.Response === 'False') {
+        // Common errors: too many results, not found
+        return [];
+      }
+
+      return (response.Search || []).slice(0, 10);
+    } catch (error) {
+      console.warn('OMDb searchTitles error:', error);
+      return [];
     }
   }
 
@@ -250,7 +294,26 @@ export class OMDbService {
 }
 
 // Export a default instance (will need API key configuration)
-export const omdbService = new OMDbService(process.env.OMDB_API_KEY || '');
+// Resolve OMDb API key for both browser (Vite) and Node contexts
+// Resolve OMDb API key from multiple sources to work in browser builds
+const runtimeOMDbApiKey = (
+  // Prefer environment variables for global consistency
+  (typeof import.meta !== 'undefined' && (import.meta as any).env && ((import.meta as any).env.VITE_OMDB_API_KEY as string))
+  // Fallback to LocalStorage for ad-hoc browser setups
+  || (typeof window !== 'undefined' && window.localStorage && window.localStorage.getItem('omdb_api_key'))
+  // Fallback for Node or server-side contexts
+  || (typeof process !== 'undefined' && process.env && process.env.OMDB_API_KEY)
+  || ''
+);
+
+if (!runtimeOMDbApiKey) {
+  console.warn('OMDb API key is not configured. Set VITE_OMDB_API_KEY or OMDB_API_KEY to enable review data.');
+}
+
+export const omdbService = new OMDbService(runtimeOMDbApiKey);
+
+export const hasOMDbKey = (): boolean => !!runtimeOMDbApiKey && runtimeOMDbApiKey.trim().length > 0;
+export const getOMDbApiKey = (): string => runtimeOMDbApiKey;
 
 /**
  * Get OMDb details from TMDB movie details
@@ -258,6 +321,10 @@ export const omdbService = new OMDbService(process.env.OMDB_API_KEY || '');
  */
 export async function getOMDbFromTMDBDetails(tmdbDetails: any): Promise<OMDbMovieDetails | null> {
   try {
+    if (!hasOMDbKey()) {
+      console.warn('OMDb key missing: skipping OMDb fetch');
+      return null;
+    }
     // Extract IMDb ID from TMDB details
     const imdbId = tmdbDetails?.imdb_id;
     
@@ -354,7 +421,7 @@ export async function getMovieDetailsWithRatings(titleOrImdbId: string, year?: s
 
     // Get full details with ratings by making another request with plot=full
   const params = new URLSearchParams({
-    apikey: process.env.OMDB_API_KEY || '',
+    apikey: runtimeOMDbApiKey,
     i: movieData.imdbID,
     plot: 'full',
     tomatoes: 'true'

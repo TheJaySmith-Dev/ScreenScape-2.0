@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { MediaItem, TVShow } from '../types';
-import { useAppleTheme } from '../hooks/useAppleTheme';
+import { useAppleTheme } from './AppleThemeProvider';
 import { useAppleAnimationEffects } from '../hooks/useAppleAnimationEffects';
 import { ChevronLeft, ChevronRight, Star, Play, Info } from 'lucide-react';
 import BackdropOverlay from './BackdropOverlay';
@@ -8,17 +8,23 @@ import TrailerPlayer from './TrailerPlayer';
 import { mediaHoverService } from '../services/mediaHoverService';
 import RottenTomatoesRating from './RottenTomatoesRating';
 import * as omdbService from '../services/omdbService';
+import { getMovieExternalIds, getMovieImages, getTVShowImages, getMovieVideosImaxOnly, getTVShowVideosImaxOnly } from '../services/tmdbService';
+// FanArt removed: posters now resolved via TMDb images with OMDb fallback for movies
 
-const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
+// Use smaller poster size for rows to improve load speed
+const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w342';
 
 interface MediaRowProps {
     title: string;
     items: MediaItem[];
     onSelectItem: (item: MediaItem) => void;
     apiKey: string;
+    imaxOnlyTrailers?: boolean;
+    titleColor?: string;
+    titleStyle?: React.CSSProperties;
 }
 
-const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => void; apiKey: string; }> = ({ item, onSelectItem, apiKey }) => {
+const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => void; apiKey: string; imaxOnlyTrailers?: boolean; }> = ({ item, onSelectItem, apiKey, imaxOnlyTrailers = false }) => {
     const title = item.media_type === 'tv' ? (item as TVShow).name : item.title;
     const { tokens } = useAppleTheme();
     const { applyHoverEffect, applyPressEffect } = useAppleAnimationEffects();
@@ -31,6 +37,7 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
     const [trailerUrl, setTrailerUrl] = useState<string>('');
     const [omdbData, setOmdbData] = useState<omdbService.OMDbMovieDetails | null>(null);
     const [isDesktop, setIsDesktop] = useState(false);
+    const [posterUrl, setPosterUrl] = useState<string | null>(null);
     
     const hoverTimeoutRef = useRef<NodeJS.Timeout>();
     const trailerTimeoutRef = useRef<NodeJS.Timeout>();
@@ -48,9 +55,60 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
             window.removeEventListener('resize', checkHoverSupport);
         };
     }, []);
+
+    // Resolve poster URL using TMDb images for movies/TV, OMDb fallback for movies
+    useEffect(() => {
+        let cancelled = false;
+        const resolvePoster = async () => {
+            try {
+                let url: string | null = null;
+                if (item.media_type === 'movie') {
+                    const images = await getMovieImages(apiKey, item.id);
+                    if (images?.posters?.length) {
+                        const english = images.posters.filter((p: any) => p.iso_639_1 === 'en');
+                        const pool = english.length > 0 ? english : images.posters;
+                        const poster = pool
+                            .slice()
+                            .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
+                        if (poster?.file_path) {
+                            url = `${IMAGE_BASE_URL}${poster.file_path}`;
+                        }
+                    }
+                    // OMDb fallback if TMDb posters missing
+                    if (!url) {
+                        const ext = await getMovieExternalIds(apiKey, item.id);
+                        const imdbId = ext?.imdb_id || null;
+                        if (imdbId) {
+                            const omdb = await omdbService.omdbService.getMovieById(imdbId);
+                            if (omdb && omdb.Poster && omdb.Poster !== 'N/A') {
+                                url = omdb.Poster;
+                            }
+                        }
+                    }
+                } else if (item.media_type === 'tv') {
+                    const images = await getTVShowImages(apiKey, item.id);
+                    if (images?.posters?.length) {
+                        const english = images.posters.filter((p: any) => p.iso_639_1 === 'en');
+                        const pool = english.length > 0 ? english : images.posters;
+                        const poster = pool
+                            .slice()
+                            .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
+                        if (poster?.file_path) {
+                            url = `${IMAGE_BASE_URL}${poster.file_path}`;
+                        }
+                    }
+                }
+                if (!cancelled) setPosterUrl(url);
+            } catch (e) {
+                if (!cancelled) setPosterUrl(null);
+            }
+        };
+        resolvePoster();
+        return () => { cancelled = true; };
+    }, [item.id, item.media_type, apiKey]);
     
     // Handle mouse enter with delay
-    const handleMouseEnter = useCallback(() => {
+    const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         if (!isDesktop) return;
         
         setIsHovered(true);
@@ -69,9 +127,24 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
                     setShowBackdrop(true);
                 }
                 
-                if (mediaData.trailerUrl) {
-                    setTrailerUrl(mediaData.trailerUrl);
-                    
+                // Trailer selection: prefer IMAX-only in IMAX mode, else use generic
+                let resolvedTrailerUrl: string | null = mediaData.trailerUrl;
+                if (imaxOnlyTrailers) {
+                    try {
+                        const imaxResp = item.media_type === 'movie'
+                            ? await getMovieVideosImaxOnly(apiKey, item.id)
+                            : await getTVShowVideosImaxOnly(apiKey, item.id);
+                        const first = (imaxResp?.results || [])[0];
+                        if (first && first.key) {
+                            resolvedTrailerUrl = `https://www.youtube.com/embed/${first.key}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;
+                        }
+                    } catch (_) {
+                        // ignore IMAX-only failures; fallback stays null or generic
+                    }
+                }
+
+                if (resolvedTrailerUrl) {
+                    setTrailerUrl(resolvedTrailerUrl);
                     // Start trailer after additional 2s delay
                     trailerTimeoutRef.current = setTimeout(() => {
                         setShowTrailer(true);
@@ -92,7 +165,8 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
             }
         }, 300);
         
-        applyHoverEffect();
+        // Apply hover animation using the event
+        applyHoverEffect(e);
     }, [isDesktop, item, apiKey, applyHoverEffect]);
     
     // Handle mouse leave
@@ -159,12 +233,28 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
                         className="desktop-only-hover"
                     />
                 )}
-                <img
-                    src={item.poster_path ? `${IMAGE_BASE_URL}${item.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image'}
-                    alt={title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                />
+                {(() => {
+                    const posterSrc = posterUrl
+                        || (item.poster_path
+                            ? (item.poster_path.startsWith('http')
+                                ? item.poster_path
+                                : `${IMAGE_BASE_URL}${item.poster_path}`)
+                            : 'https://via.placeholder.com/500x750?text=No+Image');
+                    return (
+                        <img
+                            src={posterSrc}
+                            alt={title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                            onError={(e) => {
+                                // Graceful fallback if TMDb image fails or is aborted
+                                const target = e.currentTarget as HTMLImageElement;
+                                target.src = 'https://via.placeholder.com/342x513?text=No+Image';
+                            }}
+                        />
+                    );
+                })()}
                 
                 {/* Glass overlay on hover */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover/card:opacity-100 transition-all duration-500 backdrop-blur-sm" />
@@ -201,7 +291,7 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
                                 <span 
                                     style={{
                                         fontFamily: tokens?.typography?.families?.text || 'system-ui',
-                                        fontSize: tokens?.typography?.sizes?.caption || '12px',
+                                        fontSize: tokens?.typography?.sizes?.caption1 || 12,
                                         color: tokens?.colors?.text?.secondary || '#cccccc'
                                     }}
                                 >
@@ -232,8 +322,8 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
                             <span 
                                 style={{
                                     fontFamily: tokens?.typography?.families?.text || 'system-ui',
-                                    fontSize: tokens?.typography?.sizes?.caption || '12px',
-                                    fontWeight: tokens?.typography?.weights?.medium || '500',
+                                    fontSize: tokens?.typography?.sizes?.caption1 || 12,
+                                    fontWeight: tokens?.typography?.weights?.medium || 500,
                                     color: tokens?.colors?.text?.primary || '#ffffff'
                                 }}
                             >
@@ -247,7 +337,7 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
     );
 };
 
-const MediaRow: React.FC<MediaRowProps> = ({ title, items, onSelectItem, apiKey }) => {
+const MediaRow: React.FC<MediaRowProps> = ({ title, items, onSelectItem, apiKey, imaxOnlyTrailers = false, titleColor, titleStyle }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const { tokens } = useAppleTheme();
     const { applyHoverEffect, applyPressEffect } = useAppleAnimationEffects();
@@ -284,7 +374,9 @@ const MediaRow: React.FC<MediaRowProps> = ({ title, items, onSelectItem, apiKey 
                     fontFamily: tokens?.typography?.families?.text || 'system-ui',
                     fontSize: tokens?.typography?.sizes?.title2 || '24px',
                     fontWeight: tokens?.typography?.weights?.bold || '700',
-                    color: tokens?.colors?.text?.primary || '#ffffff'
+                    color: titleColor ?? (tokens?.colors?.text?.primary || '#ffffff'),
+                    textShadow: 'none',
+                    ...(titleStyle || {})
                 }}
             >
                 {title}
@@ -300,7 +392,7 @@ const MediaRow: React.FC<MediaRowProps> = ({ title, items, onSelectItem, apiKey 
                     }}
                 >
                     {items.map(item => (
-                        <MediaCard key={`${item.id}-${item.media_type}`} item={item} onSelectItem={onSelectItem} apiKey={apiKey} />
+                        <MediaCard key={`${item.id}-${item.media_type}`} item={item} onSelectItem={onSelectItem} apiKey={apiKey} imaxOnlyTrailers={imaxOnlyTrailers} />
                     ))}
                 </div>
                 
