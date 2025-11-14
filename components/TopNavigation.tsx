@@ -44,41 +44,56 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
           alignItems: 'center',
           gap: `${tokens.spacing.micro[1]}px`,
           padding: `${tokens.spacing.micro[1]}px`,
-          borderRadius: '20px',
-          background: preferPerformance ? 'rgba(255,255,255,0.88)' : `rgba(255, 255, 255, ${tokens.materials.glass.prominent.opacity})`,
-          backdropFilter: preferPerformance ? 'none' : `blur(${tokens.materials.glass.prominent.blur}px)`,
-          WebkitBackdropFilter: preferPerformance ? 'none' : `blur(${tokens.materials.glass.prominent.blur}px)`,
-          border: preferPerformance ? '1px solid rgba(255,255,255,0.66)' : `1px solid rgba(255, 255, 255, ${tokens.materials.glass.prominent.borderOpacity})`,
-          boxShadow: preferPerformance ? '0 4px 14px rgba(0,0,0,0.18)' : `0 8px 32px rgba(0, 0, 0, ${tokens.materials.glass.prominent.shadowIntensity})`,
+          borderRadius: '24px',
+          background: preferPerformance ? 'rgba(255,255,255,0.88)' : tokens.materials.pill.primary.background,
+          backdropFilter: preferPerformance ? 'none' : tokens.materials.pill.primary.backdropFilter,
+          WebkitBackdropFilter: preferPerformance ? 'none' : tokens.materials.pill.primary.backdropFilter,
+          border: preferPerformance ? '1px solid rgba(255,255,255,0.66)' : `1px solid ${tokens.materials.pill.primary.border}`,
+          boxShadow: preferPerformance ? '0 4px 14px rgba(0,0,0,0.18)' : tokens.materials.pill.primary.shadow,
           pointerEvents: 'auto'
         }}
       >
         {/* IMAX logo (optional) */}
         {onImaxClick && (
-          <button
-            onClick={onImaxClick}
-            aria-label="IMAX"
-            title="IMAX"
+          <div
             style={{
-              border: 'none',
-              background: 'transparent',
-              padding: 0,
-              marginRight: `${tokens.spacing.micro[1]}px`,
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: 'pointer'
+              height: '44px',
+              padding: `0 ${tokens.spacing.micro[1]}px`,
+              borderRadius: `${tokens.borderRadius.large}px`,
+              background: 'rgba(0, 114, 206, 0.18)',
+              backdropFilter: preferPerformance ? 'none' : 'blur(4px) saturate(1.12) contrast(1.02)',
+              WebkitBackdropFilter: preferPerformance ? 'none' : 'blur(4px) saturate(1.12) contrast(1.02)',
+              border: '1px solid rgba(0, 114, 206, 0.32)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+              boxSizing: 'border-box'
             }}
           >
-            <img
-              src={'https://i.ibb.co/G47CHyhg/toppng-com-imax-michael-jackson-thriller-imax-445x87.png'}
-              alt="IMAX"
-              loading="lazy"
-              style={{ height: '20px', width: 'auto' }}
-            />
-          </button>
+            <button
+              onClick={onImaxClick}
+              aria-label="IMAX"
+              title="IMAX"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <img
+                src={'https://i.ibb.co/G47CHyhg/toppng-com-imax-michael-jackson-thriller-imax-445x87.png'}
+                alt="IMAX"
+                loading="lazy"
+                style={{ height: '20px', width: 'auto' }}
+              />
+            </button>
+          </div>
         )}
-        {/* Sync Button */}
         <motion.button
           onClick={onSyncClick}
           whileHover={{ scale: 1.05 }}
@@ -104,7 +119,6 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
           <RefreshCw size={20} />
         </motion.button>
 
-        {/* Settings Button */}
         <motion.button
           onClick={onSettingsClick}
           whileHover={{ scale: 1.05 }}
@@ -129,6 +143,33 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
         >
           <Settings size={20} />
         </motion.button>
+
+        <a
+          href="https://buymeacoffee.com/jasonforreels"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Buy Me A Coffee"
+          title="Buy Me A Coffee"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginLeft: `${tokens.spacing.micro[1]}px`,
+            height: '28px',
+            borderRadius: `${tokens.borderRadius.large}px`,
+            overflow: 'hidden',
+            cursor: 'pointer'
+          }}
+        >
+          <img
+            src={'https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png'}
+            alt="Buy Me A Coffee"
+            loading="lazy"
+            style={{ height: '100%', width: 'auto' }}
+          />
+        </a>
+
+        
       </div>
     </motion.div>
   );

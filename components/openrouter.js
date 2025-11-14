@@ -164,3 +164,57 @@ A thoroughly enjoyable ${genreList.toLowerCase()} piece that understands its aud
 
   return reviews;
 }
+
+export async function generateBoxOfficeRaceData(params) {
+  const configuredModel = OPENROUTER_MODEL && typeof OPENROUTER_MODEL === 'string' ? OPENROUTER_MODEL.trim() : null;
+  const model = configuredModel || 'meta-llama/llama-3.3-8b-instruct:free';
+  const mode = params && params.mode === 'actor' ? 'actor' : 'global';
+  const actorName = params && typeof params.actorName === 'string' ? params.actorName : '';
+  const userPrompt = mode === 'actor'
+    ? `Search BoxOfficeMojo and compile a timeline of cumulative worldwide grosses for films starring ${actorName}. Produce strict JSON with frames: [{date: ISO8601, entries: [{title, grossCumeUsd, sourceUrl}]}]. Use weekly or monthly snapshots where available. Only output JSON.`
+    : `Search BoxOfficeMojo and compile a timeline of cumulative worldwide grosses for the global top films. Produce strict JSON with frames: [{date: ISO8601, entries: [{title, grossCumeUsd, sourceUrl}]}]. Use weekly or monthly snapshots where available. Only output JSON.`;
+  try {
+    const response = await fetch(OPENROUTER_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://screenscape.space',
+        'X-Title': 'ChoiceForReels'
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: 'You are a precise data extraction agent. When asked, you search BoxOfficeMojo and return only machine-readable JSON with ISO dates and USD gross numbers.' },
+          { role: 'user', content: userPrompt }
+        ]
+      })
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const data = await response.json();
+    const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content ? data.choices[0].message.content : '';
+    if (typeof content !== 'string' || !content) return null;
+    const trimmed = content.trim();
+    try {
+      const parsed = JSON.parse(trimmed);
+      return parsed;
+    } catch (_) {
+      const start = trimmed.indexOf('{');
+      const end = trimmed.lastIndexOf('}');
+      if (start >= 0 && end > start) {
+        const maybe = trimmed.substring(start, end + 1);
+        try {
+          const parsed2 = JSON.parse(maybe);
+          return parsed2;
+        } catch (_) {
+          return null;
+        }
+      }
+      return null;
+    }
+  } catch (_) {
+    return null;
+  }
+}

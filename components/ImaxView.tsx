@@ -29,6 +29,30 @@ const ImaxView: React.FC<ImaxViewProps> = ({ apiKey, onSelectItem }) => {
   const [trailerLoading, setTrailerLoading] = useState<boolean>(false);
   const [trailerError, setTrailerError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
+  const [imaxAudioActivated, setImaxAudioActivated] = useState<boolean>(false);
+  const audioCtxRef = React.useRef<any>(null);
+  const activateImaxAudio = React.useCallback(() => {
+    try {
+      const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AC) return;
+      const ctx = new AC({ latencyHint: 'playback' } as any);
+      audioCtxRef.current = ctx;
+      // Short bass thump to emulate cinema woofer
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 40;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.75);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.8);
+      setTimeout(() => { try { ctx.close(); } catch {} }, 1000);
+      setImaxAudioActivated(true);
+    } catch {}
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -146,6 +170,7 @@ const ImaxView: React.FC<ImaxViewProps> = ({ apiKey, onSelectItem }) => {
         }
         setExpandedBackdropUrl(url);
         setSelectedItem(item);
+        setImaxAudioActivated(false);
       } else {
         // Fallback to IMAX-only TMDb videos if curated key not present
         let resp: { results: Array<{ key: string }> } | null = null;
@@ -166,6 +191,7 @@ const ImaxView: React.FC<ImaxViewProps> = ({ apiKey, onSelectItem }) => {
           }
           setExpandedBackdropUrl(url);
           setSelectedItem(item);
+          setImaxAudioActivated(false);
         } else {
           setTrailerError('IMAX trailer not available for this title.');
           setExpandedVideoKey(null);
@@ -180,6 +206,7 @@ const ImaxView: React.FC<ImaxViewProps> = ({ apiKey, onSelectItem }) => {
       setExpandedTitle(null);
       setExpandedBackdropUrl(null);
       setSelectedItem(null);
+      setImaxAudioActivated(false);
     } finally {
       setTrailerLoading(false);
     }
@@ -249,7 +276,7 @@ const ImaxView: React.FC<ImaxViewProps> = ({ apiKey, onSelectItem }) => {
           position: 'relative',
           width: '100%',
           aspectRatio: '16 / 9',
-          background: '#000',
+          background: '#0072CE',
           marginBottom: tokens.spacing.standard[1],
           boxShadow: tokens.shadows.medium,
           borderRadius: tokens.borderRadius.large || 12,
@@ -263,12 +290,32 @@ const ImaxView: React.FC<ImaxViewProps> = ({ apiKey, onSelectItem }) => {
             />
           )}
           {expandedVideoKey && (
-            <VideoPlayer
-              videoKey={expandedVideoKey}
-              isMuted={true}
-              onEnd={() => { /* keep player visible when finished */ }}
-              loop={false}
-            />
+            <>
+              {!imaxAudioActivated && (
+                <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', zIndex: 10 }}>
+                  <button
+                    type="button"
+                    onClick={activateImaxAudio}
+                    style={{
+                      padding: '14px 24px', borderRadius: 9999,
+                      border: '1px solid #FFFFFF', color: '#FFFFFF',
+                      background: 'rgba(0,114,206,0.15)', cursor: 'pointer',
+                      fontFamily: 'Nexa, -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', fontWeight: 700, fontSize: 14,
+                      boxShadow: '0 0 24px rgba(0,114,206,0.35)'
+                    }}
+                  >
+                    Activate IMAX Audio
+                  </button>
+                </div>
+              )}
+              <VideoPlayer
+                videoKey={expandedVideoKey}
+                isMuted={true}
+                onEnd={() => {}}
+                loop={false}
+                boostAudio={true}
+              />
+            </>
           )}
 
           {trailerLoading && (

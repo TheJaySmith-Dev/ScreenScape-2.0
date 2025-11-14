@@ -55,7 +55,7 @@ const FormattedDetailRoute: React.FC = () => {
   const handleClose = useCallback(() => {
     // Go back to IMAX or previous page
     if (location.pathname.startsWith('/IMAX')) {
-      navigate('/IMAX');
+      navigate('/IMAX', { state: { fromDetail: true } });
     } else {
       navigate(-1);
     }

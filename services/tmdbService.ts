@@ -305,6 +305,17 @@ export const getUpcomingMovies = (apiKey: string, page: number = 1): Promise<Pag
   return apiFetch(apiKey, '/movie/upcoming', { page });
 };
 
+export const discoverTopRevenueMovies = async (apiKey: string, page: number = 1): Promise<PaginatedResponse<Movie>> => {
+  const resp = await apiFetch<PaginatedResponse<any>>(apiKey, '/discover/movie', {
+    sort_by: 'revenue.desc',
+    include_adult: false,
+    include_video: false,
+    page,
+  });
+  resp.results = (resp.results || []).map((m: any) => ({ ...m, media_type: 'movie' }));
+  return resp as PaginatedResponse<Movie>;
+};
+
 // MOVIE IMAGES
 export const getMovieImages = (apiKey: string, movieId: number): Promise<{
   id: number;
@@ -476,6 +487,30 @@ export const getMovieDetailsForCollections = (apiKey: string, movieId: number): 
 // MOVIE DETAILS (with regional release info)
 export const getMovieDetails = (apiKey: string, movieId: number, country?: string): Promise<MovieDetails> => {
   return apiFetch(apiKey, `/movie/${movieId}`, country ? { region: country } : {});
+};
+
+export const getActorTopRevenueMovies = async (
+  apiKey: string,
+  personId: number,
+  limit: number = 15
+): Promise<Array<{ movie: MovieDetails; revenue: number }>> => {
+  const credits = await getPersonCombinedCredits(apiKey, personId);
+  const movies = (credits.cast || []).filter((c: any) => c.media_type === 'movie');
+  const details = await Promise.all(
+    movies.map(async (m: any) => {
+      try {
+        const d = await getMovieDetails(apiKey, m.id);
+        return { movie: d, revenue: d.revenue || 0 };
+      } catch (_) {
+        return { movie: { id: m.id } as any, revenue: 0 };
+      }
+    })
+  );
+  const sorted = details
+    .filter(d => typeof d.revenue === 'number' && d.revenue > 0)
+    .sort((a, b) => (b.revenue || 0) - (a.revenue || 0))
+    .slice(0, limit);
+  return sorted;
 };
 
 // MULTI SEARCH

@@ -6,6 +6,7 @@ export interface ImaxCuratedEntry {
   youtubeUrl: string;
   tmdbId?: number;
   mediaType?: 'movie' | 'tv';
+  posterUrl?: string;
 }
 
 // User-requested curated IMAX titles with explicit YouTube links
@@ -17,7 +18,7 @@ const CURATED_ENTRIES: ImaxCuratedEntry[] = [
   // Ensure poster comes from TMDb movie 936075 (Michael)
   { title: 'Michael', youtubeUrl: 'http://www.youtube.com/watch?v=ABAm3QqKv2s', tmdbId: 936075, mediaType: 'movie' },
   { title: 'The Mandalorian and Grogu', youtubeUrl: 'http://www.youtube.com/watch?v=6lkh0QHnk0E' },
-  { title: 'Avatar: Fire and Ash', youtubeUrl: 'http://www.youtube.com/watch?v=rv8CkgGItd4' },
+  { title: 'Avatar: Fire and Ash', youtubeUrl: 'https://youtu.be/8L5P5_lOjt8?si=lqeFDHYhufokg3DD', tmdbId: 83533, mediaType: 'movie', posterUrl: 'https://image.tmdb.org/t/p/original/5bxrxnRaxZooBAxgUVBZ13dpzC7.jpg' },
   { title: 'Oppenheimer', youtubeUrl: 'http://www.youtube.com/watch?v=hPIzgZ16oac' },
   { title: 'Blue Beetle', youtubeUrl: 'http://www.youtube.com/watch?v=Zc_KPaXlHy8' },
   { title: 'The Creator', youtubeUrl: 'http://www.youtube.com/watch?v=oPMdo-mTuPo' },
@@ -33,6 +34,7 @@ const CURATED_ENTRIES: ImaxCuratedEntry[] = [
   { title: 'Frozen 2', youtubeUrl: 'http://www.youtube.com/watch?v=HIejzQuGiUo' },
   { title: 'Avengers: Infinity War', youtubeUrl: 'https://youtu.be/8Rezjrc5WcQ?si=x3RMLF_0EdjmSYOg' },
   { title: 'Avengers: Endgame', youtubeUrl: 'https://youtu.be/ZeQ9Chg9_Fk?si=EySihTFTXDk5DnBp' },
+  { title: 'Mercy', youtubeUrl: 'https://youtu.be/i_kL2yezoGU?si=tWVNB0_CdGPi1l2D', tmdbId: 1236153, mediaType: 'movie', posterUrl: 'https://images.ctfassets.net/c4ucztjx9pmu/l0NUpgki3ASezTUoiMkqO/46bc26a1c73afd1f478a355961ba27dd/mercy-MCY_KEY_Press_2765x4096_810_F7_F1_rgb.jpg' },
 ];
 
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -78,10 +80,23 @@ export const getCuratedTrailerKeyForItem = (item: MediaItem | { title?: string; 
 export const getImaxCuratedEntries = (): ImaxCuratedEntry[] => CURATED_ENTRIES.slice();
 
 export const resolveCuratedMediaItems = async (apiKey: string): Promise<MediaItem[]> => {
-  const out: MediaItem[] = [];
-  const seen = new Set<string>();
+  const CACHE_KEY = 'imaxCuratedItemsV2';
+  const TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
-  for (const entry of CURATED_ENTRIES) {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(CACHE_KEY) : null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.items) && typeof parsed.ts === 'number') {
+        if (Date.now() - parsed.ts < TTL_MS) {
+          return parsed.items as MediaItem[];
+        }
+      }
+    }
+  } catch {}
+
+  const seen = new Set<string>();
+  const tasks = CURATED_ENTRIES.map(async (entry) => {
     try {
       let pick: MediaItem | null = null;
       if (entry.tmdbId) {
@@ -95,7 +110,6 @@ export const resolveCuratedMediaItems = async (apiKey: string): Promise<MediaIte
       } else {
         const resp = await searchMulti(apiKey, entry.title, 1);
         const results = Array.isArray(resp.results) ? resp.results : [];
-        // Prefer exact title match among movie/tv
         const target = normalize(entry.title);
         for (const r of results) {
           const title = (r as any).title || (r as any).name || '';
@@ -103,17 +117,25 @@ export const resolveCuratedMediaItems = async (apiKey: string): Promise<MediaIte
         }
         if (!pick && results.length > 0) pick = results[0] as MediaItem;
       }
-      if (pick) {
-        const key = normalize((pick as any).title || (pick as any).name || '');
-        if (!seen.has(key)) {
-          seen.add(key);
-          out.push(pick);
-        }
-      }
+      if (!pick) return null;
+      const key = normalize((pick as any).title || (pick as any).name || '');
+      if (seen.has(key)) return null;
+      seen.add(key);
+      const withOverride = entry.posterUrl ? ({ ...(pick as any), poster_override: entry.posterUrl }) : pick;
+      return withOverride as MediaItem;
     } catch {
-      // ignore resolution errors for individual entries
+      return null;
     }
-  }
+  });
 
-  return out;
+  const resolved = await Promise.all(tasks);
+  const items = resolved.filter(Boolean) as MediaItem[];
+
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ items, ts: Date.now() }));
+    }
+  } catch {}
+
+  return items;
 };

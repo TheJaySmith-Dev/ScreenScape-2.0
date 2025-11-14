@@ -6,9 +6,10 @@
 
 import React, { useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { motion } from 'framer-motion';
-import { Search, Home, Tv, Gamepad2, Heart, Settings as SettingsIcon, RefreshCw, Tag } from 'lucide-react';
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { Search, Home, Tv, Gamepad2, Heart, Settings as SettingsIcon, RefreshCw, Tag, Menu } from 'lucide-react';
 import { ViewType } from '../App';
+import { useNavigate } from 'react-router-dom';
 import { useAppleTheme } from './AppleThemeProvider';
 import { LiquidGlassWrapper } from './LiquidGlassWrapper';
 import FluidCanvasLayer from './FluidCanvasLayer';
@@ -35,7 +36,9 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
   onSearchClick
 }) => {
   const { tokens } = useAppleTheme();
+  const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
+  const navBarRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const { velocityY } = useScrollVelocity();
@@ -149,22 +152,120 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
   const navigationItems = [
     { id: 'screenSearch' as ViewType, icon: Home, label: 'Home' },
     { id: 'search' as ViewType, icon: Search, label: 'Search', isSearchButton: true },
-    { id: 'live' as ViewType, icon: Tv, label: 'Live Channels' },
     { id: 'likes' as ViewType, icon: Heart, label: 'Likes' },
-    { id: 'game' as ViewType, icon: Gamepad2, label: 'Games' },
-    { id: 'genres' as ViewType, icon: Tag, label: 'Genres' },
+    { id: 'prototype' as ViewType, label: 'More', isMenuButton: true },
   ];
+
+  // Menu detachment motion values and glow mapping
+  const detachScaleMV = useMotionValue(1);
+  const detachYMV = useMotionValue(0);
+  const detachOpacityMV = useMotionValue(1);
+  const detachScale = useSpring(detachScaleMV, { stiffness: 420, damping: 28, mass: 1.1 });
+  const detachY = useSpring(detachYMV, { stiffness: 420, damping: 28, mass: 1.1 });
+  const detachOpacity = useSpring(detachOpacityMV, { stiffness: 420, damping: 28, mass: 1.1 });
+  const glowOpacity = useTransform(detachOpacityMV, [1, 0.68], [0.8, 1.0]);
+  const navScaleXMV = useMotionValue(1);
+  const navScaleX = useSpring(navScaleXMV, { stiffness: 420, damping: 28, mass: 1.1 });
+  const blurMV = useMotionValue(32);
+  const blurBackdrop = useTransform(blurMV, (v) => `blur(${v}px) saturate(1.02)`);
+
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelPos, setPanelPos] = useState<{ left: number; bottom: number } | null>(null);
+  const menuItemRefs = useRef<HTMLButtonElement[]>([]);
+  const panelRows = useMemo(() => ([
+    { id: 'boxoffice', label: 'Box Office', Icon: Tag, onClick: () => { try { navigate('/Stats/BoxOffice'); } catch { setView('genres' as ViewType); } setPanelOpen(false); } },
+    { id: 'game', label: 'Games', Icon: Gamepad2, onClick: () => { setView('game'); setPanelOpen(false); } },
+    { id: 'live', label: 'Live', Icon: Tv, onClick: () => { setView('live'); setPanelOpen(false); } },
+  ]), [navigate, setView]);
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    try {
+      const rect = navBarRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const panelWidth = 320;
+      const gap = 12;
+      const left = Math.min(rect.right + gap, (window.innerWidth - panelWidth - gap));
+      const bottom = Math.max(12, window.innerHeight - rect.bottom + 72);
+      setPanelPos({ left, bottom });
+    } catch {}
+  }, [panelOpen]);
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    try {
+      document.body.style.overflow = 'hidden';
+      menuItemRefs.current[0]?.focus();
+      const handler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') { setPanelOpen(false); return; }
+        const idx = menuItemRefs.current.findIndex(el => el === document.activeElement);
+        if (e.key === 'ArrowDown') {
+          const next = Math.min(panelRows.length - 1, (idx < 0 ? 0 : idx + 1));
+          menuItemRefs.current[next]?.focus();
+          e.preventDefault();
+        } else if (e.key === 'ArrowUp') {
+          const prev = Math.max(0, (idx < 0 ? 0 : idx - 1));
+          menuItemRefs.current[prev]?.focus();
+          e.preventDefault();
+        } else if (e.key === 'Tab') {
+          const dir = e.shiftKey ? -1 : 1;
+          const next = Math.min(panelRows.length - 1, Math.max(0, (idx < 0 ? 0 : idx + dir)));
+          menuItemRefs.current[next]?.focus();
+          e.preventDefault();
+        } else if (e.key === 'Enter') {
+          const i = Math.max(0, idx);
+          menuItemRefs.current[i]?.click();
+          e.preventDefault();
+        }
+      };
+      window.addEventListener('keydown', handler);
+      return () => {
+        document.body.style.overflow = '';
+        window.removeEventListener('keydown', handler);
+      };
+    } catch {}
+  }, [panelOpen, panelRows]);
+
+  const handleMenuPressStart = useCallback(() => {
+    try {
+      detachScaleMV.set(1.08);
+      detachYMV.set(-16);
+      detachOpacityMV.set(0.68);
+      navScaleXMV.set(0.98);
+      blurMV.set(36);
+      setTimeout(() => blurMV.set(32), 100);
+      setPanelOpen(true);
+    } catch {}
+  }, []);
+
+  const handleMenuPressEnd = useCallback(() => {
+    try {
+      detachScaleMV.set(1.0);
+      detachYMV.set(0);
+      detachOpacityMV.set(1.0);
+      navScaleXMV.set(1.0);
+    } catch {}
+  }, []);
 
   // Enhanced navigation handler with haptic feedback
   const handleNavigation = useCallback((viewType: ViewType) => {
     if ('vibrate' in navigator) {
       navigator.vibrate(15);
     }
-    setView(viewType);
-  }, [setView]);
+    if (viewType === 'genres') {
+      try {
+        navigate('/Stats/BoxOffice');
+      } catch {
+        setView(viewType);
+      }
+    } else {
+      setView(viewType);
+    }
+  }, [setView, navigate]);
 
   return (
     mounted ? createPortal(
+    <>
     <motion.div
       ref={containerRef}
       initial={{ y: 100, opacity: 0 }}
@@ -200,138 +301,43 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
         }}
       >
         {/* Navigation container */}
-        <div
+        <motion.div
+          ref={navBarRef}
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: `${tokens.spacing.micro[0]}px`,
-            padding: `${tokens.spacing.micro[0]}px`,
-            borderRadius: '28px',
+            gap: '8px',
+            padding: '8px',
+            borderRadius: '24px',
             position: 'relative',
-            minHeight: '56px',
+            minHeight: '44px',
             width: 'auto',
             maxWidth: 'min(800px, calc(100vw - 24px))',
-            background: enableLiquidEffects ? 'transparent' : 'rgba(0,0,0,0.06)',
-            backdropFilter: enableLiquidEffects ? 'none' : 'none',
-            WebkitBackdropFilter: enableLiquidEffects ? 'none' : 'none',
-            // Remove subtle border to avoid pill-shaped outline glitches
-            border: 'none',
-            boxShadow: enableLiquidEffects ? '0 18px 40px rgba(0, 0, 0, 0.16)' : '0 6px 16px rgba(0,0,0,0.18)',
-            willChange: 'transform'
+            background: 'rgba(255,255,255,0.12)',
+            backdropFilter: 'blur(0.5px) saturate(185%) brightness(1.08) contrast(1.06)',
+            WebkitBackdropFilter: 'blur(0.5px) saturate(185%) brightness(1.08) contrast(1.06)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+            transformOrigin: 'right center',
+            willChange: 'transform',
+            scaleX: navScaleX as any
           }}
         >
-          {enableLiquidEffects && (
-            <LiquidGlassWrapper
-              componentType="navigation"
-              intensity="medium"
-              mode={refractionMode}
-              effect="clear"
-              enableEffects={enableLiquidEffects}
-              mouseContainer={containerRef}
-              // Drive refraction with live physics + aggressive tuning
-              refractionParams={refractionParams}
-              refractionQuality={refractionQuality}
-              visualTuning={aggressiveTuning}
-              style={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: '28px',
-                pointerEvents: 'none',
-                zIndex: 0
-              }}
-            >
-              <div />
-            </LiquidGlassWrapper>
-          )}
+          
 
           {/* CPU-based canvas liquid layer */}
-          {enableLiquidEffects && (
-            <FluidCanvasLayer
-              containerRef={containerRef as React.RefObject<HTMLElement>}
-              strength={1.2}
-              resolutionScale={0.8}
-            />
-          )}
+          
 
-          {/* Backdrop refraction layer: distorts content behind the pill bar */}
-          {enableLiquidEffects && (
-            <div
-              aria-hidden
-              style={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: '28px',
-                pointerEvents: 'none',
-                // Use backdrop-filter for optical refraction-like effect on underlying content
-                backdropFilter: 'blur(4px) saturate(1.08) contrast(1.01)',
-                WebkitBackdropFilter: 'blur(4px) saturate(1.08) contrast(1.01)',
-                // Slight inner vignette to mimic curvature focusing
-                background: 'radial-gradient(120% 90% at 50% 50%, rgba(255,255,255,0.06), rgba(255,255,255,0.00))',
-                zIndex: 0,
-              }}
-            />
-          )}
+          
 
-          {/* Material capsule for proper depth (non‑frosted) */}
-          <div
-            aria-hidden
-            style={{
-              position: 'absolute',
-              inset: 0,
-              borderRadius: '28px',
-              // Layered gradients: inner highlight + rim lighting
-              background: enableLiquidEffects
-                ? [
-                    'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02))',
-                    'radial-gradient(120% 80% at 20% 0%, rgba(255,255,255,0.08), rgba(255,255,255,0.00))',
-                  ].join(',')
-                : 'rgba(255,255,255,0.06)',
-              border: enableLiquidEffects ? '1px solid rgba(148,163,184,0.18)' : '1px solid rgba(148,163,184,0.16)',
-              boxShadow: enableLiquidEffects
-                ? [
-                    'inset 0 1px 0 rgba(255,255,255,0.22)',
-                    '0 8px 24px rgba(0,0,0,0.20)',
-                    '0 2px 8px rgba(0,0,0,0.12)',
-                  ].join(', ')
-                : '0 4px 12px rgba(0,0,0,0.16)',
-              zIndex: 0,
-            }}
-          />
+          
 
           {/* Ambient occlusion ring for slab read */}
-          {enableLiquidEffects && (
-            <div
-              aria-hidden
-              style={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: '28px',
-                background: 'radial-gradient(140% 60% at 50% 110%, rgba(0,0,0,0.12), rgba(0,0,0,0.00))',
-                zIndex: 0,
-                pointerEvents: 'none'
-              }}
-            />
-          )}
+          
 
           {/* Floor glow below pill for extra depth */}
-          {enableLiquidEffects && (
-            <div
-              aria-hidden
-              style={{
-                position: 'absolute',
-                left: '8%',
-                right: '8%',
-                bottom: -14,
-                height: 30,
-                borderRadius: 30,
-                background: 'radial-gradient(60% 60% at 50% 0%, rgba(255,255,255,0.10), rgba(255,255,255,0.00))',
-                filter: 'blur(12px)',
-                zIndex: 0,
-                pointerEvents: 'none'
-              }}
-            />
-          )}
+          
           {/* Navigation Items */}
           <nav 
             role="tablist"
@@ -349,6 +355,75 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
               const Icon = (item as any).icon;
               const isActive = view === item.id;
               
+              if ((item as any).isMenuButton) {
+                return (
+                  <motion.div
+                    key={item.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '12px',
+                      position: 'relative',
+                      scale: detachScale as any,
+                      y: detachY as any,
+                      opacity: detachOpacity as any,
+                    }}
+                    onMouseDown={handleMenuPressStart}
+                    onMouseUp={handleMenuPressEnd}
+                    onMouseLeave={handleMenuPressEnd}
+                    onTouchStart={handleMenuPressStart}
+                    onTouchEnd={handleMenuPressEnd}
+                    onTouchCancel={handleMenuPressEnd}
+                  >
+                    <motion.button
+                      whileHover={{ scale: 1.06 }}
+                      whileTap={{ scale: 0.965 }}
+                      aria-label={`Open ${item.label}`}
+                      aria-current={isActive ? 'page' : undefined}
+                      role="tab"
+                      tabIndex={0}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        height: '44px',
+                        padding: '0 8px',
+                        borderRadius: '12px',
+                        background: 'rgba(255,255,255,0.008)',
+                        backdropFilter: 'blur(0.5px)',
+                        WebkitBackdropFilter: 'blur(0.5px)',
+                        border: '1px solid rgba(255,255,255,0.02)',
+                        cursor: 'pointer',
+                        transition: 'transform 250ms cubic-bezier(0.68, -0.55, 0.265, 1.55), box-shadow 220ms, color 220ms',
+                        color: '#FFFFFF',
+                        minWidth: 'clamp(44px, 10vw, 52px)',
+                        outline: 'none',
+                        WebkitTapHighlightColor: 'transparent',
+                        boxShadow: 'none',
+                        textShadow: 'none'
+                      }}
+                    >
+                      <svg width="20" height="14" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                        <line x1="1" y1="2" x2="19" y2="2" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
+                        <line x1="1" y1="7" x2="19" y2="7" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
+                        <line x1="1" y1="12" x2="19" y2="12" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                      <span style={{
+                        fontSize: `${tokens.typography.sizes.caption2}px`,
+                        fontWeight: isActive ? tokens.typography.weights.semibold : tokens.typography.weights.medium,
+                        fontFamily: tokens.typography.families.text,
+                        lineHeight: 1
+                      }}>
+                        More
+                      </span>
+                    </motion.button>
+                  </motion.div>
+                );
+              }
+
               return (
                   <motion.button
                     key={item.id}
@@ -370,26 +445,25 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: `${tokens.spacing.micro[0]}px`,
-                      padding: `${tokens.spacing.micro[0]}px ${tokens.spacing.micro[1]}px`,
-                      borderRadius: `${tokens.borderRadius.large}px`,
+                      gap: '4px',
+                      height: '44px',
+                      padding: '0 8px',
+                      borderRadius: '12px',
                       background: isActive 
-                        ? `linear-gradient(135deg, ${tokens.colors.system.blue}12 0%, ${tokens.colors.system.indigo}12 100%)`
+                        ? 'rgba(0, 114, 206, 0.18)'
                         : 'transparent',
-                      border: 'none',
+                      backdropFilter: isActive ? 'blur(4px) saturate(1.12) contrast(1.02)' : 'none',
+                      WebkitBackdropFilter: isActive ? 'blur(4px) saturate(1.12) contrast(1.02)' : 'none',
+                      border: isActive ? '1px solid rgba(0, 114, 206, 0.32)' : 'none',
                       cursor: 'pointer',
-                    transition: `transform ${tokens.liquidGlass.animations.duration.medium} ${tokens.liquidGlass.animations.elasticTiming},
-                                   box-shadow 220ms ease, color 220ms ease`,
-                    color: isActive ? 'white' : tokens.colors.label.primary,
-                    minWidth: 'clamp(44px, 10vw, 52px)',
-                    // Remove default focus outline to prevent visual glitching
-                    outline: 'none',
-                    WebkitTapHighlightColor: 'transparent',
-                    // Enhanced shadow for active state
-                    boxShadow: isActive 
-                      ? `0 6px 18px rgba(0, 122, 255, 0.28), 0 2px 10px rgba(0, 0, 0, 0.10)`
-                      : 'none',
-                    // Text shadow for better readability
+                      transition: 'transform 250ms cubic-bezier(0.68, -0.55, 0.265, 1.55), box-shadow 220ms, color 220ms',
+                      color: isActive ? '#FFFFFF' : tokens.colors.label.primary,
+                      minWidth: 'clamp(44px, 10vw, 52px)',
+                      outline: 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                      boxShadow: isActive 
+                        ? '0 8px 24px rgba(0,0,0,0.18)'
+                        : 'none',
                       textShadow: isActive 
                         ? '0 1px 2px rgba(0, 0, 0, 0.2)'
                         : 'none'
@@ -425,9 +499,87 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
               );
             })}
           </nav>
-        </div>
+        </motion.div>
+        
       </div>
-    </motion.div>, document.body) : null
+    </motion.div>
+    <AnimatePresence>
+      {panelOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10001,
+            background: 'rgba(0,0,0,0.20)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setPanelOpen(false); }}
+        >
+        <motion.div
+          initial={{ scale: 0.92, y: 20, opacity: 0 }}
+          animate={{ scale: 1.0, y: 0, opacity: 1.0 }}
+          exit={{ scale: 0.92, y: 20, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+          style={{
+            maxWidth: 320,
+            width: '100%',
+            borderRadius: 24,
+            background: 'linear-gradient(180deg, rgba(20,24,32,0.30) 0%, rgba(20,24,32,0.18) 100%), rgba(255,255,255,0.22)',
+            backdropFilter: 'blur(40px) saturate(1.10) brightness(0.97) contrast(1.06)',
+            WebkitBackdropFilter: 'blur(40px) saturate(1.10) brightness(0.97) contrast(1.06)',
+            border: '1px solid rgba(255,255,255,0.26)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 20px 48px rgba(0,0,0,0.28)',
+            padding: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            position: 'relative',
+            outline: 'none'
+          }}
+            role="menu"
+            aria-label="Navigation menu"
+            tabIndex={-1}
+          >
+            {panelRows.map((row, idx) => (
+              <motion.button
+                key={row.id}
+                ref={(el) => { if (el) menuItemRefs.current[idx] = el; }}
+                role="menuitem"
+                aria-label={row.label}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ delay: idx * 0.06 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={(e) => { e.stopPropagation(); row.onClick(); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 12px',
+                  borderRadius: 14,
+                  border: '1px solid rgba(255,255,255,0.24)',
+                  background: 'transparent',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                }}
+                whileHover={{ backgroundColor: 'rgba(255,255,255,0.20)' }}
+              >
+                <row.Icon size={20} strokeWidth={2} />
+                <span style={{ fontSize: 18, fontWeight: 500, fontFamily: tokens.typography.families.text }}> {row.label} </span>
+              </motion.button>
+            ))}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>, document.body) : null
   );
 };
 

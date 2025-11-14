@@ -62,6 +62,11 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
         const resolvePoster = async () => {
             try {
                 let url: string | null = null;
+                const override = (item as any).poster_override as string | undefined;
+                if (override && override.length > 0) {
+                    if (!cancelled) setPosterUrl(override);
+                    return;
+                }
                 if (item.media_type === 'movie') {
                     const images = await getMovieImages(apiKey, item.id);
                     if (images?.posters?.length) {

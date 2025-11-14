@@ -38,6 +38,7 @@ declare namespace YT {
     events?: {
       onReady?: (event: { target: Player }) => void;
       onStateChange?: (event: { data: PlayerState; target: Player }) => void;
+      onPlaybackQualityChange?: (event: { data: string; target: Player }) => void;
     };
   }
 
@@ -49,6 +50,9 @@ declare namespace YT {
     playVideo(): void;
     isMuted(): boolean;
     loadVideoById(videoId: string): void;
+    setPlaybackQuality(suggestedQuality: string): void;
+    getAvailableQualityLevels(): string[];
+    setVolume(volume: number): void;
   }
 }
 
@@ -58,9 +62,12 @@ interface VideoPlayerProps {
     isMuted: boolean;
     onEnd: () => void;
     loop?: boolean;
+    boostAudio?: boolean;
+    onTimeUpdate?: (timeSec: number) => void;
+    onReady?: (player: any) => void;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loop = false }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loop = false, boostAudio = false, onTimeUpdate, onReady }) => {
     const playerRef = useRef<YT.Player | null>(null);
     const playerContainerRef = useRef<HTMLDivElement>(null);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
@@ -70,6 +77,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
     const lastVideoKeyRef = useRef<string | null>(null);
     const onEndRef = useRef(onEnd);
     const { tokens } = useAppleTheme();
+    const timePollRef = useRef<number | null>(null);
 
     // Local, user-controlled mute state with persistence
     const [muted, setMuted] = useState<boolean>(true);
@@ -93,6 +101,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
             if (typeof player.playVideo === 'function') {
                 player.playVideo();
             }
+
+            // Boost audio volume for IMAX trailers when unmuted
+            try {
+                if (boostAudio && typeof player.setVolume === 'function') {
+                    player.setVolume(100);
+                }
+            } catch {}
         } catch (error) {
             console.error('Failed to sync YouTube player audio state', error);
         }
@@ -183,8 +198,30 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
                             setPolicyMuted(actuallyMuted);
                             setMuted(actuallyMuted);
                         } catch {}
+
+                        // Force playback quality to 4K if available, else 1080p
+                        try {
+                            const levels = (event.target as any)?.getAvailableQualityLevels?.() || [];
+                            const target = levels.includes('highres') ? 'highres' : (levels.includes('hd1080') ? 'hd1080' : null);
+                            if (target && (event.target as any)?.setPlaybackQuality) {
+                                (event.target as any).setPlaybackQuality(target);
+                            }
+                        } catch {}
                         lastVideoKeyRef.current = null;
                         setIsPlayerReady(true);
+                        if (typeof onReady === 'function') {
+                            try { onReady(event.target as any); } catch {}
+                        }
+                        if (typeof onTimeUpdate === 'function') {
+                            const poll = () => {
+                                try {
+                                    const t = (event.target as any)?.getCurrentTime?.() ?? 0;
+                                    onTimeUpdate(t || 0);
+                                } catch {}
+                                timePollRef.current = window.requestAnimationFrame(poll);
+                            };
+                            timePollRef.current = window.requestAnimationFrame(poll);
+                        }
                     },
                     onStateChange: (event) => {
                         if (!isMountedRef.current || isCancelled) {
@@ -199,6 +236,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
                             console.error('YouTube player state change handler failed', error);
                         }
                     },
+                    onPlaybackQualityChange: (event) => {
+                        // Re-pin quality if YouTube lowers it
+                        try {
+                            const player = event.target as any;
+                            const levels = player?.getAvailableQualityLevels?.() || [];
+                            const target = levels.includes('highres') ? 'highres' : (levels.includes('hd1080') ? 'hd1080' : null);
+                            if (target && player?.setPlaybackQuality) {
+                                player.setPlaybackQuality(target);
+                            }
+                        } catch {}
+                    }
                 },
             });
         };
@@ -213,6 +261,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
                 setIsPlayerReady(false);
             }
             lastVideoKeyRef.current = null;
+            if (timePollRef.current) {
+                window.cancelAnimationFrame(timePollRef.current);
+                timePollRef.current = null;
+            }
         };
     }, [applyMuteState, loop, videoKey]);
 
@@ -240,6 +292,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoKey, isMuted, onEnd, loo
         const player = playerRef.current;
         const shouldMute = muted;
         applyMuteState(player, shouldMute);
+
+        // Reassert quality after load
+        try {
+            const levels = (player as any)?.getAvailableQualityLevels?.() || [];
+            const target = levels.includes('highres') ? 'highres' : (levels.includes('hd1080') ? 'hd1080' : null);
+            if (target && (player as any)?.setPlaybackQuality) {
+                (player as any).setPlaybackQuality(target);
+            }
+        } catch {}
     }, [applyMuteState, isPlayerReady, muted]);
 
     const handleToggleMute = useCallback(() => {

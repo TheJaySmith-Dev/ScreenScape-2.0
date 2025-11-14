@@ -660,16 +660,10 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
             {/* Enhanced Search Section */}
             <div style={{
                 display: 'flex',
-                justifyContent: 'space-between',
+                justifyContent: 'flex-end',
                 alignItems: 'center',
                 marginBottom: `${tokens.spacing.standard[1]}px`
             }}>
-                <h1 className="apple-large-title" style={{ 
-                    color: tokens.colors.label.primary,
-                    margin: 0
-                }}>
-                    Discover
-                </h1>
                 <SearchButton onSearch={handleInternalSearch} />
             </div>
 

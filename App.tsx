@@ -4,6 +4,7 @@ import { MediaItem } from './types';
 import { LiquidPillNavigation } from './components/LiquidPillNavigation';
 import IOS26Prototype from './components/IOS26Prototype';
 import TopNavigation from './components/TopNavigation';
+import { useNavigate } from 'react-router-dom';
 import NetflixView from './components/NetflixView';
 import GameView, { Game } from './components/GameView';
 import MediaDetail from './components/MediaDetail';
@@ -35,6 +36,7 @@ type SyncViewType = 'none' | 'selector' | 'export' | 'import';
 const AppContent: React.FC = () => {
     // Prefer performance in dev builds to keep interactions snappy
     const performanceMode = (import.meta as any)?.env?.DEV ?? false;
+    const navigate = useNavigate();
     const { userSettings, updateUserSettings } = useAuth();
     const { tokens } = useAppleTheme();
     const [apiKey, setApiKey] = useState<string | null>('09b97a49759876f2fde9eadb163edc44');
@@ -217,6 +219,7 @@ const AppContent: React.FC = () => {
                     onSettingsClick={() => setView('settings')}
                     onSyncClick={() => setSyncView('selector')}
                     onImaxClick={!selectedItem && view !== 'imax' ? () => setView('imax') : undefined}
+                    onBoxOfficeClick={() => navigate('/Stats/BoxOffice')}
                     preferPerformance={performanceMode}
                 />
 
