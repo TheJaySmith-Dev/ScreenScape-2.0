@@ -7,11 +7,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const apiKey = process.env.POLLINATIONS_API_KEY || process.env.VITE_POLLINATIONS_API_KEY || '';
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+    const referer = (req.headers['referer'] as string) || process.env.PUBLIC_ORIGIN || '';
     const resp = await fetch('https://text.pollinations.ai/openai', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        ...(referer ? { Referer: referer } : {}),
       },
       body: JSON.stringify(body),
     });
