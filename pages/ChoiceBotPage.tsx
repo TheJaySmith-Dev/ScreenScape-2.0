@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { searchMulti } from '../services/tmdbService';
 import { AppleThemeProvider, useAppleTheme } from '../components/AppleThemeProvider';
 import TopNavigation from '../components/TopNavigation';
 import { useNavigate } from 'react-router-dom';
@@ -59,6 +60,45 @@ const ChoiceBotContent: React.FC = () => {
     };
   }, [tokens]);
 
+  const getTmdbApiKey = () => {
+    try { return localStorage.getItem('tmdb_api_key') || '09b97a49759876f2fde9eadb163edc44'; } catch { return '09b97a49759876f2fde9eadb163edc44'; }
+  };
+
+  const extractTitle = (raw: string) => {
+    let text = (raw || '').trim();
+    const mQuoted = text.match(/"([^"]+)"|'([^']+)'/);
+    if (mQuoted) return (mQuoted[1] || mQuoted[2]).trim();
+    const mParens = text.match(/\(([^)]+)\)/);
+    if (mParens) return (mParens[1] || '').trim();
+    const intent = text.match(/(?:open|show|watch|play|go to|take me to|navigate to|bring me to|pull up|look up|find|search for|view|see|display)\s+(.+)/i);
+    let t = intent ? intent[1] : text;
+    t = t.replace(/\s+(page|film|movie|show|series)\s*$/i, '').trim();
+    t = t.replace(/^the\s+/i, '').trim();
+    t = t.replace(/[“”"'`]+/g, '').trim();
+    return t;
+  };
+
+  const maybeNavigateToTitle = async (text: string) => {
+    const apiKey = getTmdbApiKey();
+    const tryQuery = async (q: string) => {
+      try {
+        const resp = await searchMulti(apiKey, q, 1);
+        const pick = Array.isArray(resp.results) && resp.results.length > 0 ? resp.results[0] : null;
+        if (pick && pick.id) {
+          window.dispatchEvent(new CustomEvent('selectMediaItem', { detail: { ...(pick as any), forceStandardDetail: true } }));
+          return true;
+        }
+      } catch {}
+      return false;
+    };
+    const title = extractTitle(text);
+    if (title) {
+      const ok = await tryQuery(title);
+      if (ok) return true;
+    }
+    return await tryQuery(text);
+  };
+
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -67,6 +107,11 @@ const ChoiceBotContent: React.FC = () => {
     setInput('');
     setLoading(true);
     try {
+      const handled = await maybeNavigateToTitle(text);
+      if (handled) {
+        setMessages([...nextMessages, { role: 'assistant', content: 'Opening title' }]);
+        return;
+      }
       const payload = {
         model: 'openai',
         messages: [
@@ -104,6 +149,11 @@ const ChoiceBotContent: React.FC = () => {
     setInput('');
     setLoading(true);
     try {
+      const handled = await maybeNavigateToTitle(query);
+      if (handled) {
+        setMessages([...nextMessages, { role: 'assistant', content: 'Opening title' }]);
+        return;
+      }
       const url = `/api/choicegpt/search?q=${encodeURIComponent(query)}&model=gemini-search`;
       const resp = await fetch(url);
       const text = await resp.text();
@@ -136,7 +186,7 @@ const ChoiceBotContent: React.FC = () => {
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0b0e14 0%, #0f1420 60%, #0b0e14 100%)' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: `${tokens.spacing.standard[2]}px ${tokens.spacing.standard[0]}px`, display: 'flex', flexDirection: 'column', gap: tokens.spacing.standard[1] }}>
-        <TopNavigation onSettingsClick={() => {}} onSyncClick={() => {}} onImaxClick={() => navigate('/IMAX')} onDolbyClick={() => navigate('/Dolby')} preferPerformance />
+        <TopNavigation onSettingsClick={() => {}} onSyncClick={() => {}} onImaxClick={() => navigate('/IMAX')} preferPerformance />
         <header style={{ display: 'flex', alignItems: 'center', gap: tokens.spacing.standard[0] }}>
           <h2 style={{
             fontFamily: tokens.typography.families.display,

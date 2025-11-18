@@ -51,6 +51,7 @@ const AppContent: React.FC = () => {
 
     const [syncView, setSyncView] = useState<SyncViewType>('none');
     const [showChoiceGPT, setShowChoiceGPT] = useState(false);
+    const [forceStandardDetail, setForceStandardDetail] = useState(false);
 
     // Get user data for export
     const getUserData = () => ({
@@ -98,6 +99,7 @@ const AppContent: React.FC = () => {
 
     const handleCloseDetail = useCallback(() => {
         setSelectedItem(null);
+        setForceStandardDetail(false);
     }, []);
 
     const handleOpenSearchModal = useCallback(() => {
@@ -110,8 +112,10 @@ const AppContent: React.FC = () => {
 
     useEffect(() => {
         const selectMediaItemHandler = (event: Event) => {
-            const customEvent = event as CustomEvent<MediaItem>;
-            handleSelectItem(customEvent.detail);
+            const customEvent = event as CustomEvent<any>;
+            const detail = customEvent.detail as any;
+            setForceStandardDetail(!!detail?.forceStandardDetail);
+            handleSelectItem(detail as MediaItem);
         };
 
         const setSearchViewHandler = (event: Event) => {
@@ -120,12 +124,18 @@ const AppContent: React.FC = () => {
             setSearchQuery(customEvent.detail.query);
         }
 
+        const openChoiceGPTHandler = () => {
+            setShowChoiceGPT(true);
+        };
+
         window.addEventListener('selectMediaItem', selectMediaItemHandler);
         window.addEventListener('setSearchView', setSearchViewHandler);
+        window.addEventListener('openChoiceGPT', openChoiceGPTHandler);
 
         return () => {
             window.removeEventListener('selectMediaItem', selectMediaItemHandler);
             window.removeEventListener('setSearchView', setSearchViewHandler);
+            window.removeEventListener('openChoiceGPT', openChoiceGPTHandler);
         };
     }, [handleSelectItem]);
 
@@ -221,7 +231,6 @@ const AppContent: React.FC = () => {
                     onSettingsClick={() => setView('settings')}
                     onSyncClick={() => setSyncView('selector')}
                     onImaxClick={!selectedItem && view !== 'imax' ? () => setView('imax') : undefined}
-                    onDolbyClick={() => navigate('/Dolby')}
                     onChoiceBotClick={() => setShowChoiceGPT(true)}
                     onBoxOfficeClick={() => navigate('/Stats/BoxOffice')}
                     preferPerformance={performanceMode}
@@ -256,7 +265,7 @@ const AppContent: React.FC = () => {
                                 onClose={handleCloseDetail} 
                                 onSelectItem={handleSelectItem} 
                                 onInvalidApiKey={handleInvalidApiKey}
-                                preferImaxTrailer={view === 'imax'}
+                                preferImaxTrailer={view === 'imax' && !forceStandardDetail}
                             />
                         )}
                     </AnimatePresence>

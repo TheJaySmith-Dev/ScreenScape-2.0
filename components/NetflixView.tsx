@@ -6,7 +6,6 @@ import MediaRow from './MediaRow';
 import { getTrending, searchMulti, searchMovies, searchTVShows, searchKeywords, getMovieWatchProviders, getTVShowWatchProviders, normalizeMovie, normalizeTVShow, getPopularMovies, getPopularTVShows, getUpcomingMovies, getTopRatedMovies, getTopRatedTVShows } from "../services/tmdbService";
 import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
 import { useGeolocation } from '../hooks/useGeolocation';
-import StreamingHubs from './StreamingHubs';
 import Loader from './Loader';
 import { Star, Play, Plus, Info, Search } from 'lucide-react';
 import { isMobileDevice } from '../utils/deviceDetection';
@@ -755,35 +754,35 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
             {/* Content Rows - Only show when not searching */}
             {!currentSearchQuery && (
                 <>
-                    {/* Streaming Hubs */}
                     <div style={{ marginBottom: `${tokens.spacing.standard[2]}px` }}>
                         <h2 className="apple-title-2" style={{ 
                             color: '#FFFFFF',
                             margin: `0 0 ${tokens.spacing.standard[0]}px 0`,
                             textShadow: '0 2px 4px rgba(0,0,0,0.3)'
                         }}>
-                            Streaming Services
+                            Recommendations
                         </h2>
-                        <StreamingHubs 
-                            activeHub={activeHub} 
-                            setActiveHub={setActiveHub} 
-                            onNavigateProvider={onNavigateProvider} 
-                        />
-                        {activeHub && (
-                            <div style={{
-                                marginTop: tokens.spacing.standard[0],
-                                color: tokens.colors.label.secondary
-                            }}>
-                                {isFiltering ? 'Filtering content...' : (filtered.trending.length + filtered.popularMovies.length + filtered.popularTVShows.length + filtered.topRatedMovies.length + filtered.topRatedTVShows.length + filtered.upcomingMovies.length === 0)
-                                    ? 'No content available for the selected platform.'
-                                    : 'Filtered results displayed.'}
-                            </div>
-                        )}
-                        {filterError && (
-                            <div style={{ color: '#ff6b6b', marginTop: tokens.spacing.micro[1] }}>
-                                {filterError}
-                            </div>
-                        )}
+                        <div style={{ display: 'flex', gap: tokens.spacing.standard[0], alignItems: 'center' }}>
+                            <button
+                                onClick={() => { try { window.dispatchEvent(new Event('openChoiceGPT')); } catch {} }}
+                                className="apple-glass-regular"
+                                style={{
+                                    borderRadius: '16px',
+                                    border: '1px solid rgba(255,255,255,0.2)',
+                                    padding: `${tokens.spacing.micro[1]}px ${tokens.spacing.standard[0]}px`,
+                                    color: tokens.colors.label.primary,
+                                    cursor: 'pointer',
+                                    background: 'rgba(255,255,255,0.08)'
+                                }}
+                            >
+                                Ask ChoiceGPT for picks
+                            </button>
+                            {filterError && (
+                                <div style={{ color: '#ff6b6b' }}>
+                                    {filterError}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Trending This Week */}

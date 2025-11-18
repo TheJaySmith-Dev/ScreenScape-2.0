@@ -821,7 +821,7 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     const [highContrast, setHighContrast] = useState<boolean>(false);
     const longPressTimer = useRef<number | null>(null);
     // Consider IMAX mode active for explicit IMAX route or curated titles
-    const isImaxMode = useMemo(() => preferImaxTrailer || isCuratedImaxTitle(item), [preferImaxTrailer, item]);
+    const isImaxMode = useMemo(() => preferImaxTrailer, [preferImaxTrailer]);
 
     // Bass thrum: Web Audio oscillator with element fallback for reliable playback
     const playBass = useCallback(() => {

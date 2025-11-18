@@ -7,7 +7,6 @@ interface TopNavigationProps {
   onSettingsClick: () => void;
   onSyncClick: () => void;
   onImaxClick?: () => void;
-  onDolbyClick?: () => void;
   onChoiceBotClick?: () => void;
   onBoxOfficeClick?: () => void;
   preferPerformance?: boolean;
@@ -17,7 +16,6 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   onSettingsClick,
   onSyncClick,
   onImaxClick,
-  onDolbyClick,
   onChoiceBotClick,
   preferPerformance = false
 }) => {
@@ -100,46 +98,6 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
           </div>
         )}
 
-        {onDolbyClick && (
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '44px',
-              padding: `0 ${tokens.spacing.micro[1]}px`,
-              borderRadius: `${tokens.borderRadius.large}px`,
-              background: 'rgba(0, 0, 0, 0.28)',
-              backdropFilter: preferPerformance ? 'none' : 'blur(4px) saturate(1.12) contrast(1.02)',
-              WebkitBackdropFilter: preferPerformance ? 'none' : 'blur(4px) saturate(1.12) contrast(1.02)',
-              border: '1px solid rgba(255,255,255,0.24)',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-              boxSizing: 'border-box'
-            }}
-          >
-            <button
-              onClick={onDolbyClick}
-              aria-label="Dolby"
-              title="Dolby"
-              style={{
-                border: 'none',
-                background: 'transparent',
-                padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer'
-              }}
-            >
-              <img
-                src={'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Dolby_Atmos.svg/512px-Dolby_Atmos.svg.png'}
-                alt="Dolby"
-                loading="lazy"
-                style={{ height: '20px', width: 'auto' }}
-              />
-            </button>
-          </div>
-        )}
 
         {onChoiceBotClick && (
           <div

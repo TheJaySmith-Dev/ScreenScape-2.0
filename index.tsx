@@ -9,7 +9,6 @@ import Loader from './components/Loader';
 const HomeApp = React.lazy(() => import('./App'));
 const PreviewPage = React.lazy(() => import('./pages/PreviewPage'));
 const ImaxPage = React.lazy(() => import('./pages/ImaxPage'));
-const DolbyPage = React.lazy(() => import('./pages/DolbyPage'));
 const ChoiceBotPage = React.lazy(() => import('./pages/ChoiceBotPage'));
 const MarvelStudiosPage = React.lazy(() => import('./pages/MarvelStudiosPage'));
 const FormattedDetailRoute = React.lazy(() => import('./pages/FormattedDetailRoute'));
@@ -35,7 +34,6 @@ root.render(
             {/* Named routes */}
           <Route path="/Home" element={<HomeApp />} />
           <Route path="/IMAX" element={<ImaxPage />} />
-          <Route path="/Dolby" element={<DolbyPage />} />
           <Route path="/ChoiceBot" element={<ChoiceBotPage />} />
           <Route path="/IMAX/Marvel" element={<MarvelStudiosPage />} />
           <Route path="/play/studio-mogul" element={<StudioMogulPage />} />
