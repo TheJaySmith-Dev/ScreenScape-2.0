@@ -173,6 +173,7 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
   const [panelPos, setPanelPos] = useState<{ left: number; bottom: number } | null>(null);
   const menuItemRefs = useRef<HTMLButtonElement[]>([]);
   const panelRows = useMemo(() => ([
+    { id: 'dolby', label: 'Dolby', Icon: Tv, onClick: () => { try { navigate('/Dolby'); } catch { setView('screenSearch' as ViewType); } setPanelOpen(false); } },
     { id: 'boxoffice', label: 'Box Office', Icon: Tag, onClick: () => { try { navigate('/Stats/BoxOffice'); } catch { setView('genres' as ViewType); } setPanelOpen(false); } },
     { id: 'game', label: 'Games', Icon: Gamepad2, onClick: () => { setView('game'); setPanelOpen(false); } },
     { id: 'live', label: 'Live', Icon: Tv, onClick: () => { setView('live'); setPanelOpen(false); } },

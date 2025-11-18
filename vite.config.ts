@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
     const geminiApiKey = env.GEMINI_API_KEY || 'AIzaSyAkRoZKZG2lOMS9_vzlIeHsOJAK5dFAGkA';
   return {
       server: {
-        port: 3000,
+        port: 3001,
         host: '0.0.0.0',
         proxy: {
           '/mdblist': {

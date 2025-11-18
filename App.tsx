@@ -219,6 +219,7 @@ const AppContent: React.FC = () => {
                     onSettingsClick={() => setView('settings')}
                     onSyncClick={() => setSyncView('selector')}
                     onImaxClick={!selectedItem && view !== 'imax' ? () => setView('imax') : undefined}
+                    onDolbyClick={() => navigate('/Dolby')}
                     onBoxOfficeClick={() => navigate('/Stats/BoxOffice')}
                     preferPerformance={performanceMode}
                 />
