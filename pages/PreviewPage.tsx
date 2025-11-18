@@ -88,6 +88,113 @@ const LandingContent: React.FC = () => {
           </Link>
         </header>
 
+        {/* ChoiceGPT Showcase */}
+        <section style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr',
+          gap: tokens.spacing.standard[1],
+          alignItems: 'center',
+          padding: tokens.spacing.standard[1],
+          borderRadius: 16,
+          border: `1px solid ${tokens.colors.separator.opaque}`,
+          background: 'rgba(255,255,255,0.06)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)'
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: tokens.spacing.standard[0] }}>
+            <h2 style={{
+              fontFamily: tokens.typography.families.display,
+              fontSize: tokens.typography.sizes.title2,
+              fontWeight: tokens.typography.weights.bold,
+              color: tokens.colors.label.primary,
+              margin: 0
+            }}>✨ ChoiceGPT — Your Personal AI for Movies & TV</h2>
+            <img
+              src="https://i.postimg.cc/ZKmJwTLS/Choice-GPT-Hero.png"
+              alt="ChoiceGPT Hero"
+              style={{ width: '100%', maxWidth: 960, height: 'auto', borderRadius: 16, alignSelf: 'center' }}
+              loading="lazy"
+            />
+            <p style={{
+              fontFamily: tokens.typography.families.text,
+              fontSize: tokens.typography.sizes.body,
+              color: tokens.colors.label.secondary
+            }}>
+              Powered by Pollinations AI, ChoiceGPT brings intelligent recommendations directly into ChoiceForReels. Ask anything —
+              “What should I watch tonight?”, “Find me movies like Interstellar”, “Show me trending shows in my country” — and get fast, smart, personalised results.
+            </p>
+            <h3 style={{
+              fontFamily: tokens.typography.families.display,
+              fontSize: tokens.typography.sizes.title3,
+              fontWeight: tokens.typography.weights.bold,
+              color: tokens.colors.label.primary,
+              margin: 0
+            }}>What ChoiceGPT Can Do</h3>
+            <ul style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: tokens.spacing.micro[2],
+              margin: 0,
+              paddingLeft: tokens.spacing.standard[0]
+            }}>
+              <li style={{ color: tokens.colors.label.primary }}>
+                🎬 <strong>Instant Recommendations</strong> — Ask for any genre, vibe, or mood — ChoiceGPT delivers curated suggestions instantly.
+              </li>
+              <li style={{ color: tokens.colors.label.primary }}>
+                🔍 <strong>Smart Search</strong> — Use natural language: “That show with the robot girl”, “Movies about multiverses”, “Comedies from the 2000s”.
+              </li>
+              <li style={{ color: tokens.colors.label.primary }}>
+                ⚡ <strong>Powered by Pollinations AI</strong> — A fast, creative, modern AI engine built for expressive, human-like responses.
+              </li>
+            </ul>
+            <h3 style={{
+              fontFamily: tokens.typography.families.display,
+              fontSize: tokens.typography.sizes.title3,
+              fontWeight: tokens.typography.weights.bold,
+              color: tokens.colors.label.primary,
+              margin: 0
+            }}>Why it’s special</h3>
+            <p style={{
+              fontFamily: tokens.typography.families.text,
+              fontSize: tokens.typography.sizes.body,
+              color: tokens.colors.label.secondary
+            }}>
+              ChoiceGPT is deeply integrated into ChoiceForReels — giving you context-aware recommendations that feel like talking to a real movie expert.
+            </p>
+            <div style={{ display: 'flex', gap: tokens.spacing.standard[0] }}>
+              <button
+                onClick={() => { try { window.dispatchEvent(new Event('openChoiceGPT')); } catch {} }}
+                style={{
+                  padding: '12px 18px',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: '#1f6feb',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Try ChoiceGPT
+              </button>
+              <Link to="/Home" style={{ textDecoration: 'none' }}>
+                <button
+                  style={{
+                    padding: '12px 18px',
+                    borderRadius: 999,
+                    border: `1px solid ${tokens.colors.separator.opaque}`,
+                    background: tokens.colors.background.secondary,
+                    color: tokens.colors.label.primary,
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Explore content
+                </button>
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* Streaming find */}
         <section style={sectionStyle}>
           <h2 style={titleStyle}>Streaming find</h2>
