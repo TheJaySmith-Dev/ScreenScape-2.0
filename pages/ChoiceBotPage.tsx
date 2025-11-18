@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { AppleThemeProvider, useAppleTheme } from '../components/AppleThemeProvider';
 import TopNavigation from '../components/TopNavigation';
 import { useNavigate } from 'react-router-dom';
@@ -14,11 +14,13 @@ const ChoiceBotContent: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchMode, setSearchMode] = useState(true);
-  const [apiKey, setApiKey] = useState<string>(() => {
-    try { return localStorage.getItem('pollinations_api_key') || ''; } catch { return ''; }
-  });
+  const [apiKey] = useState<string>('');
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.removeItem('pollinations_api_key'); } catch {}
+  }, []);
 
   const sectionStyle: React.CSSProperties = {
     display: 'flex',
@@ -73,9 +75,9 @@ const ChoiceBotContent: React.FC = () => {
         ],
         max_tokens: 512
       };
-      const resp = await fetch('https://text.pollinations.ai/openai', {
+      const resp = await fetch('/api/choicegpt/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       let replyText = '';
@@ -102,8 +104,8 @@ const ChoiceBotContent: React.FC = () => {
     setInput('');
     setLoading(true);
     try {
-      const url = `https://text.pollinations.ai/${encodeURIComponent(query)}?model=gemini-search`;
-      const resp = await fetch(url, { headers: { ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) } });
+      const url = `/api/choicegpt/search?q=${encodeURIComponent(query)}&model=gemini-search`;
+      const resp = await fetch(url);
       const text = await resp.text();
       const reply = text || 'No search results available.';
       setMessages([...nextMessages, { role: 'assistant', content: reply }]);
@@ -117,7 +119,7 @@ const ChoiceBotContent: React.FC = () => {
   const fetchModels = async () => {
     setModelsLoading(true);
     try {
-      const resp = await fetch('https://text.pollinations.ai/models', { headers: { ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) } });
+      const resp = await fetch('/api/choicegpt/models');
       const text = await resp.text();
       // Try JSON parse; fallback to split lines
       let parsed: any = null;
@@ -145,40 +147,6 @@ const ChoiceBotContent: React.FC = () => {
           }}>ChoiceGPT</h2>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: tokens.colors.label.secondary, fontSize: tokens.typography.sizes.caption1 }}>Powered by Pollinations AI</span>
-            <input
-              value={apiKey}
-              onChange={(e) => {
-                const v = e.target.value;
-                setApiKey(v);
-                try { localStorage.setItem('pollinations_api_key', v); } catch {}
-              }}
-              placeholder="API key"
-              style={{
-                height: 28,
-                padding: '0 8px',
-                borderRadius: 8,
-                border: `1px solid ${tokens.colors.separator.opaque}`,
-                background: tokens.colors.background.secondary,
-                color: tokens.colors.label.primary,
-                fontSize: tokens.typography.sizes.caption1
-              }}
-            />
-            <button
-              onClick={fetchModels}
-              disabled={modelsLoading}
-              style={{
-                height: 28,
-                padding: '0 10px',
-                borderRadius: 8,
-                border: `1px solid ${tokens.colors.separator.opaque}`,
-                background: tokens.colors.background.secondary,
-                color: tokens.colors.label.primary,
-                fontSize: tokens.typography.sizes.caption1,
-                cursor: 'pointer'
-              }}
-            >
-              {modelsLoading ? 'Loading…' : 'Models'}
-            </button>
           </div>
         </header>
 

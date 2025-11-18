@@ -8,6 +8,7 @@ interface TopNavigationProps {
   onSyncClick: () => void;
   onImaxClick?: () => void;
   onDolbyClick?: () => void;
+  onChoiceBotClick?: () => void;
   onBoxOfficeClick?: () => void;
   preferPerformance?: boolean;
 }
@@ -17,6 +18,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   onSyncClick,
   onImaxClick,
   onDolbyClick,
+  onChoiceBotClick,
   preferPerformance = false
 }) => {
   const { tokens } = useAppleTheme();
@@ -134,6 +136,47 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                 alt="Dolby"
                 loading="lazy"
                 style={{ height: '20px', width: 'auto' }}
+              />
+            </button>
+          </div>
+        )}
+
+        {onChoiceBotClick && (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '44px',
+              padding: `0 ${tokens.spacing.micro[1]}px`,
+              borderRadius: `${tokens.borderRadius.large}px`,
+              background: 'rgba(31, 111, 235, 0.18)',
+              backdropFilter: preferPerformance ? 'none' : 'blur(4px) saturate(1.12) contrast(1.02)',
+              WebkitBackdropFilter: preferPerformance ? 'none' : 'blur(4px) saturate(1.12) contrast(1.02)',
+              border: '1px solid rgba(31,111,235,0.32)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+              boxSizing: 'border-box'
+            }}
+          >
+            <button
+              onClick={onChoiceBotClick}
+              aria-label="ChoiceGPT"
+              title="ChoiceGPT"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <img
+                src={'https://pollinations.ai/icon-512.png'}
+                alt="ChoiceGPT"
+                loading="lazy"
+                style={{ height: '20px', width: '20px', borderRadius: '4px' }}
               />
             </button>
           </div>

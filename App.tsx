@@ -6,6 +6,7 @@ import IOS26Prototype from './components/IOS26Prototype';
 import TopNavigation from './components/TopNavigation';
 import { useNavigate } from 'react-router-dom';
 import NetflixView from './components/NetflixView';
+import ChoiceGPTWidget from './components/ChoiceGPTWidget';
 import GameView, { Game } from './components/GameView';
 import MediaDetail from './components/MediaDetail';
 import ApiKeySetup from './components/ApiKeySetup';
@@ -49,6 +50,7 @@ const AppContent: React.FC = () => {
     // Remove IMAX Search variant; Search is always standard
 
     const [syncView, setSyncView] = useState<SyncViewType>('none');
+    const [showChoiceGPT, setShowChoiceGPT] = useState(false);
 
     // Get user data for export
     const getUserData = () => ({
@@ -220,6 +222,7 @@ const AppContent: React.FC = () => {
                     onSyncClick={() => setSyncView('selector')}
                     onImaxClick={!selectedItem && view !== 'imax' ? () => setView('imax') : undefined}
                     onDolbyClick={() => navigate('/Dolby')}
+                    onChoiceBotClick={() => setShowChoiceGPT(true)}
                     onBoxOfficeClick={() => navigate('/Stats/BoxOffice')}
                     preferPerformance={performanceMode}
                 />
@@ -300,6 +303,10 @@ const AppContent: React.FC = () => {
                     onSelectItem={handleSelectItem}
                     onInvalidApiKey={handleInvalidApiKey}
                 />
+
+                {showChoiceGPT && (
+                    <ChoiceGPTWidget onClose={() => setShowChoiceGPT(false)} />
+                )}
             </div>
         </ImageGeneratorProvider>
     );

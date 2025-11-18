@@ -28,8 +28,10 @@ root.render(
       <BrowserRouter>
         <React.Suspense fallback={<Loader />}> 
           <Routes>
-            {/* Root with no page name: Preview page */}
-            <Route path="/" element={<PreviewPage />} />
+            {/* Root shows Home content */}
+            <Route path="/" element={<HomeApp />} />
+            {/* Preview page available under /Preview */}
+            <Route path="/Preview" element={<PreviewPage />} />
             {/* Named routes */}
           <Route path="/Home" element={<HomeApp />} />
           <Route path="/IMAX" element={<ImaxPage />} />
