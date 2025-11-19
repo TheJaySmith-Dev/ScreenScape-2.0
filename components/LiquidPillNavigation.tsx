@@ -7,7 +7,7 @@
 import React, { useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
-import { Search, Home, Tv, Gamepad2, Heart, Settings as SettingsIcon, RefreshCw, Tag, Menu } from 'lucide-react';
+import { Search, Home, Tv, Gamepad2, Heart, Settings as SettingsIcon, RefreshCw, Tag, Menu, Coins, Image as ImageIcon } from 'lucide-react';
 import { ViewType } from '../App';
 import { useNavigate } from 'react-router-dom';
 import { useAppleTheme } from './AppleThemeProvider';
@@ -174,6 +174,8 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
   const menuItemRefs = useRef<HTMLButtonElement[]>([]);
   const panelRows = useMemo(() => ([
     { id: 'boxoffice', label: 'Box Office', Icon: Tag, onClick: () => { try { navigate('/Stats/BoxOffice'); } catch { setView('genres' as ViewType); } setPanelOpen(false); } },
+    { id: 'choicegen', label: 'ChoiceGen', Icon: ImageIcon, onClick: () => { try { navigate('/play/choicegen'); } catch {} setPanelOpen(false); } },
+    { id: 'billionaire', label: 'Billionaire Sandbox', Icon: Coins, onClick: () => { try { navigate('/play/billionaire-sandbox'); } catch {} setPanelOpen(false); } },
     { id: 'game', label: 'Games', Icon: Gamepad2, onClick: () => { setView('game'); setPanelOpen(false); } },
     { id: 'live', label: 'Live', Icon: Tv, onClick: () => { setView('live'); setPanelOpen(false); } },
   ]), [navigate, setView]);

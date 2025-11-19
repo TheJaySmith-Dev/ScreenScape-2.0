@@ -28,6 +28,7 @@ import {
     hasAvailability,
 } from '../utils/streamingAvailability';
 import MediaTitleLogo from './MediaTitleLogo';
+import GlassPillButton from './GlassPillButton';
 // FanArt removed: backdrops resolved via TMDb image APIs
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
@@ -1092,6 +1093,9 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     const [rtSourceUrl, setRtSourceUrl] = useState<string | null>(null);
     const [isRtLoading, setIsRtLoading] = useState(false);
     const [rtError, setRtError] = useState<string | null>(null);
+    const [streamingAI, setStreamingAI] = useState<string | null>(null);
+    const [isStreamingAILoading, setIsStreamingAILoading] = useState(false);
+    const [streamingAIError, setStreamingAIError] = useState<string | null>(null);
     const [backdropUrl, setBackdropUrl] = useState<string | null>(null);
 
     // Refs for dynamic background detection
@@ -1440,6 +1444,33 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
             window.removeEventListener('controlTrailerAudio', handleControlTrailerAudio);
         };
     }, [handleControlTrailerAudio]);
+
+    const handleWhereToStreamAI = useCallback(async () => {
+        if (!details) return;
+        setIsStreamingAILoading(true);
+        setStreamingAIError(null);
+        setStreamingAI(null);
+        try {
+            const title = 'title' in details ? details.title : details.name;
+            const q = `Where can I stream "${title}" in ${country?.name || country?.code || 'my country'}? Prefer local services and provide links if available.`;
+            let text = '';
+            try {
+                const resp = await fetch(`/api/choicegpt/search?q=${encodeURIComponent(q)}&model=gemini-search`);
+                if (resp.ok) {
+                    text = await resp.text();
+                }
+            } catch {}
+            if (!text) {
+                const direct = await fetch(`https://text.pollinations.ai/${encodeURIComponent(q)}?model=gemini-search`);
+                text = await direct.text();
+            }
+            setStreamingAI(text);
+        } catch (e: any) {
+            setStreamingAIError('Service connectivity issue while searching.');
+        } finally {
+            setIsStreamingAILoading(false);
+        }
+    }, [details, country]);
 
 
 
@@ -2123,6 +2154,48 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                                                 </span>
                                             ))}
                                         </div>
+                                        <div style={{ marginTop: tokens.spacing.small, position: 'relative', zIndex: 2, pointerEvents: 'auto' }}>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); handleWhereToStreamAI(); }}
+                                                style={{
+                                                    padding: '10px 14px',
+                                                    borderRadius: 12,
+                                                    border: 'none',
+                                                    background: '#1f6feb',
+                                                    color: '#ffffff',
+                                                    fontWeight: 700,
+                                                    cursor: 'pointer',
+                                                    pointerEvents: 'auto'
+                                                }}
+                                            >
+                                                Where to Stream (AI)
+                                            </button>
+                                        </div>
+                                        {isStreamingAILoading && (
+                                            <div style={{ marginTop: tokens.spacing.small }}>
+                                                <Loader />
+                                            </div>
+                                        )}
+                                        {streamingAIError && (
+                                            <div className="rounded-xl border p-3 mt-3" style={{
+                                                borderColor: tokens.colors.border.primary,
+                                                background: `${tokens.colors.background.secondary}80`,
+                                                color: tokens.colors.text.secondary
+                                            }}>
+                                                {streamingAIError}
+                                            </div>
+                                        )}
+                                        {streamingAI && (
+                                            <div className="rounded-xl border p-3 mt-3" style={{
+                                                borderColor: tokens.colors.border.primary,
+                                                background: `${tokens.colors.background.secondary}80`,
+                                                color: tokens.colors.text.primary,
+                                                whiteSpace: 'pre-wrap'
+                                            }}>
+                                                {streamingAI}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -2152,6 +2225,41 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                                         )}
                                     </div>
                                 </div>
+                            </div>
+
+                            <div style={{ marginTop: tokens.spacing.medium, position: 'relative', zIndex: 1000, pointerEvents: 'auto' }}>
+                                <GlassPillButton
+                                    variant="primary"
+                                    size="medium"
+                                    onClick={handleWhereToStreamAI}
+                                    style={{ pointerEvents: 'auto', position: 'relative', zIndex: 1000 }}
+                                >
+                                    Where to Stream (AI)
+                                </GlassPillButton>
+                                {isStreamingAILoading && (
+                                    <div style={{ marginTop: tokens.spacing.small }}>
+                                        <Loader />
+                                    </div>
+                                )}
+                                {streamingAIError && (
+                                    <div className="rounded-xl border p-3 mt-3" style={{
+                                        borderColor: tokens.colors.border.primary,
+                                        background: `${tokens.colors.background.secondary}80`,
+                                        color: tokens.colors.text.secondary
+                                    }}>
+                                        {streamingAIError}
+                                    </div>
+                                )}
+                                {streamingAI && (
+                                    <div className="rounded-xl border p-3 mt-3" style={{
+                                        borderColor: tokens.colors.border.primary,
+                                        background: `${tokens.colors.background.secondary}80`,
+                                        color: tokens.colors.text.primary,
+                                        whiteSpace: 'pre-wrap'
+                                    }}>
+                                        {streamingAI}
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     </div>

@@ -14,6 +14,8 @@ const MarvelStudiosPage = React.lazy(() => import('./pages/MarvelStudiosPage'));
 const FormattedDetailRoute = React.lazy(() => import('./pages/FormattedDetailRoute'));
 const StudioMogulPage = React.lazy(() => import('./pages/StudioMogulPage'));
 const BoxOfficeStatsPage = React.lazy(() => import('./pages/BoxOfficeStatsPage'));
+const BillionaireSandboxPage = React.lazy(() => import('./pages/BillionaireSandboxPage'));
+const ChoiceGenPage = React.lazy(() => import('./pages/ChoiceGenPage'));
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -37,6 +39,8 @@ root.render(
           <Route path="/ChoiceBot" element={<ChoiceBotPage />} />
           <Route path="/IMAX/Marvel" element={<MarvelStudiosPage />} />
           <Route path="/play/studio-mogul" element={<StudioMogulPage />} />
+          <Route path="/play/billionaire-sandbox" element={<BillionaireSandboxPage />} />
+          <Route path="/play/choicegen" element={<ChoiceGenPage />} />
           {/* Formatted detail routes: /IMAX|/Browse with m.|t. prefixes */}
           {/* Simplified IMAX movie route without type prefix */}
           <Route path="/IMAX/:id" element={<FormattedDetailRoute />} />
