@@ -1,9 +1,8 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AppleThemeProvider, useAppleTheme } from '../components/AppleThemeProvider';
 
 const ChoiceGenContent: React.FC = () => {
   const { tokens } = useAppleTheme();
-  const [tab, setTab] = useState<'generate' | 'edit'>('generate');
   const modelOptions = useMemo(() => [
     'nano-banana',
     'flux',
@@ -20,16 +19,7 @@ const ChoiceGenContent: React.FC = () => {
   const [size, setSize] = useState<number>(512);
   const [images, setImages] = useState<string[]>([]);
   const [readyImages, setReadyImages] = useState<Set<string>>(new Set());
-
-  const [editPrompt, setEditPrompt] = useState('');
-  const [editModel, setEditModel] = useState<string>(modelOptions[0]);
-  const [sourceImageUrl, setSourceImageUrl] = useState('');
-  const [editAspect, setEditAspect] = useState<'1:1' | '16:9' | '9:16' | '4:3' | '3:2'>('1:1');
-  const [editSize, setEditSize] = useState<number>(512);
-  const [editedImages, setEditedImages] = useState<string[]>([]);
-  const [readyEditedImages, setReadyEditedImages] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState<string | null>(null);
-  const editPromptInputRef = useRef<HTMLInputElement>(null);
 
   const sectionStyle: React.CSSProperties = {
     display: 'flex',
@@ -108,18 +98,6 @@ const ChoiceGenContent: React.FC = () => {
     return `${base}?${qs.toString()}`;
   };
 
-  const buildEditUrl = (imgUrl: string, p: string, m: string, ratio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:2', baseHeight?: number) => {
-    const base = `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}`;
-    const qs = new URLSearchParams();
-    if (m) qs.set('model', m);
-    if (imgUrl) qs.set('image_url', imgUrl);
-    if (ratio && baseHeight) {
-      const { width, height } = ratioToWH(ratio, baseHeight);
-      qs.set('width', String(width));
-      qs.set('height', String(height));
-    }
-    return `${base}?${qs.toString()}`;
-  };
 
   const sanitizeFilename = (s: string) => {
     const a = s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-{2,}/g, '-');
@@ -142,27 +120,6 @@ const ChoiceGenContent: React.FC = () => {
     });
   };
 
-  const handleEdit = () => {
-    if (!sourceImageUrl.trim() || !editPrompt.trim()) return;
-    const url = buildEditUrl(sourceImageUrl.trim(), editPrompt.trim(), editModel, editAspect, editSize);
-    setEditedImages([url, ...editedImages].slice(0, 24));
-    setReadyEditedImages(prev => {
-      const next = new Set(prev);
-      next.delete(url);
-      return next;
-    });
-  };
-
-  const beginEditFromImage = (src: string) => {
-    setSourceImageUrl(src);
-    setEditModel(model);
-    setEditAspect(aspect);
-    setEditSize(size);
-    setTab('edit');
-    setTimeout(() => {
-      editPromptInputRef.current?.focus();
-    }, 0);
-  };
 
   const handleDownload = async (src: string, suggested: string) => {
     try {
@@ -190,19 +147,11 @@ const ChoiceGenContent: React.FC = () => {
         <section style={sectionStyle}>
           <h1 style={{ ...titleStyle, fontSize: tokens.typography.sizes.largeTitle }}>ChoiceGen</h1>
           <p style={{ fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.body, color: tokens.colors.label.secondary }}>
-            Generate and edit images with selectable Pollinations.ai models. Choose a model like Nano Banana, craft prompts, and produce visuals instantly. For editing, provide a source image URL and a transformation prompt.
+            Generate images with selectable Pollinations.ai models. Choose a model like Nano Banana, craft prompts, and produce visuals instantly.
           </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setTab('generate')} style={{ ...buttonSecondary, background: tab === 'generate' ? 'rgba(31,111,235,0.18)' : tokens.colors.background.secondary }}>
-              Generate
-            </button>
-            <button onClick={() => setTab('edit')} style={{ ...buttonSecondary, background: tab === 'edit' ? 'rgba(31,111,235,0.18)' : tokens.colors.background.secondary }}>
-              Edit
-            </button>
-          </div>
         </section>
 
-        {tab === 'generate' && (
+        {
           <section style={sectionStyle}>
             <h2 style={titleStyle}>Image generation</h2>
             <label style={labelStyle}>Prompt</label>
@@ -247,29 +196,8 @@ const ChoiceGenContent: React.FC = () => {
               <button onClick={() => setImages([])} style={buttonSecondary}>Clear</button>
             </div>
           </section>
-        )}
+        }
 
-        {tab === 'edit' && (
-          <section style={sectionStyle}>
-            <h2 style={titleStyle}>Image editing</h2>
-            <label style={labelStyle}>Source image URL</label>
-            <input value={sourceImageUrl} onChange={(e) => setSourceImageUrl(e.target.value)} placeholder="https://..." style={inputStyle} />
-            <label style={labelStyle}>Edit prompt</label>
-            <input ref={editPromptInputRef} value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} placeholder="e.g., turn into watercolor illustration" style={inputStyle} />
-            <div>
-              <label style={labelStyle}>Model</label>
-              <select value={editModel} onChange={(e) => setEditModel(e.target.value)} style={{ ...inputStyle, padding: 10 }}>
-                {modelOptions.map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleEdit} style={buttonPrimary}>Edit</button>
-              <button onClick={() => setEditedImages([])} style={buttonSecondary}>Clear</button>
-            </div>
-          </section>
-        )}
 
         {images.length > 0 && (
           <section style={sectionStyle}>
@@ -288,41 +216,6 @@ const ChoiceGenContent: React.FC = () => {
                   />
                   <div style={{ display: 'flex', gap: 8, padding: 8 }}>
                     {readyImages.has(src) ? (
-                      <>
-                        <button onClick={() => handleDownload(src, sanitizeFilename(promptFromUrl(src)))} style={buttonSecondary} disabled={downloading === src}>
-                          {downloading === src ? 'Downloading…' : 'Download'}
-                        </button>
-                        <button onClick={() => beginEditFromImage(src)} style={buttonSecondary}>
-                          Edit
-                        </button>
-                      </>
-                    ) : (
-                      <span style={{ fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.caption1, color: tokens.colors.label.secondary }}>Generating…</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {editedImages.length > 0 && (
-          <section style={sectionStyle}>
-            <h2 style={titleStyle}>Edited results</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-              {editedImages.map((src, i) => (
-                <div key={`${src}-${i}`} style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${tokens.colors.separator.opaque}`, background: '#000' }}>
-                  <img 
-                    src={src} 
-                    alt={`Edited ${i}`} 
-                    loading="eager" 
-                    decoding="async"
-                    fetchPriority="high"
-                    style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }}
-                    onLoad={() => setReadyEditedImages(prev => { const next = new Set(prev); next.add(src); return next; })}
-                  />
-                  <div style={{ display: 'flex', gap: 8, padding: 8 }}>
-                    {readyEditedImages.has(src) ? (
                       <button onClick={() => handleDownload(src, sanitizeFilename(promptFromUrl(src)))} style={buttonSecondary} disabled={downloading === src}>
                         {downloading === src ? 'Downloading…' : 'Download'}
                       </button>
