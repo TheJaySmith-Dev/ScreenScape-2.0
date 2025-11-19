@@ -1452,7 +1452,9 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         setStreamingAI(null);
         try {
             const title = 'title' in details ? details.title : details.name;
-            const q = `Where can I stream "${title}" in ${country?.name || country?.code || 'my country'}? Prefer local services and provide links if available.`;
+            let preferredCountry: string | null = null;
+            try { preferredCountry = localStorage.getItem('choicegpt:lastCountry'); } catch {}
+            const q = `Where can I stream "${title}" in ${preferredCountry || country?.name || country?.code || 'my country'}? Prefer local services and provide links if available.`;
             let text = '';
             try {
                 const resp = await fetch(`/api/choicegpt/search?q=${encodeURIComponent(q)}&model=gemini-search`);

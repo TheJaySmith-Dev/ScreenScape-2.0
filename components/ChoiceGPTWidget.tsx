@@ -19,9 +19,17 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose }) => {
   const [apiKey] = useState<string>('');
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [rememberedCountry, setRememberedCountry] = useState<string | null>(null);
+  const [rememberStreaming, setRememberStreaming] = useState<boolean>(false);
 
   useEffect(() => {
     try { localStorage.removeItem('pollinations_api_key'); } catch {}
+    try {
+      const last = localStorage.getItem('choicegpt:lastCountry');
+      if (last) setRememberedCountry(last);
+      const lastIntent = localStorage.getItem('choicegpt:lastStreamingIntent');
+      if (lastIntent === '1') setRememberStreaming(true);
+    } catch {}
   }, []);
 
   const bubbleStyles = useMemo(() => {
@@ -93,6 +101,14 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose }) => {
     return await tryQuery(text);
   };
 
+  const hasStreamingIntent = (t: string) => /where\s+to\s+(watch|stream)|streaming|availability|available\s+to\s+(watch|stream)/i.test(t);
+  const extractCountryFromText = (t: string) => {
+    const m = t.match(/\b(?:in|for)\s+([A-Za-z][A-Za-z\s\-]+)\b/);
+    const name = m?.[1]?.trim();
+    if (!name) return null;
+    return name.replace(/[.,!?]$/, '').trim();
+  };
+
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -101,6 +117,15 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose }) => {
     setInput('');
     setLoading(true);
     try {
+      const foundCountry = extractCountryFromText(text);
+      if (foundCountry) {
+        setRememberedCountry(foundCountry);
+        try { localStorage.setItem('choicegpt:lastCountry', foundCountry); } catch {}
+      }
+      if (hasStreamingIntent(text)) {
+        setRememberStreaming(true);
+        try { localStorage.setItem('choicegpt:lastStreamingIntent', '1'); } catch {}
+      }
       const handled = await maybeNavigateToTitle(text);
       if (handled) {
         setMessages([...nextMessages, { role: 'assistant', content: 'Opening title' }]);
@@ -110,6 +135,7 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose }) => {
         model: 'openai',
         messages: [
           { role: 'system', content: 'You are ChoiceGPT, a helpful assistant for movies, TV, streaming availability, and recommendations.' },
+          ...(rememberedCountry ? [{ role: 'system', content: `For availability queries, assume the country is ${rememberedCountry} unless the user specifies otherwise.` }] : []),
           ...nextMessages.map(m => ({ role: m.role, content: m.content }))
         ],
         max_tokens: 512
@@ -143,12 +169,33 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose }) => {
     setInput('');
     setLoading(true);
     try {
+      const foundCountry = extractCountryFromText(query);
+      if (foundCountry) {
+        setRememberedCountry(foundCountry);
+        try { localStorage.setItem('choicegpt:lastCountry', foundCountry); } catch {}
+      }
+      if (hasStreamingIntent(query)) {
+        setRememberStreaming(true);
+        try { localStorage.setItem('choicegpt:lastStreamingIntent', '1'); } catch {}
+      }
       const handled = await maybeNavigateToTitle(query);
       if (handled) {
         setMessages([...nextMessages, { role: 'assistant', content: 'Opening title' }]);
         return;
       }
-      const url = `/api/choicegpt/search?q=${encodeURIComponent(query)}&model=gemini-search`;
+      const explicitCountry = !!extractCountryFromText(query);
+      const streamingIntent = hasStreamingIntent(query) || rememberStreaming;
+      let effectiveQuery = query;
+      if (rememberedCountry && !explicitCountry) {
+        if (streamingIntent) {
+          if (!/\bwhere\s+to\s+(watch|stream)\b/i.test(query)) {
+            effectiveQuery = `Where can I stream ${query} in ${rememberedCountry}`;
+          } else {
+            effectiveQuery = `${query} in ${rememberedCountry}`;
+          }
+        }
+      }
+      const url = `/api/choicegpt/search?q=${encodeURIComponent(effectiveQuery)}&model=gemini-search`;
       const resp = await fetch(url);
       const text = await resp.text();
       const reply = text || 'No search results available.';
