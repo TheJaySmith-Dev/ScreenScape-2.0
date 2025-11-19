@@ -8,10 +8,13 @@ type ChatMessage = { role: 'user' | 'assistant'; content: string };
 interface ChoiceGPTWidgetProps {
   onClose?: () => void;
   inline?: boolean;
+  modes?: ('text' | 'image')[];
 }
 
-const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline }) => {
+const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, modes }) => {
   const { tokens } = useAppleTheme();
+  const availableModes = (modes && modes.length ? modes : ['text']) as ('text' | 'image')[];
+  const [mode, setMode] = useState<'text' | 'image'>(availableModes[0]);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'assistant', content: 'Hi, I am ChoiceGPT. Ask me anything about movies, TV, streaming, and availability.' }
   ]);
@@ -24,6 +27,23 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline }) =>
   const [searchModel, setSearchModel] = useState<string>('gemini-search');
   const [rememberedCountry, setRememberedCountry] = useState<string | null>(null);
   const [rememberStreaming, setRememberStreaming] = useState<boolean>(false);
+
+  const imageModelOptions = useMemo(() => [
+    'nano-banana',
+    'flux',
+    'sdxl',
+    'playground-v2',
+    'photorealistic',
+    'openai'
+  ], []);
+  const [prompt, setPrompt] = useState('');
+  const [imageModel, setImageModel] = useState<string>(imageModelOptions[0]);
+  const [seed, setSeed] = useState<string>('');
+  const [aspect, setAspect] = useState<'1:1' | '16:9' | '9:16' | '4:3' | '3:2'>('1:1');
+  const [size, setSize] = useState<number>(512);
+  const [images, setImages] = useState<string[]>([]);
+  const [readyImages, setReadyImages] = useState<Set<string>>(new Set());
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     try { localStorage.removeItem('pollinations_api_key'); } catch {}
@@ -83,6 +103,67 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline }) =>
       }
     };
   }, [tokens]);
+
+  const ratioToWH = (ratio: '1:1' | '16:9' | '9:16' | '4:3' | '3:2', baseHeight: number) => {
+    const [rw, rh] = ratio.split(':').map(Number);
+    const height = baseHeight;
+    const width = Math.round((height * rw) / rh);
+    return { width, height };
+  };
+
+  const buildImageUrl = (p: string, m: string, s?: string, r?: '1:1' | '16:9' | '9:16' | '4:3' | '3:2', h?: number) => {
+    const base = `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}`;
+    const qs = new URLSearchParams();
+    if (m) qs.set('model', m);
+    if (s) qs.set('seed', s);
+    if (r && h) {
+      const { width, height } = ratioToWH(r, h);
+      qs.set('width', String(width));
+      qs.set('height', String(height));
+    }
+    return `${base}?${qs.toString()}`;
+  };
+
+  const sanitizeFilename = (s: string) => {
+    const a = s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-{2,}/g, '-');
+    const b = a.substring(0, 80);
+    return b || 'image';
+  };
+  const promptFromUrl = (src: string) => {
+    const m = src.match(/\/prompt\/([^?]+)/);
+    return m ? decodeURIComponent(m[1]) : 'image';
+  };
+
+  const handleGenerate = () => {
+    if (!prompt.trim()) return;
+    const url = buildImageUrl(prompt.trim(), imageModel, seed.trim() || undefined, aspect, size);
+    setImages([url, ...images].slice(0, 24));
+    setReadyImages(prev => {
+      const next = new Set(prev);
+      next.delete(url);
+      return next;
+    });
+  };
+
+  const handleDownload = async (src: string, suggested: string) => {
+    try {
+      setDownloading(src);
+      const resp = await fetch(src, { mode: 'cors' });
+      const blob = await resp.blob();
+      const ct = resp.headers.get('content-type') || '';
+      const ext = ct.includes('jpeg') ? 'jpg' : ct.includes('png') ? 'png' : 'webp';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${suggested}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   const getTmdbApiKey = () => {
     try { return localStorage.getItem('tmdb_api_key') || '09b97a49759876f2fde9eadb163edc44'; } catch { return '09b97a49759876f2fde9eadb163edc44'; }
@@ -273,32 +354,112 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline }) =>
           <img src="https://pollinations.ai/icon-512.png" alt="ChoiceGPT" style={{ height: 18, width: 18, borderRadius: 4 }} />
           <span style={{ fontFamily: tokens.typography.families.display, fontSize: tokens.typography.sizes.caption1, fontWeight: tokens.typography.weights.semibold, color: tokens.colors.label.primary }}>ChoiceGPT</span>
           <span style={{ marginLeft: 'auto', color: tokens.colors.label.secondary, fontSize: tokens.typography.sizes.caption2 }}>Pollinations AI</span>
+          {availableModes.length > 1 && (
+            <div style={{ display: 'flex', gap: 8, marginLeft: 8 }}>
+              <button onClick={() => setMode('image')} style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${tokens.colors.separator.opaque}`, background: mode === 'image' ? 'rgba(31,111,235,0.18)' : tokens.colors.background.secondary, color: tokens.colors.label.primary, fontWeight: 600, cursor: 'pointer' }}>Image</button>
+              <button onClick={() => setMode('text')} style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${tokens.colors.separator.opaque}`, background: mode === 'text' ? 'rgba(31,111,235,0.18)' : tokens.colors.background.secondary, color: tokens.colors.label.primary, fontWeight: 600, cursor: 'pointer' }}>Text</button>
+            </div>
+          )}
           {onClose && (
             <button onClick={onClose} style={{ marginLeft: 8, height: 28, padding: '0 10px', borderRadius: 8, border: 'none', background: '#1f6feb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Close</button>
           )}
         </div>
-        {/* API key input removed from UI per request */}
         <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
-          {messages.map((m, i) => (
-            <div key={i} style={m.role === 'user' ? bubbleStyles.user : bubbleStyles.assistant}>{m.content}</div>
-          ))}
+          {mode === 'text' && (
+            <>
+              {messages.map((m, i) => (
+                <div key={i} style={m.role === 'user' ? bubbleStyles.user : bubbleStyles.assistant}>{m.content}</div>
+              ))}
+            </>
+          )}
+          {mode === 'image' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Prompt" style={{ padding: '10px 12px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary }} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <label style={{ fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.caption1, color: tokens.colors.label.secondary }}>Model</label>
+                  <select value={imageModel} onChange={(e) => setImageModel(e.target.value)} style={{ padding: 10, borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, width: '100%' }}>
+                    {imageModelOptions.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.caption1, color: tokens.colors.label.secondary }}>Seed</label>
+                  <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="random or fixed number" style={{ padding: '10px 12px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, width: '100%' }} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <label style={{ fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.caption1, color: tokens.colors.label.secondary }}>Aspect ratio</label>
+                  <select value={aspect} onChange={(e) => setAspect(e.target.value as any)} style={{ padding: 10, borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, width: '100%' }}>
+                    <option value="1:1">1:1</option>
+                    <option value="16:9">16:9</option>
+                    <option value="9:16">9:16</option>
+                    <option value="4:3">4:3</option>
+                    <option value="3:2">3:2</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.caption1, color: tokens.colors.label.secondary }}>Preview size</label>
+                  <select value={size} onChange={(e) => setSize(Number(e.target.value))} style={{ padding: 10, borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, width: '100%' }}>
+                    <option value={384}>384</option>
+                    <option value={512}>512</option>
+                    <option value={768}>768</option>
+                    <option value={1024}>1024</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={handleGenerate} style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: '#1f6feb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Generate</button>
+                <button onClick={() => setImages([])} style={{ padding: '10px 14px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, fontWeight: 700, cursor: 'pointer' }}>Clear</button>
+              </div>
+              {images.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+                  {images.map((src, i) => (
+                    <div key={`${src}-${i}`} style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${tokens.colors.separator.opaque}`, background: '#000' }}>
+                      <img 
+                        src={src} 
+                        alt={`Generated ${i}`} 
+                        loading="eager" 
+                        decoding="async"
+                        fetchPriority="high"
+                        style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }}
+                        onLoad={() => setReadyImages(prev => { const next = new Set(prev); next.add(src); return next; })}
+                      />
+                      <div style={{ display: 'flex', gap: 8, padding: 8 }}>
+                        {readyImages.has(src) ? (
+                          <button onClick={() => handleDownload(src, sanitizeFilename(promptFromUrl(src)))} style={{ padding: '8px 12px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary }} disabled={downloading === src}>
+                            {downloading === src ? 'Downloading…' : 'Download'}
+                          </button>
+                        ) : (
+                          <span style={{ fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.caption1, color: tokens.colors.label.secondary }}>Generating…</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
-        <div style={{ padding: 10, borderTop: '1px solid rgba(255,255,255,0.18)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center' }}>
-            <input
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') (searchMode ? runSearch() : sendMessage()); }}
-              placeholder={searchMode ? 'Search (web + AI)…' : 'Ask ChoiceGPT…'}
-              style={{ padding: '10px 12px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, minWidth: 0 }}
-            />
-            <button onClick={searchMode ? runSearch : sendMessage} disabled={loading} style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: loading ? '#999999' : '#1f6feb', color: '#ffffff', fontWeight: 700, cursor: loading ? 'default' : 'pointer' }}>{loading ? 'Working…' : searchMode ? 'Search' : 'Send'}</button>
-            <button onClick={() => setSearchMode(s => !s)} aria-label={searchMode ? 'Search: On' : 'Search: Off'} title={searchMode ? 'Search: On' : 'Search: Off'} style={{ padding: '10px 14px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, fontWeight: 600, cursor: 'pointer' }}>
-              <SettingsIcon size={18} />
-            </button>
+        {mode === 'text' && (
+          <div style={{ padding: 10, borderTop: '1px solid rgba(255,255,255,0.18)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center' }}>
+              <input
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') (searchMode ? runSearch() : sendMessage()); }}
+                placeholder={searchMode ? 'Search (web + AI)…' : 'Ask ChoiceGPT…'}
+                style={{ padding: '10px 12px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, minWidth: 0 }}
+              />
+              <button onClick={searchMode ? runSearch : sendMessage} disabled={loading} style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: loading ? '#999999' : '#1f6feb', color: '#ffffff', fontWeight: 700, cursor: loading ? 'default' : 'pointer' }}>{loading ? 'Working…' : searchMode ? 'Search' : 'Send'}</button>
+              <button onClick={() => setSearchMode(s => !s)} aria-label={searchMode ? 'Search: On' : 'Search: Off'} title={searchMode ? 'Search: On' : 'Search: Off'} style={{ padding: '10px 14px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, fontWeight: 600, cursor: 'pointer' }}>
+                <SettingsIcon size={18} />
+              </button>
+            </div>
           </div>
-          {/* Model selection hidden when not needed */}
-        </div>
+        )}
       </div>
   );
 
