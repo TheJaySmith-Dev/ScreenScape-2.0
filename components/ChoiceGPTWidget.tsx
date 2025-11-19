@@ -15,6 +15,18 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
   const { tokens } = useAppleTheme();
   const availableModes = (modes && modes.length ? modes : ['text']) as ('text' | 'image')[];
   const [mode, setMode] = useState<'text' | 'image'>(availableModes[0]);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      try {
+        const m = window.matchMedia('(max-width: 640px)');
+        setIsMobile(m.matches);
+      } catch {}
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'assistant', content: 'Hi, I am ChoiceGPT. Ask me anything about movies, TV, streaming, and availability.' }
   ]);
@@ -337,8 +349,8 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
 
   const container = (
       <div style={{
-        width: 'min(640px, 100%)',
-        maxHeight: '70vh',
+        width: isMobile ? 'calc(100vw - 24px)' : 'min(640px, 100%)',
+        maxHeight: isMobile ? 'calc(85vh - env(safe-area-inset-bottom))' : '70vh',
         display: 'flex',
         flexDirection: 'column',
         gap: tokens.spacing.standard[0],
@@ -468,7 +480,7 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
   }
 
   return (
-    <div style={{ position: 'fixed', right: 16, bottom: 16, zIndex: 10050 }}>
+    <div style={{ position: 'fixed', bottom: isMobile ? 'calc(8px + env(safe-area-inset-bottom))' : 16, left: isMobile ? 8 : 'auto', right: isMobile ? 8 : 16, zIndex: 10050, display: 'flex', justifyContent: 'center' }}>
       {container}
     </div>
   );
