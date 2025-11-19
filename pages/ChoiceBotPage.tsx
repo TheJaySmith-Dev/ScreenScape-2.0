@@ -18,6 +18,7 @@ const ChoiceBotContent: React.FC = () => {
   const [apiKey] = useState<string>('');
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [searchModel, setSearchModel] = useState<string>('gemini-search');
   const [rememberedCountry, setRememberedCountry] = useState<string | null>(null);
   const [rememberStreaming, setRememberStreaming] = useState<boolean>(false);
 
@@ -29,6 +30,25 @@ const ChoiceBotContent: React.FC = () => {
       const lastIntent = localStorage.getItem('choicegpt:lastStreamingIntent');
       if (lastIntent === '1') setRememberStreaming(true);
     } catch {}
+    (async () => {
+      setModelsLoading(true);
+      try {
+        const resp = await fetch('/api/choicegpt/models');
+        const text = await resp.text();
+        let parsed: any = null;
+        try { parsed = JSON.parse(text); } catch {}
+        const list: string[] = Array.isArray(parsed) ? parsed.filter((x: any) => typeof x === 'string') : (text.split(/\r?\n/).map(s => s.trim()).filter(Boolean));
+        setModels(list);
+        const priorities = ['gemini-search', 'qwen-search', 'perplexity', 'deep-research', 'google-search', 'internet', 'openai-web', 'openai'];
+        const picked = priorities.find(p => list.includes(p)) || 'gemini-search';
+        setSearchModel(picked);
+      } catch {
+        setModels([]);
+        setSearchModel('gemini-search');
+      } finally {
+        setModelsLoading(false);
+      }
+    })();
   }, []);
 
   const sectionStyle: React.CSSProperties = {
@@ -201,9 +221,18 @@ const ChoiceBotContent: React.FC = () => {
           }
         }
       }
-      const url = `/api/choicegpt/search?q=${encodeURIComponent(effectiveQuery)}&model=gemini-search`;
-      const resp = await fetch(url);
-      const text = await resp.text();
+      const url = `/api/choicegpt/search?q=${encodeURIComponent(effectiveQuery)}&model=${encodeURIComponent(searchModel)}`;
+      let text = '';
+      try {
+        const resp = await fetch(url);
+        if (resp.ok) {
+          text = await resp.text();
+        }
+      } catch {}
+      if (!text) {
+        const direct = await fetch(`https://text.pollinations.ai/${encodeURIComponent(effectiveQuery)}?model=${encodeURIComponent(searchModel)}`);
+        text = await direct.text();
+      }
       const reply = text || 'No search results available.';
       setMessages([...nextMessages, { role: 'assistant', content: reply }]);
     } catch {
