@@ -155,11 +155,7 @@ const MediaCard: React.FC<{ item: MediaItem; onClick: (i: MediaItem) => void; ca
               ))}
             </div>
           )}
-          {regionUnavailable && (
-            <div style={{ color: tokens.colors.system.red, fontSize: tokens.typography.sizes.caption1, marginBottom: 6 }}>
-              Unavailable in current region
-            </div>
-          )}
+          
           <div
             style={{
               color: tokens.colors.background.primary,

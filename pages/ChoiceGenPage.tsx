@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { AppleThemeProvider, useAppleTheme } from '../components/AppleThemeProvider';
 
 const ChoiceGenContent: React.FC = () => {
@@ -29,6 +29,7 @@ const ChoiceGenContent: React.FC = () => {
   const [editedImages, setEditedImages] = useState<string[]>([]);
   const [readyEditedImages, setReadyEditedImages] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState<string | null>(null);
+  const editPromptInputRef = useRef<HTMLInputElement>(null);
 
   const sectionStyle: React.CSSProperties = {
     display: 'flex',
@@ -152,6 +153,17 @@ const ChoiceGenContent: React.FC = () => {
     });
   };
 
+  const beginEditFromImage = (src: string) => {
+    setSourceImageUrl(src);
+    setEditModel(model);
+    setEditAspect(aspect);
+    setEditSize(size);
+    setTab('edit');
+    setTimeout(() => {
+      editPromptInputRef.current?.focus();
+    }, 0);
+  };
+
   const handleDownload = async (src: string, suggested: string) => {
     try {
       setDownloading(src);
@@ -243,7 +255,7 @@ const ChoiceGenContent: React.FC = () => {
             <label style={labelStyle}>Source image URL</label>
             <input value={sourceImageUrl} onChange={(e) => setSourceImageUrl(e.target.value)} placeholder="https://..." style={inputStyle} />
             <label style={labelStyle}>Edit prompt</label>
-            <input value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} placeholder="e.g., turn into watercolor illustration" style={inputStyle} />
+            <input ref={editPromptInputRef} value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} placeholder="e.g., turn into watercolor illustration" style={inputStyle} />
             <div>
               <label style={labelStyle}>Model</label>
               <select value={editModel} onChange={(e) => setEditModel(e.target.value)} style={{ ...inputStyle, padding: 10 }}>
@@ -276,9 +288,14 @@ const ChoiceGenContent: React.FC = () => {
                   />
                   <div style={{ display: 'flex', gap: 8, padding: 8 }}>
                     {readyImages.has(src) ? (
-                      <button onClick={() => handleDownload(src, sanitizeFilename(promptFromUrl(src)))} style={buttonSecondary} disabled={downloading === src}>
-                        {downloading === src ? 'Downloading…' : 'Download'}
-                      </button>
+                      <>
+                        <button onClick={() => handleDownload(src, sanitizeFilename(promptFromUrl(src)))} style={buttonSecondary} disabled={downloading === src}>
+                          {downloading === src ? 'Downloading…' : 'Download'}
+                        </button>
+                        <button onClick={() => beginEditFromImage(src)} style={buttonSecondary}>
+                          Edit
+                        </button>
+                      </>
                     ) : (
                       <span style={{ fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.caption1, color: tokens.colors.label.secondary }}>Generating…</span>
                     )}

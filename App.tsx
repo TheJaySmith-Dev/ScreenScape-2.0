@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { MediaItem } from './types';
-import { LiquidPillNavigation } from './components/LiquidPillNavigation';
+ 
 import IOS26Prototype from './components/IOS26Prototype';
 import TopNavigation from './components/TopNavigation';
 import { useNavigate } from 'react-router-dom';
 import NetflixView from './components/NetflixView';
 import ChoiceGPTWidget from './components/ChoiceGPTWidget';
+import { LiquidPillNavigation } from './components/LiquidPillNavigation';
 import GameView, { Game } from './components/GameView';
 import MediaDetail from './components/MediaDetail';
 import ApiKeySetup from './components/ApiKeySetup';
@@ -244,7 +245,7 @@ const AppContent: React.FC = () => {
                     style={{
                         padding: `${tokens.spacing.standard[1]}px ${tokens.spacing.standard[0]}px`,
                         paddingTop: `${tokens.spacing.standard[2]}px`,
-                        paddingBottom: `calc(${tokens.spacing.standard[3]}px + 64px + env(safe-area-inset-bottom))`, // Space for pill navigation
+                        paddingBottom: `calc(${tokens.spacing.standard[3]}px + 64px + env(safe-area-inset-bottom))`,
                         maxWidth: '1400px',
                         margin: '0 auto',
                         width: '100%',

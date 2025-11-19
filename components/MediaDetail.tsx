@@ -28,7 +28,7 @@ import {
     hasAvailability,
 } from '../utils/streamingAvailability';
 import MediaTitleLogo from './MediaTitleLogo';
-import GlassPillButton from './GlassPillButton';
+ 
 // FanArt removed: backdrops resolved via TMDb image APIs
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
@@ -2128,76 +2128,8 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                                         >
                                             Where to Watch
                                         </h3>
-                                        <div className="flex flex-wrap" style={{ gap: tokens.spacing.small }}>
-                                            {availabilityDescriptors.slice(0, 3).map(descriptor => (
-                                                <span
-                                                    key={descriptor.type}
-                                                    className="rounded-full backdrop-blur-xl border"
-                                                    style={{
-                                                        background: `${tokens.colors.background.secondary}80`,
-                                                        borderColor: tokens.colors.border.primary,
-                                                        padding: `${tokens.spacing.small} ${tokens.spacing.small}`,
-                                                        fontSize: tokens.typography.sizes.caption1,
-                                                        fontFamily: tokens.typography.families.text
-                                                    }}
-                                                >
-                                                    <span 
-                                                        style={{
-                                                            fontWeight: tokens.typography.weights.semibold,
-                                                            color: 'white',
-                                                            marginRight: tokens.spacing.small
-                                                        }}
-                                                    >
-                                                        {descriptor.type}:
-                                                    </span>
-                                                    <span style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                        {descriptor.text}
-                                                    </span>
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <div style={{ marginTop: tokens.spacing.small, position: 'relative', zIndex: 2, pointerEvents: 'auto' }}>
-                                            <button
-                                                type="button"
-                                                onClick={(e) => { e.stopPropagation(); handleWhereToStreamAI(); }}
-                                                style={{
-                                                    padding: '10px 14px',
-                                                    borderRadius: 12,
-                                                    border: 'none',
-                                                    background: '#1f6feb',
-                                                    color: '#ffffff',
-                                                    fontWeight: 700,
-                                                    cursor: 'pointer',
-                                                    pointerEvents: 'auto'
-                                                }}
-                                            >
-                                                Where to Stream (AI)
-                                            </button>
-                                        </div>
-                                        {isStreamingAILoading && (
-                                            <div style={{ marginTop: tokens.spacing.small }}>
-                                                <Loader />
-                                            </div>
-                                        )}
-                                        {streamingAIError && (
-                                            <div className="rounded-xl border p-3 mt-3" style={{
-                                                borderColor: tokens.colors.border.primary,
-                                                background: `${tokens.colors.background.secondary}80`,
-                                                color: tokens.colors.text.secondary
-                                            }}>
-                                                {streamingAIError}
-                                            </div>
-                                        )}
-                                        {streamingAI && (
-                                            <div className="rounded-xl border p-3 mt-3" style={{
-                                                borderColor: tokens.colors.border.primary,
-                                                background: `${tokens.colors.background.secondary}80`,
-                                                color: tokens.colors.text.primary,
-                                                whiteSpace: 'pre-wrap'
-                                            }}>
-                                                {streamingAI}
-                                            </div>
-                                        )}
+                                        
+                                        
                                     </div>
                                 )}
 
@@ -2229,40 +2161,7 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                                 </div>
                             </div>
 
-                            <div style={{ marginTop: tokens.spacing.medium, position: 'relative', zIndex: 1000, pointerEvents: 'auto' }}>
-                                <GlassPillButton
-                                    variant="primary"
-                                    size="medium"
-                                    onClick={handleWhereToStreamAI}
-                                    style={{ pointerEvents: 'auto', position: 'relative', zIndex: 1000 }}
-                                >
-                                    Where to Stream (AI)
-                                </GlassPillButton>
-                                {isStreamingAILoading && (
-                                    <div style={{ marginTop: tokens.spacing.small }}>
-                                        <Loader />
-                                    </div>
-                                )}
-                                {streamingAIError && (
-                                    <div className="rounded-xl border p-3 mt-3" style={{
-                                        borderColor: tokens.colors.border.primary,
-                                        background: `${tokens.colors.background.secondary}80`,
-                                        color: tokens.colors.text.secondary
-                                    }}>
-                                        {streamingAIError}
-                                    </div>
-                                )}
-                                {streamingAI && (
-                                    <div className="rounded-xl border p-3 mt-3" style={{
-                                        borderColor: tokens.colors.border.primary,
-                                        background: `${tokens.colors.background.secondary}80`,
-                                        color: tokens.colors.text.primary,
-                                        whiteSpace: 'pre-wrap'
-                                    }}>
-                                        {streamingAI}
-                                    </div>
-                                )}
-                            </div>
+                            
                         </motion.div>
                     </div>
                 );
