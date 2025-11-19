@@ -151,8 +151,9 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
 
   const navigationItems = [
     { id: 'screenSearch' as ViewType, icon: Home, label: 'Home' },
-    { id: 'search' as ViewType, icon: Search, label: 'Search', isSearchButton: true },
     { id: 'likes' as ViewType, icon: Heart, label: 'Likes' },
+    { id: 'sync' as ViewType, icon: RefreshCw, label: 'Sync' },
+    { id: 'settings' as ViewType, icon: SettingsIcon, label: 'Settings' },
     { id: 'prototype' as ViewType, label: 'More', isMenuButton: true },
   ];
 
@@ -174,7 +175,8 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
   const menuItemRefs = useRef<HTMLButtonElement[]>([]);
   const panelRows = useMemo(() => ([
     { id: 'boxoffice', label: 'Box Office', Icon: Tag, onClick: () => { try { navigate('/Stats/BoxOffice'); } catch { setView('genres' as ViewType); } setPanelOpen(false); } },
-    { id: 'choicegen', label: 'ChoiceGen', Icon: ImageIcon, onClick: () => { try { navigate('/play/choicegen'); } catch {} setPanelOpen(false); } },
+    { id: 'choice', label: 'Choice (Text/Image)', Icon: ImageIcon, onClick: () => { try { navigate('/play/choicegen'); } catch {} setPanelOpen(false); } },
+    { id: 'coffee', label: 'Buy Me A Coffee', Icon: Tag, onClick: () => { try { window.open('https://buymeacoffee.com/jasonforreels', '_blank', 'noopener,noreferrer'); } catch {} setPanelOpen(false); } },
     { id: 'billionaire', label: 'Billionaire Sandbox', Icon: Coins, onClick: () => { try { navigate('/play/billionaire-sandbox'); } catch {} setPanelOpen(false); } },
     { id: 'game', label: 'Games', Icon: Gamepad2, onClick: () => { setView('game'); setPanelOpen(false); } },
     { id: 'live', label: 'Live', Icon: Tv, onClick: () => { setView('live'); setPanelOpen(false); } },
@@ -430,6 +432,11 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
                   <motion.button
                     key={item.id}
                     onClick={() => {
+                      const custom = (item as any).onClick as undefined | (() => void);
+                      if (typeof custom === 'function') {
+                        custom();
+                        return;
+                      }
                       if ((item as any).isSearchButton && onSearchClick) {
                         onSearchClick();
                       } else {

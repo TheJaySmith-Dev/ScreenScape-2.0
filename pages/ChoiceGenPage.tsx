@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import ChoiceGPTWidget from '../components/ChoiceGPTWidget';
 import { AppleThemeProvider, useAppleTheme } from '../components/AppleThemeProvider';
 
 const ChoiceGenContent: React.FC = () => {
@@ -20,6 +21,7 @@ const ChoiceGenContent: React.FC = () => {
   const [images, setImages] = useState<string[]>([]);
   const [readyImages, setReadyImages] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [mode, setMode] = useState<'image' | 'text'>('image');
 
   const sectionStyle: React.CSSProperties = {
     display: 'flex',
@@ -147,11 +149,19 @@ const ChoiceGenContent: React.FC = () => {
         <section style={sectionStyle}>
           <h1 style={{ ...titleStyle, fontSize: tokens.typography.sizes.largeTitle }}>ChoiceGen</h1>
           <p style={{ fontFamily: tokens.typography.families.text, fontSize: tokens.typography.sizes.body, color: tokens.colors.label.secondary }}>
-            Generate images with selectable Pollinations.ai models. Choose a model like Nano Banana, craft prompts, and produce visuals instantly.
+            Choice — switch between Text (ChoiceGPT) and Image (ChoiceGen).
           </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setMode('image')} style={{ ...buttonSecondary, background: mode === 'image' ? 'rgba(31,111,235,0.18)' : tokens.colors.background.secondary }}>
+              Image
+            </button>
+            <button onClick={() => setMode('text')} style={{ ...buttonSecondary, background: mode === 'text' ? 'rgba(31,111,235,0.18)' : tokens.colors.background.secondary }}>
+              Text
+            </button>
+          </div>
         </section>
 
-        {
+        {mode === 'image' && (
           <section style={sectionStyle}>
             <h2 style={titleStyle}>Image generation</h2>
             <label style={labelStyle}>Prompt</label>
@@ -196,7 +206,14 @@ const ChoiceGenContent: React.FC = () => {
               <button onClick={() => setImages([])} style={buttonSecondary}>Clear</button>
             </div>
           </section>
-        }
+        )}
+
+        {mode === 'text' && (
+          <section style={sectionStyle}>
+            <h2 style={titleStyle}>Text assistant</h2>
+            <ChoiceGPTWidget inline />
+          </section>
+        )}
 
 
         {images.length > 0 && (

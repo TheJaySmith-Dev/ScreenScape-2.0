@@ -1,11 +1,13 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { Settings as SettingsIcon } from 'lucide-react';
 import { searchMulti } from '../services/tmdbService';
 import { useAppleTheme } from './AppleThemeProvider';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
 interface ChoiceGPTWidgetProps {
-  onClose: () => void;
+  onClose?: () => void;
+  inline?: boolean;
 }
 
 const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose }) => {
@@ -252,10 +254,9 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose }) => {
     }
   };
 
-  return (
-    <div style={{ position: 'fixed', right: 16, bottom: 16, zIndex: 10050 }}>
+  const container = (
       <div style={{
-        width: 420,
+        width: 'min(640px, 100%)',
         maxHeight: '70vh',
         display: 'flex',
         flexDirection: 'column',
@@ -272,7 +273,9 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose }) => {
           <img src="https://pollinations.ai/icon-512.png" alt="ChoiceGPT" style={{ height: 18, width: 18, borderRadius: 4 }} />
           <span style={{ fontFamily: tokens.typography.families.display, fontSize: tokens.typography.sizes.caption1, fontWeight: tokens.typography.weights.semibold, color: tokens.colors.label.primary }}>ChoiceGPT</span>
           <span style={{ marginLeft: 'auto', color: tokens.colors.label.secondary, fontSize: tokens.typography.sizes.caption2 }}>Pollinations AI</span>
-          <button onClick={onClose} style={{ marginLeft: 8, height: 28, padding: '0 10px', borderRadius: 8, border: 'none', background: '#1f6feb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Close</button>
+          {onClose && (
+            <button onClick={onClose} style={{ marginLeft: 8, height: 28, padding: '0 10px', borderRadius: 8, border: 'none', background: '#1f6feb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Close</button>
+          )}
         </div>
         {/* API key input removed from UI per request */}
         <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
@@ -287,14 +290,25 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose }) => {
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') (searchMode ? runSearch() : sendMessage()); }}
               placeholder={searchMode ? 'Search (web + AI)…' : 'Ask ChoiceGPT…'}
-              style={{ padding: '10px 12px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary }}
+              style={{ padding: '10px 12px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, minWidth: 0 }}
             />
             <button onClick={searchMode ? runSearch : sendMessage} disabled={loading} style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: loading ? '#999999' : '#1f6feb', color: '#ffffff', fontWeight: 700, cursor: loading ? 'default' : 'pointer' }}>{loading ? 'Working…' : searchMode ? 'Search' : 'Send'}</button>
-            <button onClick={() => setSearchMode(s => !s)} style={{ padding: '10px 14px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, fontWeight: 600, cursor: 'pointer' }}>{searchMode ? 'Search: On' : 'Search: Off'}</button>
+            <button onClick={() => setSearchMode(s => !s)} aria-label={searchMode ? 'Search: On' : 'Search: Off'} title={searchMode ? 'Search: On' : 'Search: Off'} style={{ padding: '10px 14px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, fontWeight: 600, cursor: 'pointer' }}>
+              <SettingsIcon size={18} />
+            </button>
           </div>
           {/* Model selection hidden when not needed */}
         </div>
       </div>
+  );
+
+  if (inline) {
+    return container;
+  }
+
+  return (
+    <div style={{ position: 'fixed', right: 16, bottom: 16, zIndex: 10050 }}>
+      {container}
     </div>
   );
 };

@@ -3,7 +3,6 @@ import { AnimatePresence } from 'framer-motion';
 import { MediaItem } from './types';
  
 import IOS26Prototype from './components/IOS26Prototype';
-import TopNavigation from './components/TopNavigation';
 import { useNavigate } from 'react-router-dom';
 import NetflixView from './components/NetflixView';
 import ChoiceGPTWidget from './components/ChoiceGPTWidget';
@@ -25,6 +24,7 @@ import LiquidGlassPillMenuDemo from './pages/LiquidGlassPillMenuDemo';
 // Hubs now live inside the IMAX page only
 import ImaxView from './components/ImaxView';
 import { MDBLIST_API_KEY } from './utils/genscapeKeys';
+import TopNavigation from './components/TopNavigation';
 
 import { useAuth } from './contexts/AuthContext';
 import { ImageGeneratorProvider } from './contexts/ImageGeneratorContext';
@@ -128,15 +128,20 @@ const AppContent: React.FC = () => {
         const openChoiceGPTHandler = () => {
             setShowChoiceGPT(true);
         };
+        const openSyncSelectorHandler = () => {
+            setSyncView('selector');
+        };
 
         window.addEventListener('selectMediaItem', selectMediaItemHandler);
         window.addEventListener('setSearchView', setSearchViewHandler);
         window.addEventListener('openChoiceGPT', openChoiceGPTHandler);
+        window.addEventListener('openSyncSelector', openSyncSelectorHandler);
 
         return () => {
             window.removeEventListener('selectMediaItem', selectMediaItemHandler);
             window.removeEventListener('setSearchView', setSearchViewHandler);
             window.removeEventListener('openChoiceGPT', openChoiceGPTHandler);
+            window.removeEventListener('openSyncSelector', openSyncSelectorHandler);
         };
     }, [handleSelectItem]);
 
@@ -227,15 +232,15 @@ const AppContent: React.FC = () => {
                     />
                 )}
 
-                {/* Top Navigation - provides quick access when bottom nav is obscured */}
                 <TopNavigation
                     onSettingsClick={() => setView('settings')}
                     onSyncClick={() => setSyncView('selector')}
                     onImaxClick={!selectedItem && view !== 'imax' ? () => setView('imax') : undefined}
                     onChoiceBotClick={() => setShowChoiceGPT(true)}
-                    onBoxOfficeClick={() => navigate('/Stats/BoxOffice')}
                     preferPerformance={performanceMode}
                 />
+
+                
 
                 {/* Liquid panel demo removed per requirement; pill menu drives effect */}
 

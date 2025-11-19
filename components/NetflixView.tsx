@@ -276,93 +276,6 @@ const providerGifMap: Record<string, string> = {
     'Prime Video': 'https://media.giphy.com/media/gvfw1b9opaAFgOTBDI/giphy.gif',
 };
 
-// Enhanced Search Button Component
-const SearchButton: React.FC<{
-    onSearch: (query: string) => void;
-    placeholder?: string;
-    className?: string;
-}> = ({ onSearch, placeholder = "Search movies and TV shows...", className = "" }) => {
-    const { tokens } = useAppleTheme();
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    const handleToggle = () => {
-        setIsExpanded(!isExpanded);
-        if (!isExpanded) {
-            setTimeout(() => inputRef.current?.focus(), 100);
-        } else {
-            setSearchQuery('');
-            onSearch('');
-        }
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSearch(searchQuery);
-    };
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        setSearchQuery(value);
-        onSearch(value);
-    };
-
-    return (
-        <div className={`apple-glass-regular apple-depth-1 ${className}`} style={{
-            display: 'flex',
-            alignItems: 'center',
-            borderRadius: '50px',
-            padding: `${tokens.spacing.micro[1]}px`,
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-            width: isExpanded ? '300px' : '44px',
-            height: '44px',
-            overflow: 'hidden'
-        }}>
-            <button
-                onClick={handleToggle}
-                style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: tokens.colors.label.primary,
-                    cursor: 'pointer',
-                    padding: `${tokens.spacing.micro[1]}px`,
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: '32px',
-                    minHeight: '32px'
-                }}
-                aria-label="Search movies and TV shows"
-            >
-                <Search size={18} />
-            </button>
-            
-            {isExpanded && (
-                <form onSubmit={handleSubmit} style={{ flex: 1, marginLeft: `${tokens.spacing.micro[1]}px` }}>
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={searchQuery}
-                        onChange={handleInputChange}
-                        placeholder={placeholder}
-                        style={{
-                            width: '100%',
-                            background: 'transparent',
-                            border: 'none',
-                            outline: 'none',
-                            color: tokens.colors.label.primary,
-                            fontSize: tokens.typography.sizes.body,
-                            fontFamily: tokens.typography.families.text,
-                            padding: `${tokens.spacing.micro[0]}px 0`
-                        }}
-                    />
-                </form>
-            )}
-        </div>
-    );
-};
 
 const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelectItem, onInvalidApiKey, onNavigateProvider }) => {
     const { tokens } = useAppleTheme();
@@ -656,15 +569,7 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
             maxWidth: '1400px',
             margin: '0 auto'
         }}>
-            {/* Enhanced Search Section */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-                marginBottom: `${tokens.spacing.standard[1]}px`
-            }}>
-                <SearchButton onSearch={handleInternalSearch} />
-            </div>
+            
 
             {/* Search Results */}
             {currentSearchQuery && (

@@ -46,6 +46,8 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
           display: 'flex',
           alignItems: 'center',
           gap: `${tokens.spacing.micro[1]}px`,
+          flexWrap: 'wrap',
+          rowGap: `${tokens.spacing.micro[1]}px`,
           padding: `${tokens.spacing.micro[1]}px`,
           borderRadius: '24px',
           background: preferPerformance ? 'rgba(255,255,255,0.88)' : tokens.materials.pill.primary.background,
@@ -53,7 +55,8 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
           WebkitBackdropFilter: preferPerformance ? 'none' : tokens.materials.pill.primary.backdropFilter,
           border: preferPerformance ? '1px solid rgba(255,255,255,0.66)' : `1px solid ${tokens.materials.pill.primary.border}`,
           boxShadow: preferPerformance ? '0 4px 14px rgba(0,0,0,0.18)' : tokens.materials.pill.primary.shadow,
-          pointerEvents: 'auto'
+          pointerEvents: 'auto',
+          maxWidth: 'calc(100vw - 32px)'
         }}
       >
         {/* IMAX logo (optional) */}
@@ -99,120 +102,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
         )}
 
 
-        {onChoiceBotClick && (
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '44px',
-              padding: `0 ${tokens.spacing.micro[1]}px`,
-              borderRadius: `${tokens.borderRadius.large}px`,
-              background: 'rgba(31, 111, 235, 0.18)',
-              backdropFilter: preferPerformance ? 'none' : 'blur(4px) saturate(1.12) contrast(1.02)',
-              WebkitBackdropFilter: preferPerformance ? 'none' : 'blur(4px) saturate(1.12) contrast(1.02)',
-              border: '1px solid rgba(31,111,235,0.32)',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-              boxSizing: 'border-box'
-            }}
-          >
-            <button
-              onClick={onChoiceBotClick}
-              aria-label="ChoiceGPT"
-              title="ChoiceGPT"
-              style={{
-                border: 'none',
-                background: 'transparent',
-                padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer'
-              }}
-            >
-              <img
-                src={'https://pollinations.ai/icon-512.png'}
-                alt="ChoiceGPT"
-                loading="lazy"
-                style={{ height: '20px', width: '20px', borderRadius: '4px' }}
-              />
-            </button>
-          </div>
-        )}
-        <motion.button
-          onClick={onSyncClick}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          aria-label="Sync settings"
-          title="Sync settings"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '44px',
-            height: '44px',
-            borderRadius: `${tokens.borderRadius.large}px`,
-            background: preferPerformance ? 'rgba(255,255,255,0.9)' : `rgba(255, 255, 255, ${tokens.materials.glass.regular.opacity})`,
-            backdropFilter: preferPerformance ? 'none' : `blur(${tokens.materials.glass.regular.blur}px)`,
-            WebkitBackdropFilter: preferPerformance ? 'none' : `blur(${tokens.materials.glass.regular.blur}px)`,
-            border: preferPerformance ? '1px solid rgba(255,255,255,0.66)' : `1px solid rgba(255, 255, 255, ${tokens.materials.glass.regular.borderOpacity})`,
-            cursor: 'pointer',
-            color: tokens.colors.label.primary,
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-          }}
-        >
-          <RefreshCw size={20} />
-        </motion.button>
-
-        <motion.button
-          onClick={onSettingsClick}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          aria-label="Open settings"
-          title="Open settings"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '44px',
-            height: '44px',
-            borderRadius: `${tokens.borderRadius.large}px`,
-            background: preferPerformance ? 'rgba(255,255,255,0.9)' : `rgba(255, 255, 255, ${tokens.materials.glass.regular.opacity})`,
-            backdropFilter: preferPerformance ? 'none' : `blur(${tokens.materials.glass.regular.blur}px)`,
-            WebkitBackdropFilter: preferPerformance ? 'none' : `blur(${tokens.materials.glass.regular.blur}px)`,
-            border: preferPerformance ? '1px solid rgba(255,255,255,0.66)' : `1px solid rgba(255, 255, 255, ${tokens.materials.glass.regular.borderOpacity})`,
-            cursor: 'pointer',
-            color: tokens.colors.label.primary,
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-          }}
-        >
-          <Settings size={20} />
-        </motion.button>
-
-        <a
-          href="https://buymeacoffee.com/jasonforreels"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Buy Me A Coffee"
-          title="Buy Me A Coffee"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginLeft: `${tokens.spacing.micro[1]}px`,
-            height: '28px',
-            borderRadius: `${tokens.borderRadius.large}px`,
-            overflow: 'hidden',
-            cursor: 'pointer'
-          }}
-        >
-          <img
-            src={'https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png'}
-            alt="Buy Me A Coffee"
-            loading="lazy"
-            style={{ height: '100%', width: 'auto' }}
-          />
-        </a>
+        
 
         
       </div>
