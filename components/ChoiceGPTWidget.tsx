@@ -10,7 +10,7 @@ interface ChoiceGPTWidgetProps {
   inline?: boolean;
 }
 
-const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose }) => {
+const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline }) => {
   const { tokens } = useAppleTheme();
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'assistant', content: 'Hi, I am ChoiceGPT. Ask me anything about movies, TV, streaming, and availability.' }
