@@ -320,7 +320,7 @@ const AppContent: React.FC = () => {
                 />
 
                 {showChoiceGPT && (
-                    <ChoiceGPTWidget onClose={() => setShowChoiceGPT(false)} />
+                    <ChoiceGPTWidget onClose={() => setShowChoiceGPT(false)} modes={['image','text']} />
                 )}
             </div>
         </ImageGeneratorProvider>

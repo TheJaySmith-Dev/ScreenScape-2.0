@@ -22,6 +22,7 @@ import Loader from './Loader';
 import { useAppleTheme } from './AppleThemeProvider';
 import { useAppleAnimationEffects } from '../hooks/useAppleAnimationEffects';
 import { Star, Heart, ThumbsDown, X, Play } from 'lucide-react';
+import { LiquidGlassWrapper } from './LiquidGlassWrapper';
 import {
     getAvailabilityBuckets,
     buildAvailabilityDescriptors,
@@ -3347,32 +3348,30 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
             {showTrailerModal && mainTrailerKey && (
                 <TrailerModalOverlay onClick={handleCloseTrailerModal}>
                     <TrailerModalContent onClick={(e) => e.stopPropagation()}>
-                        <button
+                        <LiquidGlassWrapper
+                            componentType="button"
+                            intensity="prominent"
+                            effect="regular"
+                            shape="circle"
+                            refractionQuality="high"
+                            artifactReduction="mild"
                             onClick={handleCloseTrailerModal}
-                            onMouseEnter={applyHoverEffect}
-                            onMouseDown={applyPressEffect}
-                            className="absolute top-4 right-4 z-10 backdrop-blur-xl border"
-                            aria-label="Close trailer"
+                            className="absolute top-4 right-4 z-50"
                             style={{
-                                padding: '12px',
-                                borderRadius: '50%',
-                                minWidth: '44px',
-                                minHeight: '44px',
+                                width: 44,
+                                height: 44,
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                background: tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.1)',
-                                backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
-                                WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
-                                borderColor: tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)',
-                                boxShadow: tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.3)',
+                                border: '1px solid rgba(255,255,255,0.22)',
+                                boxShadow: '0 10px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.2)',
                                 color: tokens.colors.text.primary,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                                cursor: 'pointer'
                             }}
+                            aria-label="Close trailer"
                         >
                             <X size={20} />
-                        </button>
+                        </LiquidGlassWrapper>
                         <TrailerVideoContainer>
                             <VideoPlayer
                                 videoKey={mainTrailerKey}

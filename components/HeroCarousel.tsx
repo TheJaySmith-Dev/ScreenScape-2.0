@@ -1,18 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { MediaItem, TVShow, WatchProviderCountry } from '../types';
-import { getTrending, getMovieWatchProviders, getTVShowWatchProviders, getMovieImages, getTVShowImages } from '../services/tmdbService';
-// FanArt removed: backdrops resolved via TMDb images
-import { useGeolocation } from '../hooks/useGeolocation';
-import { useStreamingPreferences } from '../hooks/useStreamingPreferences';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppleTheme } from './AppleThemeProvider';
-import { PlayIcon } from './Icons';
-import { Info } from 'lucide-react';
-import MediaTitleLogo from './MediaTitleLogo';
+import { MediaItem, TVShow } from '../types';
 import {
-    getAvailabilityBuckets,
-    buildAvailabilityDescriptors,
-    hasAvailability,
-} from '../utils/streamingAvailability';
+    getUpcomingMovies,
+    getPopularMovies,
+    getPopularTVShows,
+    getMovieImages,
+    getTVShowImages,
+    getMovieVideos,
+    getTVShowVideos
+} from '../services/tmdbService';
+import { Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import MediaTitleLogo from './MediaTitleLogo';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
 
@@ -22,372 +21,320 @@ interface HeroCarouselProps {
     onInvalidApiKey: () => void;
 }
 
+type HeroItem = MediaItem & { heroType: 'Trending Now' | 'New Release' };
+
 const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInvalidApiKey }) => {
-    const { tokens } = useAppleTheme();
-    const [items, setItems] = useState<MediaItem[]>([]);
+    const [items, setItems] = useState<HeroItem[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
-    const [availabilityMap, setAvailabilityMap] = useState<Record<number, WatchProviderCountry | null>>({});
     const [tmdbBackdrops, setTmdbBackdrops] = useState<Record<number, string | null>>({});
+    const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
+    const [shouldPlayVideo, setShouldPlayVideo] = useState<boolean>(false);
     const intervalRef = useRef<number | null>(null);
-    const { country } = useGeolocation();
-    const { providerIds } = useStreamingPreferences();
+    const activeVideoUrlRef = useRef<string | null>(null);
+    const { tokens } = useAppleTheme();
 
+    // 1. Data Fetching
     useEffect(() => {
         let isMounted = true;
-        const fetchTrending = async () => {
+        const fetchData = async () => {
             try {
-                const trending = await getTrending(apiKey, 'week');
-                const filteredItems = trending.results
-                    .filter(item => item.backdrop_path && (item.media_type === 'movie' || item.media_type === 'tv'))
-                    .sort((a, b) => b.popularity - a.popularity)
-                    .slice(0, 7);
-                if (isMounted) {
-                    setItems(filteredItems);
-                    setAvailabilityMap({});
-                    setTmdbBackdrops({});
+                const [upcomingResp, popularMoviesResp, popularTVResp] = await Promise.all([
+                    getUpcomingMovies(apiKey),
+                    getPopularMovies(apiKey),
+                    getPopularTVShows(apiKey)
+                ]);
+
+                const recentThreshold = new Date();
+                recentThreshold.setMonth(recentThreshold.getMonth() - 4);
+
+                const newMovies = upcomingResp.results
+                    .filter(it => it.backdrop_path)
+                    .slice(0, 5)
+                    .map(item => ({ ...item, heroType: 'New Release' as const }));
+
+                const newShows = popularTVResp.results
+                    .filter(tv => {
+                        const d = (tv as TVShow).first_air_date;
+                        if (!d) return false;
+                        const dt = new Date(d);
+                        return !isNaN(dt.getTime()) && dt >= recentThreshold;
+                    })
+                    .filter(it => it.backdrop_path)
+                    .slice(0, Math.max(0, 5 - newMovies.length))
+                    .map(item => ({ ...item, heroType: 'New Release' as const }));
+
+                const popularMovies = popularMoviesResp.results
+                    .filter(it => it.backdrop_path)
+                    .slice(0, 5)
+                    .map(item => ({ ...item, heroType: 'Trending Now' as const }));
+
+                const popularShows = popularTVResp.results
+                    .filter(it => it.backdrop_path)
+                    .slice(0, Math.max(0, 5 - popularMovies.length))
+                    .map(item => ({ ...item, heroType: 'Trending Now' as const }));
+
+                const newSet = [...newMovies, ...newShows].slice(0, 5);
+                const popularSet = [...popularMovies, ...popularShows].slice(0, 5);
+
+                const combined: HeroItem[] = [];
+                const maxLen = Math.max(newSet.length, popularSet.length);
+                for (let i = 0; i < maxLen; i++) {
+                    if (i < newSet.length) combined.push(newSet[i]);
+                    if (i < popularSet.length) combined.push(popularSet[i]);
                 }
-            } catch (error) {
-                console.error(error);
-                if (error instanceof Error && error.message.includes("Invalid API Key")) {
+
+                if (isMounted) {
+                    setItems(combined.slice(0, 10));
+                }
+            } catch (err) {
+                console.error("Hero fetch error", err);
+                if (err instanceof Error && err.message.includes("Invalid API Key")) {
                     onInvalidApiKey();
                 }
             }
         };
-        fetchTrending();
+        fetchData();
         return () => { isMounted = false; };
     }, [apiKey, onInvalidApiKey]);
 
-    // Resolve TMDb backdrops for items
+    // 2. Resolve Backdrops (High Quality)
     useEffect(() => {
+        if (items.length === 0) return;
         let cancelled = false;
-        const resolveBackdrops = async () => {
+        const resolveImages = async () => {
             const updates: Record<number, string | null> = {};
-            for (const it of items) {
+            for (const item of items) {
                 try {
                     let url: string | null = null;
-                    if (it.media_type === 'movie') {
-                        const images = await getMovieImages(apiKey, it.id);
-                        const backdrops = Array.isArray(images?.backdrops) ? images.backdrops : [];
-                        if (backdrops.length > 0) {
-                            const pick = backdrops
-                                .slice()
-                                .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
-                            if (pick?.file_path) {
-                                url = `${IMAGE_BASE_URL}${pick.file_path}`;
-                            }
-                        }
-                    } else if (it.media_type === 'tv') {
-                        const images = await getTVShowImages(apiKey, it.id);
-                        const backdrops = Array.isArray(images?.backdrops) ? images.backdrops : [];
-                        if (backdrops.length > 0) {
-                            const pick = backdrops
-                                .slice()
-                                .sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0];
-                            if (pick?.file_path) {
-                                url = `${IMAGE_BASE_URL}${pick.file_path}`;
-                            }
-                        }
+                    // Try to get better backdrops
+                    if (item.media_type === 'movie') {
+                        const imgs = await getMovieImages(apiKey, item.id);
+                        const best = imgs.backdrops?.[0];
+                        if (best?.file_path) url = `${IMAGE_BASE_URL}${best.file_path}`;
+                    } else if (item.media_type === 'tv') {
+                        const imgs = await getTVShowImages(apiKey, item.id);
+                        const best = imgs.backdrops?.[0];
+                        if (best?.file_path) url = `${IMAGE_BASE_URL}${best.file_path}`;
                     }
-                    updates[it.id] = url || null;
+                    updates[item.id] = url;
                 } catch {
-                    updates[it.id] = null;
+                    updates[item.id] = null;
                 }
             }
             if (!cancelled) setTmdbBackdrops(prev => ({ ...prev, ...updates }));
         };
-        if (items.length > 0) resolveBackdrops();
+        resolveImages();
         return () => { cancelled = true; };
     }, [items, apiKey]);
 
+    // 3. Video Logic (Simplified for stability)
     useEffect(() => {
-        if (items.length === 0) return;
+        activeVideoUrlRef.current = activeVideoUrl;
+    }, [activeVideoUrl]);
 
-        let isMounted = true;
-        const currentItem = items[currentIndex];
+    const activeItem = items[currentIndex];
 
-        // Only fetch watch providers since we don't need trailers anymore
-        const fetchProviders = async () => {
+    useEffect(() => {
+        // Reset video state on slide change
+        setActiveVideoUrl(null);
+        setShouldPlayVideo(false);
+
+        if (!activeItem) return;
+
+        let cancelled = false;
+        let videoTimer: number | null = null;
+
+        const loadVideo = async () => {
             try {
-                const providersResponse = currentItem.media_type === 'movie'
-                    ? await getMovieWatchProviders(apiKey, currentItem.id, country.code)
-                    : await getTVShowWatchProviders(apiKey, currentItem.id, country.code);
+                const res = activeItem.media_type === 'movie'
+                    ? await getMovieVideos(apiKey, activeItem.id)
+                    : await getTVShowVideos(apiKey, activeItem.id);
 
-                if (isMounted) {
-                    const providers = providersResponse.results?.[country.code] ?? null;
-                    setAvailabilityMap(prev => ({ ...prev, [currentItem.id]: providers }));
+                const vids = res.results || [];
+                // Priority: TV Spot > Official Trailer > Trailer
+                const video = vids.find(v => v.site === 'YouTube' && (v.type === 'TV Spot' || /tv\s*spot/i.test(v.name || '')))
+                    || vids.find(v => v.site === 'YouTube' && v.type === 'Trailer' && v.official)
+                    || vids.find(v => v.site === 'YouTube' && v.type === 'Trailer');
+
+                if (video?.key && !cancelled) {
+                    const url = `https://www.youtube.com/embed/${video.key}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${video.key}`;
+                    setActiveVideoUrl(url);
+
+                    // Delay playing to allow backdrop to show first
+                    videoTimer = window.setTimeout(() => {
+                        if (!cancelled) setShouldPlayVideo(true);
+                    }, 5000);
                 }
-            } catch (error) {
-                // Handle network errors silently to prevent console spam
-                if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-                    // Network error - silently set providers to null
-                    if (isMounted) {
-                        setAvailabilityMap(prev => ({ ...prev, [currentItem.id]: null }));
-                    }
-                } else {
-                    // Log other types of errors for debugging
-                    console.error("Failed to fetch providers:", error);
-                    if (isMounted) {
-                        setAvailabilityMap(prev => ({ ...prev, [currentItem.id]: null }));
-                    }
-                }
+            } catch (e) {
+                console.error("Video fetch error", e);
             }
         };
-        fetchProviders();
 
-        return () => { isMounted = false; };
-    }, [currentIndex, items, apiKey, country.code]);
+        loadVideo();
 
+        return () => {
+            cancelled = true;
+            if (videoTimer) clearTimeout(videoTimer);
+        };
+    }, [activeItem, apiKey]);
+
+    // 4. Navigation Logic
     const goToNext = useCallback(() => {
-        setCurrentIndex(prevIndex => (prevIndex + 1) % (items.length || 1));
+        setCurrentIndex(prev => (prev + 1) % (items.length || 1));
     }, [items.length]);
 
+    const goToPrev = useCallback(() => {
+        setCurrentIndex(prev => (prev - 1 + (items.length || 1)) % (items.length || 1));
+    }, [items.length]);
+
+    // 5. Auto Rotation
     useEffect(() => {
-        if (!isHovered && items.length > 0) {
-            intervalRef.current = window.setInterval(goToNext, 7000);
+        if (!isHovered && !shouldPlayVideo && items.length > 0) {
+            intervalRef.current = window.setInterval(goToNext, 8000);
         }
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
+            intervalRef.current = null;
         };
-    }, [isHovered, items.length, goToNext]);
+    }, [isHovered, shouldPlayVideo, items.length, goToNext]);
 
-    const activeItem = items[currentIndex];
-    const activeAvailability = activeItem ? availabilityMap[activeItem.id] ?? undefined : undefined;
-    // Always show static backdrop images instead of trying to autoplay trailers
-    const showVideo = false;
-
-    const activeBuckets = useMemo(
-        () => getAvailabilityBuckets(activeAvailability, providerIds),
-        [activeAvailability, providerIds]
-    );
-
-    const availabilityDescriptors = useMemo(
-        () => buildAvailabilityDescriptors(activeBuckets, 3),
-        [activeBuckets]
-    );
-
-    const showAvailability = useMemo(() => hasAvailability(activeBuckets), [activeBuckets]);
+    if (items.length === 0) {
+        return <div className="w-screen h-[70vh] bg-black/20 animate-pulse" />;
+    }
 
     return (
-        <div 
-            className="relative w-screen h-[70vh] overflow-hidden -mx-8"
+        <div
+            className="relative w-screen h-screen md:h-[95vh] overflow-hidden group"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             style={{
                 marginLeft: 'calc(-50vw + 50%)',
                 marginRight: 'calc(-50vw + 50%)',
                 width: '100vw',
+                background: '#000'
             }}
         >
-            {/* Edge gradient masks for seamless blending */}
-            <div className="absolute inset-0 pointer-events-none z-10">
-                <div className="absolute left-0 top-0 w-32 h-full bg-gradient-to-r from-black/20 to-transparent" />
-                <div className="absolute right-0 top-0 w-32 h-full bg-gradient-to-l from-black/20 to-transparent" />
-                <div className="absolute top-0 left-0 w-full h-16 bg-gradient-to-b from-black/20 to-transparent" />
-                <div className="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-black/20 to-transparent" />
-            </div>
-
+            {/* Slides */}
             {items.map((item, index) => {
                 const isActive = index === currentIndex;
-                const availability = availabilityMap[item.id];
-                const availabilityBuckets = getAvailabilityBuckets(availability, providerIds);
-                const availabilityDescriptors = buildAvailabilityDescriptors(availabilityBuckets);
-                const hasAnyAvailability = hasAvailability(availabilityBuckets);
+                const backdrop = tmdbBackdrops[item.id]
+                    || (item.backdrop_path ? `${IMAGE_BASE_URL}${item.backdrop_path}` : null);
 
                 return (
                     <div
-                        key={item.id}
-                        className={`absolute inset-0 transition-opacity duration-1000 ${
-                            isActive ? 'opacity-100' : 'opacity-0'
-                        }`}
+                        key={`${item.id}-${index}`}
+                        className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                            }`}
                     >
-                        {/* Background Image */}
-                        <div className="absolute inset-0">
-                            {(() => {
-                                const fa = tmdbBackdrops[item.id];
-                                const fallback = item.backdrop_path
-                                    ? (item.backdrop_path.startsWith('http')
-                                        ? item.backdrop_path
-                                        : `${IMAGE_BASE_URL}${item.backdrop_path}`)
-                                    : '';
-                                const backdropSrc = fa || fallback;
-                                return (
-                                    <img
-                                        src={backdropSrc}
-                                        alt={item.media_type === 'movie' ? item.title : (item as TVShow).name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                );
-                            })()}
-                            {/* Subtle overlay for better text readability */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
-                        </div>
+                        {/* Image Layer */}
+                        {backdrop && (
+                            <img
+                                src={backdrop}
+                                alt={item.title || (item as TVShow).name}
+                                className="w-full h-full object-cover"
+                            />
+                        )}
+
+                        {/* Video Layer */}
+                        {isActive && shouldPlayVideo && activeVideoUrl && (
+                            <div className="absolute inset-0 overflow-hidden animate-fadeIn">
+                                <iframe
+                                    src={activeVideoUrl}
+                                    className="absolute w-[170%] h-[170%] sm:w-[185%] sm:h-[185%] md:w-[200%] md:h-[200%] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                                    allow="autoplay; encrypted-media"
+                                />
+                            </div>
+                        )}
+
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/35 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
                     </div>
                 );
             })}
 
-            <div className="relative h-full flex flex-col justify-end z-20">
+            {/* Content Layer (Z-20) */}
+            <div className="absolute inset-0 z-20 pointer-events-none flex flex-col justify-center px-8 sm:px-16">
                 {activeItem && (
-                    <div className="mx-4 sm:mx-8 mb-8 sm:mb-12">
-                        {/* Glass morphism content panel */}
-                        <div 
-                            className="p-6 sm:p-8 rounded-2xl max-w-4xl"
-                            style={{
-                                background: tokens?.materials?.pill?.primary?.background || 'rgba(255, 255, 255, 0.1)',
-                                backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
-                                WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(20px)',
-                                border: `1px solid ${tokens?.materials?.pill?.primary?.border || 'rgba(255, 255, 255, 0.2)'}`,
-                                boxShadow: tokens?.shadows?.large || '0 8px 32px rgba(0, 0, 0, 0.3)',
-                            }}
-                        >
-                            <div className="flex items-start gap-6 w-full">
-                                {/* Logo Section - Left */}
-                                <div className="flex-shrink-0 hidden sm:block">
-                                    <MediaTitleLogo
-                                        media={activeItem}
-                                        apiKey={apiKey}
-                                        size="large"
-                                        fallbackToText={false}
-                                        style={{
-                                            maxWidth: '150px',
-                                            maxHeight: '80px',
-                                            filter: 'drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3))'
-                                        }}
-                                    />
-                                </div>
-
-                                {/* Content Section */}
-                                <div className="flex-1 space-y-4">
-                            {/* Mobile Logo - Show on small screens */}
-                            <div className="block sm:hidden mb-4">
-                                <MediaTitleLogo
-                                    media={activeItem}
-                                    apiKey={apiKey}
-                                    size="medium"
-                                    fallbackToText={false}
-                                    style={{
-                                        maxWidth: '120px',
-                                        maxHeight: '60px',
-                                        filter: 'drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5))'
-                                    }}
-                                />
-                            </div>
-
-                                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-tight">
-                                        {activeItem.media_type === 'movie' ? activeItem.title : (activeItem as TVShow).name}
-                                    </h2>
-                                    <p className="text-base sm:text-lg text-white/90 line-clamp-3 sm:line-clamp-2 leading-relaxed">
-                                        {activeItem.overview}
-                                    </p>
-                            {showAvailability && activeAvailability && (
-                                <div className="flex flex-wrap gap-2 items-center">
-                                    {/* Show actual provider logos */}
-                                    {activeAvailability.flatrate?.slice(0, 5).map(provider => (
-                                        <div
-                                            key={`flatrate-${provider.provider_id}`}
-                                            className="relative group"
-                                            title={`Stream on ${provider.provider_name}`}
-                                        >
-                                            <img
-                                                src={`https://image.tmdb.org/t/p/original${provider.logo_path}`}
-                                                alt={provider.provider_name}
-                                                className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20"
-                                                onError={(e) => {
-                                                    e.currentTarget.style.display = 'none';
-                                                }}
-                                            />
-                                        </div>
-                                    ))}
-                                    {activeAvailability.rent?.slice(0, 3).map(provider => (
-                                        <div
-                                            key={`rent-${provider.provider_id}`}
-                                            className="relative group"
-                                            title={`Rent on ${provider.provider_name}`}
-                                        >
-                                            <img
-                                                src={`https://image.tmdb.org/t/p/original${provider.logo_path}`}
-                                                alt={provider.provider_name}
-                                                className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 opacity-75"
-                                                onError={(e) => {
-                                                    e.currentTarget.style.display = 'none';
-                                                }}
-                                            />
-                                        </div>
-                                    ))}
-                                    {/* Fallback text if no logos */}
-                                    {(!activeAvailability.flatrate || activeAvailability.flatrate.length === 0) && availabilityDescriptors.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 text-xs sm:text-sm text-white/80">
-                                            {availabilityDescriptors.slice(0, 2).map(descriptor => (
-                                                <span
-                                                    key={descriptor.type}
-                                                    className="bg-white/10 border border-white/20 px-3 py-1 rounded-full backdrop-blur-sm"
-                                                >
-                                                    <span className="font-semibold text-white mr-1">{descriptor.type}:</span>
-                                                    <span className="text-white/90">{descriptor.text}</span>
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-2">
-                                        <button
-                                            onClick={() => onSelectItem(activeItem)}
-                                            className="flex items-center justify-center gap-2 text-white font-semibold px-6 py-3 rounded-full transition-all duration-200"
-                                            style={{
-                                                background: 'rgba(255, 255, 255, 0.15)',
-                                                backdropFilter: 'blur(20px)',
-                                                WebkitBackdropFilter: 'blur(20px)',
-                                                border: '1px solid rgba(255, 255, 255, 0.2)',
-                                                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-                                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                                            }}
-                                        >
-                                            <Info className="w-5 h-5" />
-                                            More Info
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                    <div className="max-w-2xl space-y-6 pointer-events-auto animate-slideUp">
+                        {/* Badge */}
+                        <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-white uppercase tracking-wider shadow-lg">
+                            {activeItem.heroType}
                         </div>
+
+                        {/* Title / Logo */}
+                        <div className="origin-left transform scale-100">
+                            <MediaTitleLogo
+                                media={activeItem}
+                                apiKey={apiKey}
+                                size="large"
+                                fallbackToText={true}
+                                style={{ maxWidth: '400px', maxHeight: '150px' }}
+                            />
+                        </div>
+
+                        {/* Overview (Optional, short) */}
+                        <p className="text-white/80 text-sm sm:text-base line-clamp-3 max-w-xl drop-shadow-md">
+                            {activeItem.overview}
+                        </p>
+
+                        {/* Action Button */}
+                        <button
+                            onClick={() => onSelectItem(activeItem)}
+                            className="flex items-center gap-2 bg-white text-black px-6 py-3 rounded-full font-bold hover:bg-gray-200 transition-colors shadow-xl"
+                        >
+                            <Info className="w-5 h-5" />
+                            More Info
+                        </button>
                     </div>
                 )}
             </div>
 
-            {/* Progress Indicators - Horizontal Lines */}
-            <div className="absolute bottom-8 sm:bottom-12 md:bottom-16 left-1/2 -translate-x-1/2 z-10 flex gap-2">
-                {items.map((_, index) => (
-                    <button 
-                        key={index} 
-                        onClick={() => setCurrentIndex(index)} 
-                        className="w-8 sm:w-12 h-1 bg-white/30 rounded-full overflow-hidden transition-all duration-300 hover:bg-white/50"
-                        style={{
-                            backdropFilter: 'blur(10px)',
-                            WebkitBackdropFilter: 'blur(10px)'
-                        }}
-                    >
-                        <div 
-                            className={`h-full bg-white rounded-full transition-all duration-300 ${
-                                index === currentIndex ? 'animate-progress' : ''
-                            } ${
-                                index > currentIndex ? 'w-0' : index < currentIndex ? 'w-full' : ''
+            {/* Navigation Buttons (Z-50) - Always Visible & Clickable */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    goToPrev();
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-50 p-3 rounded-full bg-black/30 text-white hover:bg-white hover:text-black transition-all backdrop-blur-sm border border-white/10 shadow-lg cursor-pointer"
+                aria-label="Previous Slide"
+            >
+                <ChevronLeft className="w-8 h-8" />
+            </button>
+
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    goToNext();
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-50 p-3 rounded-full bg-black/30 text-white hover:bg-white hover:text-black transition-all backdrop-blur-sm border border-white/10 shadow-lg cursor-pointer"
+                aria-label="Next Slide"
+            >
+                <ChevronRight className="w-8 h-8" />
+            </button>
+
+            {/* Bottom Blend to Page */}
+            <div
+                aria-hidden
+                className="absolute left-0 right-0 bottom-0 z-20 pointer-events-none"
+                style={{
+                    height: '18vh',
+                    background: `linear-gradient(to bottom, rgba(0,0,0,0) 0%, ${tokens?.colors?.background?.primary || '#000000'} 100%)`
+                }}
+            />
+
+            {/* Indicators (Z-30) */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex gap-2">
+                {items.map((_, idx) => (
+                    <button
+                        key={idx}
+                        onClick={() => setCurrentIndex(idx)}
+                        className={`w-2 h-2 rounded-full transition-all duration-300 ${idx === currentIndex ? 'bg-white w-6' : 'bg-white/40 hover:bg-white/60'
                             }`}
-                            style={{
-                                boxShadow: index === currentIndex ? '0 0 8px rgba(255, 255, 255, 0.6)' : 'none'
-                            }}
-                        />
-                    </button>
+                        aria-label={`Go to slide ${idx + 1}`}
+                    />
                 ))}
             </div>
-             <style>{`
-                @keyframes progress {
-                    from { width: 0%; }
-                    to { width: 100%; }
-                }
-                .animate-progress {
-                    animation: progress 7s linear forwards;
-                }
-            `}</style>
         </div>
     );
 };

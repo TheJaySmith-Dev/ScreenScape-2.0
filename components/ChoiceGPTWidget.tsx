@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
+import { LiquidGlassPillButton } from './LiquidGlassPillButton';
 import { searchMulti } from '../services/tmdbService';
 import { useAppleTheme } from './AppleThemeProvider';
 
@@ -368,12 +369,58 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
           <span style={{ marginLeft: 'auto', color: tokens.colors.label.secondary, fontSize: tokens.typography.sizes.caption2 }}>Pollinations AI</span>
           {availableModes.length > 1 && (
             <div style={{ display: 'flex', gap: 8, marginLeft: 8 }}>
-              <button onClick={() => setMode('image')} style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${tokens.colors.separator.opaque}`, background: mode === 'image' ? 'rgba(31,111,235,0.18)' : tokens.colors.background.secondary, color: tokens.colors.label.primary, fontWeight: 600, cursor: 'pointer' }}>Image</button>
-              <button onClick={() => setMode('text')} style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${tokens.colors.separator.opaque}`, background: mode === 'text' ? 'rgba(31,111,235,0.18)' : tokens.colors.background.secondary, color: tokens.colors.label.primary, fontWeight: 600, cursor: 'pointer' }}>Text</button>
+              <button
+                onClick={() => setMode('image')}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 10,
+                  border: mode === 'image' ? '1px solid rgba(255,255,255,0.28)' : `1px solid ${tokens.colors.separator.opaque}`,
+                  background: mode === 'image' ? 'rgba(255,255,255,0.12)' : tokens.colors.background.secondary,
+                  backdropFilter: mode === 'image' ? 'blur(10px) saturate(1.15)' : undefined,
+                  WebkitBackdropFilter: mode === 'image' ? 'blur(10px) saturate(1.15)' : undefined,
+                  boxShadow: mode === 'image' ? '0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.25)' : 'none',
+                  color: tokens.colors.label.primary,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Image
+              </button>
+              <button
+                onClick={() => setMode('text')}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 10,
+                  border: mode === 'text' ? '1px solid rgba(255,255,255,0.28)' : `1px solid ${tokens.colors.separator.opaque}`,
+                  background: mode === 'text' ? 'rgba(255,255,255,0.12)' : tokens.colors.background.secondary,
+                  backdropFilter: mode === 'text' ? 'blur(10px) saturate(1.15)' : undefined,
+                  WebkitBackdropFilter: mode === 'text' ? 'blur(10px) saturate(1.15)' : undefined,
+                  boxShadow: mode === 'text' ? '0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.25)' : 'none',
+                  color: tokens.colors.label.primary,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Text
+              </button>
             </div>
           )}
           {onClose && (
-            <button onClick={onClose} style={{ marginLeft: 8, height: 28, padding: '0 10px', borderRadius: 8, border: 'none', background: '#1f6feb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Close</button>
+            <button
+              onClick={onClose}
+              className="glass-button"
+              style={{
+                padding: '8px 12px',
+                borderRadius: 10,
+                border: '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(255,255,255,0.10)',
+                color: tokens.colors.label.primary,
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Close
+            </button>
           )}
         </div>
         <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
@@ -422,9 +469,32 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
                   </select>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={handleGenerate} style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: '#1f6feb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Generate</button>
-                <button onClick={() => setImages([])} style={{ padding: '10px 14px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, fontWeight: 700, cursor: 'pointer' }}>Clear</button>
+              <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                <button 
+                  onClick={handleGenerate}
+                  className="glass-button"
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: 20,
+                    border: '1px solid rgba(255,255,255,0.28)',
+                    background: 'rgba(255,255,255,0.12)',
+                    backdropFilter: 'blur(12px) saturate(1.15)',
+                    WebkitBackdropFilter: 'blur(12px) saturate(1.15)',
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.25)',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Generate
+                </button>
+                <button 
+                  onClick={() => setImages([])}
+                  className="glass-button"
+                  style={{ padding: '10px 14px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.10)', color: tokens.colors.label.primary, fontWeight: 700, cursor: 'pointer', marginLeft: 'auto' }}
+                >
+                  Clear
+                </button>
               </div>
               {images.length > 0 && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
@@ -457,7 +527,7 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
         </div>
         {mode === 'text' && (
           <div style={{ padding: 10, borderTop: '1px solid rgba(255,255,255,0.18)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 16, alignItems: 'center' }}>
               <input
                 value={input}
                 onChange={e => setInput(e.target.value)}
@@ -465,8 +535,20 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
                 placeholder={searchMode ? 'Search (web + AI)…' : 'Ask ChoiceGPT…'}
                 style={{ padding: '10px 12px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, minWidth: 0 }}
               />
-              <button onClick={searchMode ? runSearch : sendMessage} disabled={loading} style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: loading ? '#999999' : '#1f6feb', color: '#ffffff', fontWeight: 700, cursor: loading ? 'default' : 'pointer' }}>{loading ? 'Working…' : searchMode ? 'Search' : 'Send'}</button>
-              <button onClick={() => setSearchMode(s => !s)} aria-label={searchMode ? 'Search: On' : 'Search: Off'} title={searchMode ? 'Search: On' : 'Search: Off'} style={{ padding: '10px 14px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, fontWeight: 600, cursor: 'pointer' }}>
+              <button 
+                onClick={searchMode ? runSearch : sendMessage}
+                disabled={loading}
+                style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: loading ? '#999999' : '#1f6feb', color: '#ffffff', fontWeight: 700, cursor: loading ? 'default' : 'pointer' }}
+              >
+                {loading ? 'Working…' : (searchMode ? 'Search' : 'Send')}
+              </button>
+              <button 
+                onClick={() => setSearchMode(s => !s)}
+                aria-label={searchMode ? 'Search: On' : 'Search: Off'}
+                title={searchMode ? 'Search: On' : 'Search: Off'}
+                className="glass-button"
+                style={{ padding: '10px 14px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.10)', color: tokens.colors.label.primary, fontWeight: 600, cursor: 'pointer' }}
+              >
                 <SettingsIcon size={18} />
               </button>
             </div>

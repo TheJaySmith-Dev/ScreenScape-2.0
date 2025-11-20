@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { LiquidGlassWrapper } from './LiquidGlassWrapper';
 import { generateImage } from '../services/imageGenerationService';
 import { useImageGenerator } from '../contexts/ImageGeneratorContext';
 
@@ -94,14 +95,28 @@ const ImageGenerator: React.FC = () => {
 
           {/* Generate Button */}
           <div className="text-center">
-            <button
-              onClick={handleGenerate}
-              disabled={isGenerating || !prompt.trim()}
-              className={`px-8 py-3 rounded-full font-semibold transition-all duration-300 ${
-                isGenerating || !prompt.trim()
-                  ? 'glass-button-secondary cursor-not-allowed opacity-50'
-                  : 'glass-button-primary hover:scale-105'
-              }`}
+            <LiquidGlassWrapper
+              componentType="button"
+              intensity="prominent"
+              effect="regular"
+              shape="pill"
+              refractionQuality="balanced"
+              artifactReduction="mild"
+              onClick={isGenerating || !prompt.trim() ? undefined : handleGenerate}
+              className={isGenerating || !prompt.trim() ? '' : 'transition-transform duration-300 hover:scale-[1.03] active:scale-[0.98]'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '12px 24px',
+                border: '1px solid rgba(255,255,255,0.22)',
+                boxShadow: '0 10px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.2)',
+                color: '#fff',
+                fontWeight: 600,
+                borderRadius: 9999,
+                cursor: isGenerating || !prompt.trim() ? 'not-allowed' : 'pointer',
+                opacity: isGenerating || !prompt.trim() ? 0.5 : 1
+              }}
             >
               {isGenerating ? (
                 <div className="flex items-center gap-2">
@@ -109,9 +124,9 @@ const ImageGenerator: React.FC = () => {
                   Generating...
                 </div>
               ) : (
-                'Generate Image'
+                'Generate'
               )}
-            </button>
+            </LiquidGlassWrapper>
           </div>
         </div>
       </div>

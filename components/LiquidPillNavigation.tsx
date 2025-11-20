@@ -175,7 +175,7 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
   const menuItemRefs = useRef<HTMLButtonElement[]>([]);
   const panelRows = useMemo(() => ([
     { id: 'boxoffice', label: 'Box Office', Icon: Tag, onClick: () => { try { navigate('/Stats/BoxOffice'); } catch { setView('genres' as ViewType); } setPanelOpen(false); } },
-    { id: 'choice', label: 'Choice (Text/Image)', Icon: ImageIcon, onClick: () => { try { navigate('/play/choicegen'); } catch {} setPanelOpen(false); } },
+    { id: 'choice', label: 'Choice (Text/Image)', Icon: ImageIcon, onClick: () => { try { window.dispatchEvent(new Event('openChoiceGPT')); } catch {} setPanelOpen(false); } },
     { id: 'coffee', label: 'Buy Me A Coffee', Icon: Tag, onClick: () => { try { window.open('https://buymeacoffee.com/jasonforreels', '_blank', 'noopener,noreferrer'); } catch {} setPanelOpen(false); } },
     { id: 'billionaire', label: 'Billionaire Sandbox', Icon: Coins, onClick: () => { try { navigate('/play/billionaire-sandbox'); } catch {} setPanelOpen(false); } },
     { id: 'game', label: 'Games', Icon: Gamepad2, onClick: () => { setView('game'); setPanelOpen(false); } },
