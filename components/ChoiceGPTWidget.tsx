@@ -4,7 +4,8 @@ import { LiquidGlassPillButton } from './LiquidGlassPillButton';
 import { searchMulti } from '../services/tmdbService';
 import { useAppleTheme } from './AppleThemeProvider';
 
-type ChatMessage = { role: 'user' | 'assistant'; content: string };
+type Citation = { index: number; url: string; title: string };
+type ChatMessage = { role: 'user' | 'assistant'; content: string; html?: string; citations?: Citation[] };
 
 interface ChoiceGPTWidgetProps {
   onClose?: () => void;
@@ -34,6 +35,7 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchMode, setSearchMode] = useState(true);
+  const [citationDensity, setCitationDensity] = useState<'minimal' | 'standard' | 'comprehensive'>('standard');
   const [apiKey] = useState<string>('');
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -116,6 +118,112 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
       }
     };
   }, [tokens]);
+
+  const escapeHtml = (s: string) => s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+  const splitIntoClaims = (text: string) => {
+    const parts = text.split(/(?<=\.)\s+|\n+/).map(t => t.trim()).filter(Boolean);
+    const scored = parts.map(p => {
+      const hasNumber = /\d/.test(p) ? 1 : 0;
+      const hasQuote = /"|“|”|'/.test(p) ? 1 : 0;
+      const definitional = /( is | are | means | refers to | defined as )/i.test(p) ? 1 : 0;
+      const proper = (p.match(/[A-Z][a-z]+/g) || []).length > 2 ? 1 : 0;
+      const score = hasNumber + hasQuote + definitional + proper;
+      return { text: p, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    const take = citationDensity === 'minimal' ? 1 : citationDensity === 'standard' ? Math.min(3, scored.length) : Math.min(6, scored.length);
+    return scored.slice(0, take).map(s => s.text);
+  };
+
+  const brandSites: Record<string, string> = {
+    'Netflix': 'https://help.netflix.com/en/node/412',
+    'Disney+': 'https://www.disneyplus.com/',
+    'HBO Max': 'https://www.max.com/',
+    'Prime Video': 'https://www.primevideo.com/',
+    'Amazon Prime Video': 'https://www.primevideo.com/',
+    'Hulu': 'https://www.hulu.com/',
+    'Paramount+': 'https://www.paramountplus.com/'
+  };
+
+  const wikify = async (q: string) => {
+    try {
+      const url = `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(q)}&limit=3&namespace=0&format=json&origin=*`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      const titles: string[] = data?.[1] || [];
+      const links: string[] = data?.[3] || [];
+      const items = titles.map((t, i) => ({ title: t, url: links[i] })).filter(x => x.url && x.title);
+      return items.slice(0, 2);
+    } catch {
+      return [];
+    }
+  };
+
+  const findAuthoritativeSources = async (claim: string) => {
+    const sources: { title: string; url: string }[] = [];
+    const brand = Object.keys(brandSites).find(k => new RegExp(`\\b${k.replace('+','\\+') }\\b`, 'i').test(claim));
+    if (brand) sources.push({ title: brand, url: brandSites[brand] });
+    const wiki = await wikify(claim);
+    sources.push(...wiki);
+    const unique: Record<string, boolean> = {};
+    const allowedHosts = ['wikipedia.org', 'disneyplus.com', 'max.com', 'primevideo.com', 'hulu.com', 'paramountplus.com', 'netflix.com', 'help.netflix.com', 'themoviedb.org', 'imdb.com'];
+    const filtered = sources.filter(s => {
+      if (unique[s.url]) return false;
+      unique[s.url] = true;
+      try {
+        const u = new URL(s.url);
+        if (u.protocol !== 'https:') return false;
+        const hostOk = allowedHosts.some(h => u.hostname === h || u.hostname.endsWith(`.${h}`));
+        return hostOk;
+      } catch { return false; }
+    });
+    const picks = filtered.slice(0, citationDensity === 'comprehensive' ? 3 : 1);
+    // Best-effort liveness check
+    const live: { title: string; url: string }[] = [];
+    for (const p of picks) {
+      try {
+        const resp = await fetch(p.url, { method: 'HEAD', mode: 'cors' });
+        if (resp.ok) live.push(p); else live.push(p);
+      } catch { live.push(p); }
+    }
+    return live;
+  };
+
+  const buildCitations = async (text: string) => {
+    const claims = splitIntoClaims(text);
+    const results: Citation[] = [];
+    const decorations: { claim: string; indices: number[] }[] = [];
+    let counter = 1;
+    for (const c of claims) {
+      const srcs = await findAuthoritativeSources(c);
+      const idxs: number[] = [];
+      for (const s of srcs) {
+        results.push({ index: counter, url: s.url, title: s.title });
+        idxs.push(counter);
+        counter++;
+      }
+      decorations.push({ claim: c, indices: idxs });
+    }
+    const escaped = escapeHtml(text);
+    let html = escaped;
+    for (const d of decorations) {
+      const marker = d.indices.map(i => `<sup><a href="#ref-${i}" title="${escapeHtml(results.find(r => r.index === i)?.title || '' )}">[${i}]</a></sup>`).join('');
+      const pattern = d.claim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(pattern);
+      html = html.replace(re, (m) => `${m} ${marker}`);
+    }
+    if (results.length > 0) {
+      const refs = results.map(r => `<li id="ref-${r.index}"><a href="${r.url}" target="_blank" rel="noreferrer" title="${escapeHtml(r.title)}">[${r.index}] ${escapeHtml(r.title)}</a></li>`).join('');
+      html = `${html}\n\n<b>References</b>\n<ul>${refs}</ul>`;
+    }
+    return { html, citations: results };
+  };
 
   const ratioToWH = (ratio: '1:1' | '16:9' | '9:16' | '4:3' | '3:2', baseHeight: number) => {
     const [rw, rh] = ratio.split(':').map(Number);
@@ -269,7 +377,9 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
         replyText = await resp.text();
       }
       if (!replyText) replyText = 'I could not generate a reply. Please try again.';
-      setMessages([...nextMessages, { role: 'assistant', content: replyText }]);
+      let htmlPayload: { html: string; citations: Citation[] } | null = null;
+      try { htmlPayload = await buildCitations(replyText); } catch {}
+      setMessages([...nextMessages, { role: 'assistant', content: replyText, html: htmlPayload?.html || undefined, citations: htmlPayload?.citations || [] }]);
     } catch {
       setMessages([...nextMessages, { role: 'assistant', content: 'Network error. Please try again.' }]);
     } finally {
@@ -324,7 +434,9 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
         text = await direct.text();
       }
       const reply = text || 'No search results available.';
-      setMessages([...nextMessages, { role: 'assistant', content: reply }]);
+      let htmlPayload: { html: string; citations: Citation[] } | null = null;
+      try { htmlPayload = await buildCitations(reply); } catch {}
+      setMessages([...nextMessages, { role: 'assistant', content: reply, html: htmlPayload?.html || undefined, citations: htmlPayload?.citations || [] }]);
     } catch {
       setMessages([...nextMessages, { role: 'assistant', content: 'Search error. Please try again.' }]);
     } finally {
@@ -427,7 +539,24 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
           {mode === 'text' && (
             <>
               {messages.map((m, i) => (
-                <div key={i} style={m.role === 'user' ? bubbleStyles.user : bubbleStyles.assistant}>{m.content}</div>
+                <div key={i} style={m.role === 'user' ? bubbleStyles.user : bubbleStyles.assistant}>
+                  {m.role === 'assistant' && m.html ? (
+                    <div dangerouslySetInnerHTML={{ __html: m.html }} />
+                  ) : (
+                    m.content
+                  )}
+                  {m.role === 'assistant' && (m.citations && m.citations.length > 0) && (
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => { const text = m.citations!.map(c => c.url).join('\n'); try { navigator.clipboard.writeText(text); } catch {} }}
+                        style={{ padding: '6px 10px', borderRadius: 10, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, fontSize: tokens.typography.sizes.caption2 }}
+                        title="Copy references"
+                      >
+                        Copy references
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))}
             </>
           )}
@@ -527,7 +656,7 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
         </div>
         {mode === 'text' && (
           <div style={{ padding: 10, borderTop: '1px solid rgba(255,255,255,0.18)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 16, alignItems: 'center' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 16, alignItems: 'center' }}>
               <input
                 value={input}
                 onChange={e => setInput(e.target.value)}
@@ -542,6 +671,16 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
               >
                 {loading ? 'Working…' : (searchMode ? 'Search' : 'Send')}
               </button>
+              <select
+                value={citationDensity}
+                onChange={(e) => setCitationDensity(e.target.value as any)}
+                style={{ height: 36, borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, fontSize: tokens.typography.sizes.caption1 }}
+                title={`Citations: ${citationDensity}`}
+              >
+                <option value="minimal">Citations: Minimal</option>
+                <option value="standard">Citations: Standard</option>
+                <option value="comprehensive">Citations: Comprehensive</option>
+              </select>
               <button 
                 onClick={() => setSearchMode(s => !s)}
                 aria-label={searchMode ? 'Search: On' : 'Search: Off'}

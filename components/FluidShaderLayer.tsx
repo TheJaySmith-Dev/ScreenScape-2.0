@@ -109,8 +109,10 @@ export default function FluidShaderLayer({ containerRef, strength = 1.0 }: Fluid
 
   // Fit canvas to parent size
   const fitCanvas = () => {
-    const canvas = canvasRef.current!;
-    const parent = canvas.parentElement!;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
     const rect = parent.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.max(1, Math.floor(rect.width * dpr));
@@ -281,4 +283,3 @@ export default function FluidShaderLayer({ containerRef, strength = 1.0 }: Fluid
     />
   );
 }
-

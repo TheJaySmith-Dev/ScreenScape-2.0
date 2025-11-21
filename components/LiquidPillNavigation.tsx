@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppleTheme } from './AppleThemeProvider';
 import { LiquidGlassWrapper } from './LiquidGlassWrapper';
 import FluidCanvasLayer from './FluidCanvasLayer';
+import FluidGlass from './FluidGlass';
 import { defaultLiquidVisualTuning } from '../utils/liquidGlassUserTuning';
 import { useScrollVelocity } from '../utils/useScrollVelocity';
 import { useOcclusionTracker } from '../utils/useOcclusionTracker';
@@ -318,16 +319,19 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
             minHeight: '44px',
             width: 'auto',
             maxWidth: 'min(800px, calc(100vw - 24px))',
-            background: 'rgba(255,255,255,0.12)',
-            backdropFilter: 'blur(0.5px) saturate(185%) brightness(1.08) contrast(1.06)',
-            WebkitBackdropFilter: 'blur(0.5px) saturate(185%) brightness(1.08) contrast(1.06)',
-            border: '1px solid rgba(255,255,255,0.18)',
+            background: 'rgba(255,255,255,0.08)',
+            backdropFilter: 'blur(6px) saturate(1.08) brightness(1.00) contrast(1.02)',
+            WebkitBackdropFilter: 'blur(6px) saturate(1.08) brightness(1.00) contrast(1.02)',
+            border: 'none',
             boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
             transformOrigin: 'right center',
             willChange: 'transform',
             scaleX: navScaleX as any
           }}
         >
+          <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
+            <FluidGlass mode="bar" />
+          </div>
           
 
           {/* CPU-based canvas liquid layer */}

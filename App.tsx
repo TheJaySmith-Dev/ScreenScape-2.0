@@ -29,6 +29,7 @@ import TopNavigation from './components/TopNavigation';
 import { useAuth } from './contexts/AuthContext';
 import { ImageGeneratorProvider } from './contexts/ImageGeneratorContext';
 import { AppleThemeProvider, useAppleTheme } from './components/AppleThemeProvider';
+import FluidGlass from './components/FluidGlass';
 // ScrollLiquidPanel demo removed; effect now lives in pill navigation
 
 export type ViewType = 'screenSearch' | 'search' | 'live' | 'likes' | 'game' | 'settings' | 'sync' | 'prototype' | 'genres' | 'liquidGlassDemo' | 'imax';
