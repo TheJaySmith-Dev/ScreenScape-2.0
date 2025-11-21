@@ -192,7 +192,20 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
         if (resp.ok) live.push(p); else live.push(p);
       } catch { live.push(p); }
     }
-    return live;
+    if (live.length > 0) return live;
+    // Fallback to TMDb if no sources found
+    try {
+      const apiKey = getTmdbApiKey();
+      const resp: any = await searchMulti(apiKey, claim, 1);
+      const hit = Array.isArray(resp?.results) ? resp.results[0] : null;
+      if (hit && hit.id) {
+        const isTv = (hit.media_type || '').toLowerCase() === 'tv';
+        const title = (hit.title || hit.name || claim).trim();
+        const url = `https://www.themoviedb.org/${isTv ? 'tv' : 'movie'}/${hit.id}`;
+        return [{ title, url }];
+      }
+    } catch {}
+    return [];
   };
 
   const buildCitations = async (text: string) => {
@@ -213,14 +226,14 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
     const escaped = escapeHtml(text);
     let html = escaped;
     for (const d of decorations) {
-      const marker = d.indices.map(i => `<sup><a href="#ref-${i}" title="${escapeHtml(results.find(r => r.index === i)?.title || '' )}">[${i}]</a></sup>`).join('');
+      const marker = d.indices.map(i => `<sup><a href="#ref-${i}" title="${escapeHtml(results.find(r => r.index === i)?.title || '' )}" style="color:#1f6feb;text-decoration:none">[${i}]</a></sup>`).join('');
       const pattern = d.claim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const re = new RegExp(pattern);
       html = html.replace(re, (m) => `${m} ${marker}`);
     }
     if (results.length > 0) {
-      const refs = results.map(r => `<li id="ref-${r.index}"><a href="${r.url}" target="_blank" rel="noreferrer" title="${escapeHtml(r.title)}">[${r.index}] ${escapeHtml(r.title)}</a></li>`).join('');
-      html = `${html}\n\n<b>References</b>\n<ul>${refs}</ul>`;
+      const refs = results.map(r => `<li id="ref-${r.index}"><a href="${r.url}" target="_blank" rel="noreferrer" title="${escapeHtml(r.title)}" style="color:#1f6feb;text-decoration:underline">[${r.index}] ${escapeHtml(r.title)}</a></li>`).join('');
+      html = `${html}\n\n<b>References</b>\n<ul style="margin:8px 0 0 16px">${refs}</ul>`;
     }
     return { html, citations: results };
   };
