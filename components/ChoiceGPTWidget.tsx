@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { LiquidGlassPillButton } from './LiquidGlassPillButton';
-import { searchMulti } from '../services/tmdbService';
+import { searchMulti, getMovieVideosImaxOnly, getTVShowVideosImaxOnly, getMovieVideos, getTVShowVideos } from '../services/tmdbService';
 import { useAppleTheme } from './AppleThemeProvider';
 
 type Citation = { index: number; url: string; title: string };
@@ -317,6 +317,39 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
     return t;
   };
 
+  const hasTrailerIntent = (t: string) => /(watch|play|show|view|see|display)\s+.*\b(trailer|teaser|clip)\b|\b(trailer|teaser)\b/i.test(t);
+
+  const buildYouTubeEmbedHtml = (key: string, label: string) => {
+    const safe = escapeHtml(label);
+    return `<div style="width:100%;max-width:520px;border-radius:12px;overflow:hidden;border:1px solid ${tokens.colors.separator.opaque};background:#000"><div style="position:relative;padding-top:56.25%"><iframe src="https://www.youtube.com/embed/${key}?rel=0" title="${safe}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div></div>`;
+  };
+
+  const attemptEmbedTrailer = async (text: string, nextMessages: ChatMessage[]): Promise<boolean> => {
+    if (!hasTrailerIntent(text)) return false;
+    const apiKey = getTmdbApiKey();
+    const title = extractTitle(text);
+    const query = title || text;
+    try {
+      const resp = await searchMulti(apiKey, query, 1);
+      const hit = Array.isArray(resp.results) && resp.results.length > 0 ? resp.results[0] : null;
+      if (!hit || !hit.id) return false;
+      const isTv = (hit as any).media_type === 'tv';
+      let videoResp: any = isTv ? await getTVShowVideosImaxOnly(apiKey, (hit as any).id) : await getMovieVideosImaxOnly(apiKey, (hit as any).id);
+      let pick = Array.isArray(videoResp?.results) ? videoResp.results.find((v: any) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser')) : null;
+      if (!pick) {
+        const fb = isTv ? await getTVShowVideos(apiKey, (hit as any).id) : await getMovieVideos(apiKey, (hit as any).id);
+        pick = Array.isArray(fb?.results) ? (fb.results.find((v: any) => v.site === 'YouTube' && v.type === 'Trailer') || fb.results.find((v: any) => v.site === 'YouTube')) : null;
+      }
+      if (!pick || !pick.key) return false;
+      const label = ((hit as any).title || (hit as any).name || 'Trailer') as string;
+      const html = buildYouTubeEmbedHtml(pick.key, label);
+      setMessages([...nextMessages, { role: 'assistant', content: '', html, citations: [] }]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const maybeNavigateToTitle = async (text: string) => {
     const apiKey = getTmdbApiKey();
     const tryQuery = async (q: string) => {
@@ -354,6 +387,10 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
     setInput('');
     setLoading(true);
     try {
+      const embedded = await attemptEmbedTrailer(text, nextMessages);
+      if (embedded) {
+        return;
+      }
       const foundCountry = extractCountryFromText(text);
       if (foundCountry) {
         setRememberedCountry(foundCountry);
@@ -408,6 +445,10 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
     setInput('');
     setLoading(true);
     try {
+      const embedded = await attemptEmbedTrailer(query, nextMessages);
+      if (embedded) {
+        return;
+      }
       const foundCountry = extractCountryFromText(query);
       if (foundCountry) {
         setRememberedCountry(foundCountry);
