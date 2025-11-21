@@ -7,7 +7,7 @@ import BackdropOverlay from './BackdropOverlay';
 import TrailerPlayer from './TrailerPlayer';
 import { mediaHoverService } from '../services/mediaHoverService';
 import RottenTomatoesRating from './RottenTomatoesRating';
-import * as omdbService from '../services/omdbService';
+import { getOMDbFromTMDBDetails, extractRottenTomatoesRating, OMDbMovieDetails } from '../services/omdbService';
 import { getMovieExternalIds, getMovieImages, getTVShowImages, getMovieVideosImaxOnly, getTVShowVideosImaxOnly } from '../services/tmdbService';
 // FanArt removed: posters now resolved via TMDb images with OMDb fallback for movies
 
@@ -35,7 +35,7 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
     const [showTrailer, setShowTrailer] = useState(false);
     const [backdropUrl, setBackdropUrl] = useState<string>('');
     const [trailerUrl, setTrailerUrl] = useState<string>('');
-    const [omdbData, setOmdbData] = useState<omdbService.OMDbMovieDetails | null>(null);
+    const [omdbData, setOmdbData] = useState<OMDbMovieDetails | null>(null);
     const [isDesktop, setIsDesktop] = useState(false);
     const [posterUrl, setPosterUrl] = useState<string | null>(null);
     
@@ -79,17 +79,7 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
                             url = `${IMAGE_BASE_URL}${poster.file_path}`;
                         }
                     }
-                    // OMDb fallback if TMDb posters missing
-                    if (!url) {
-                        const ext = await getMovieExternalIds(apiKey, item.id);
-                        const imdbId = ext?.imdb_id || null;
-                        if (imdbId) {
-                            const omdb = await omdbService.omdbService.getMovieById(imdbId);
-                            if (omdb && omdb.Poster && omdb.Poster !== 'N/A') {
-                                url = omdb.Poster;
-                            }
-                        }
-                    }
+                    
                 } else if (item.media_type === 'tv') {
                     const images = await getTVShowImages(apiKey, item.id);
                     if (images?.posters?.length) {
@@ -159,7 +149,7 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
                 // Fetch OMDb data for Rotten Tomatoes rating (only for movies)
                 if (item.media_type === 'movie') {
                     try {
-                        const omdbDetails = await omdbService.getOMDbFromTMDBDetails(item);
+                        const omdbDetails = await getOMDbFromTMDBDetails(item);
                         setOmdbData(omdbDetails);
                     } catch (error) {
                         console.error('Error fetching OMDb data:', error);
@@ -306,7 +296,7 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
                             
                             {/* Rotten Tomatoes Rating */}
                             {omdbData && (() => {
-                                const rtRating = omdbService.extractRottenTomatoesRating(omdbData);
+                                const rtRating = extractRottenTomatoesRating(omdbData);
                                 return rtRating && (
                                     <RottenTomatoesRating 
                                         rating={rtRating} 

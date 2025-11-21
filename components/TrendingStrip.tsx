@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getTrending, getMovieExternalIds, getMovieImages, getTVShowImages } from '../services/tmdbService';
 // FanArt removed: posters now resolved via TMDb images with OMDb fallback for movies
-import * as omdbService from '../services/omdbService';
 import { MediaItem, TVShow } from '../types';
 import { ChevronLeftIcon, ChevronRightIcon } from './Icons';
 
@@ -54,17 +53,7 @@ const TrendingStrip: React.FC<TrendingStripProps> = ({ apiKey, onSelectItem, onI
                                 url = `${IMAGE_BASE_URL}${poster.file_path}`;
                             }
                         }
-                        // OMDb fallback if TMDb posters missing
-                        if (!url) {
-                            const ext = await getMovieExternalIds(apiKey, it.id);
-                            const imdbId = ext?.imdb_id || null;
-                            if (imdbId) {
-                                const omdb = await omdbService.omdbService.getMovieById(imdbId);
-                                if (omdb && omdb.Poster && omdb.Poster !== 'N/A') {
-                                    url = omdb.Poster;
-                                }
-                            }
-                        }
+                        
                     } else if (it.media_type === 'tv') {
                         const images = await getTVShowImages(apiKey, it.id);
                         if (images?.posters?.length) {

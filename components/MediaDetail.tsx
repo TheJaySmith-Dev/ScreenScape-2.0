@@ -23,6 +23,7 @@ import { useAppleTheme } from './AppleThemeProvider';
 import { useAppleAnimationEffects } from '../hooks/useAppleAnimationEffects';
 import { Star, Heart, ThumbsDown, X, Play } from 'lucide-react';
 import { LiquidGlassWrapper } from './LiquidGlassWrapper';
+import BoxOfficeSection from './BoxOfficeSection';
 import {
     getAvailabilityBuckets,
     buildAvailabilityDescriptors,
@@ -2164,6 +2165,16 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
 
                             
                         </motion.div>
+
+                        {item.media_type === 'movie' && (
+                            <BoxOfficeSection
+                                title={'title' in details ? details.title : details.name}
+                                year={year ? String(year) : null}
+                                imdbId={omdbData?.imdbID || null}
+                                tmdbId={String(details.id)}
+                                fallbackRevenue={'revenue' in details ? details.revenue : null}
+                            />
+                        )}
                     </div>
                 );
             case 'cast':

@@ -164,20 +164,22 @@ const ModeWrapper = memo(function ModeWrapper({ children, glb, geometryKey, lock
     const v = viewport.getCurrentViewport(camera, [0, 0, 15]);
     const destX = followPointer ? (pointer.x * v.width) / 2 : 0;
     const destY = lockToBottom ? -v.height / 2 + 0.2 : followPointer ? (pointer.y * v.height) / 2 : 0;
-    easing.damp3(ref.current.position, [destX, destY, 15], 0.15, delta);
-    if (modeProps.scale == null) {
-      if (geometryKey === 'Cube') {
-        const barW = v.width * 0.82;
-        const barH = Math.min(0.6, v.height * 0.16);
-        ref.current.scale.set(barW, barH, 0.2);
-      } else {
-        const maxWorld = v.width * 0.9;
-        const desired = maxWorld / geoWidthRef.current;
-        ref.current.scale.setScalar(Math.min(0.25, desired));
+    if (ref.current) {
+      easing.damp3(ref.current.position, [destX, destY, 15], 0.15, delta);
+      if (modeProps.scale == null) {
+        if (geometryKey === 'Cube') {
+          const barW = v.width * 0.82;
+          const barH = Math.min(0.6, v.height * 0.16);
+          ref.current.scale.set(barW, barH, 0.2);
+        } else {
+          const maxWorld = v.width * 0.9;
+          const desired = maxWorld / geoWidthRef.current;
+          ref.current.scale.setScalar(Math.min(0.25, desired));
+        }
+      } else if (Array.isArray(modeProps.scale)) {
+        const [sx, sy, sz] = modeProps.scale;
+        ref.current.scale.set(sx, sy ?? sx, sz ?? 0.2);
       }
-    } else if (Array.isArray(modeProps.scale)) {
-      const [sx, sy, sz] = modeProps.scale;
-      ref.current.scale.set(sx, sy ?? sx, sz ?? 0.2);
     }
     gl.setRenderTarget(buffer);
     gl.render(scene, camera);

@@ -94,28 +94,20 @@ export class OMDbService {
    */
   async searchMovie(title: string, year?: string): Promise<OMDbMovieData | null> {
     try {
-      const params = new URLSearchParams({
-        apikey: this.apiKey,
-        t: title,
-        type: 'movie',
-        plot: 'short',
-        tomatoes: 'true'
-      });
-
-      if (year) {
-        params.append('y', year);
-      }
-
-      const response = await this.makeRequest(`${this.baseUrl}?${params}`);
-      
-      if (response.Response === 'False') {
-        console.warn(`OMDb: Movie not found - ${response.Error}`);
-        return null;
-      }
-
-      return response;
-    } catch (error) {
-      console.error('OMDb search error:', error);
+      const prompt = `Return ONLY JSON for movie ${title}${year ? ' (' + year + ')' : ''} with keys Title, Year, imdbID, Type, Poster, Plot`;
+      const data = await pollinationsJson(prompt);
+      if (!data || !data.Title) return null;
+      const basic: OMDbMovieData = {
+        Title: String(data.Title || title),
+        Year: String(data.Year || year || ''),
+        imdbID: String(data.imdbID || ''),
+        Type: String(data.Type || 'movie'),
+        Poster: String(data.Poster || ''),
+        Plot: data.Plot ? String(data.Plot) : undefined,
+        Response: 'True'
+      };
+      return basic;
+    } catch {
       return null;
     }
   }
@@ -153,23 +145,20 @@ export class OMDbService {
    */
   async getMovieById(imdbId: string): Promise<OMDbMovieData | null> {
     try {
-      const params = new URLSearchParams({
-        apikey: this.apiKey,
-        i: imdbId,
-        plot: 'short',
-        tomatoes: 'true'
-      });
-
-      const response = await this.makeRequest(`${this.baseUrl}?${params}`);
-      
-      if (response.Response === 'False') {
-        console.warn(`OMDb: Movie not found by ID - ${response.Error}`);
-        return null;
-      }
-
-      return response;
-    } catch (error) {
-      console.error('OMDb getById error:', error);
+      const prompt = `Return ONLY JSON for IMDb ${imdbId} with keys Title, Year, imdbID, Type, Poster, Plot`;
+      const data = await pollinationsJson(prompt);
+      if (!data || !data.Title) return null;
+      const basic: OMDbMovieData = {
+        Title: String(data.Title || ''),
+        Year: String(data.Year || ''),
+        imdbID: String(data.imdbID || imdbId),
+        Type: String(data.Type || 'movie'),
+        Poster: String(data.Poster || ''),
+        Plot: data.Plot ? String(data.Plot) : undefined,
+        Response: 'True'
+      };
+      return basic;
+    } catch {
       return null;
     }
   }
@@ -233,7 +222,7 @@ export class OMDbService {
   /**
    * Make HTTP request with retry logic and timeout
    */
-  private async makeRequest(url: string, retryCount = 0): Promise<any> {
+  async makeRequest(url: string, retryCount = 0): Promise<any> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
@@ -275,7 +264,7 @@ export class OMDbService {
   /**
    * Utility delay function
    */
-  private delay(ms: number): Promise<void> {
+  delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
@@ -293,27 +282,45 @@ export class OMDbService {
   }
 }
 
+export async function pollinationsJson(prompt: string, retryCount = 0): Promise<any> {
+  const timeout = 10000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  try {
+    const url = `https://text.pollinations.ai/${encodeURIComponent(prompt)}`;
+    const response = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'text/plain' } });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      throw new Error(String(response.status));
+    }
+    const raw = await response.text();
+    let text = raw.trim();
+    if (text.startsWith('```')) {
+      text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    }
+    try {
+      const json = JSON.parse(text);
+      return json;
+    } catch {
+      return null;
+    }
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (retryCount < 3) {
+      await new Promise(r => setTimeout(r, 800 * (retryCount + 1)));
+      return pollinationsJson(prompt, retryCount + 1);
+    }
+    throw error;
+  }
+}
+
 // Export a default instance (will need API key configuration)
 // Resolve OMDb API key for both browser (Vite) and Node contexts
 // Resolve OMDb API key from multiple sources to work in browser builds
-const runtimeOMDbApiKey = (
-  // Prefer environment variables for global consistency
-  (typeof import.meta !== 'undefined' && (import.meta as any).env && ((import.meta as any).env.VITE_OMDB_API_KEY as string))
-  // Fallback to LocalStorage for ad-hoc browser setups
-  || (typeof window !== 'undefined' && window.localStorage && window.localStorage.getItem('omdb_api_key'))
-  // Fallback for Node or server-side contexts
-  || (typeof process !== 'undefined' && process.env && process.env.OMDB_API_KEY)
-  || ''
-);
-
-if (!runtimeOMDbApiKey) {
-  console.warn('OMDb API key is not configured. Set VITE_OMDB_API_KEY or OMDB_API_KEY to enable review data.');
-}
-
+const runtimeOMDbApiKey = '';
 export const omdbService = new OMDbService(runtimeOMDbApiKey);
-
-export const hasOMDbKey = (): boolean => !!runtimeOMDbApiKey && runtimeOMDbApiKey.trim().length > 0;
-export const getOMDbApiKey = (): string => runtimeOMDbApiKey;
+export const hasOMDbKey = (): boolean => true;
+export const getOMDbApiKey = (): string => '';
 
 /**
  * Get OMDb details from TMDB movie details
@@ -321,30 +328,53 @@ export const getOMDbApiKey = (): string => runtimeOMDbApiKey;
  */
 export async function getOMDbFromTMDBDetails(tmdbDetails: any): Promise<OMDbMovieDetails | null> {
   try {
-    if (!hasOMDbKey()) {
-      console.warn('OMDb key missing: skipping OMDb fetch');
-      return null;
+    const title = tmdbDetails?.title || tmdbDetails?.name || '';
+    const year = (tmdbDetails?.release_date || tmdbDetails?.first_air_date || '').slice(0, 4);
+    const prompt = `Return ONLY JSON for movie ${title}${year ? ' (' + year + ')' : ''} with keys Title, Year, Rated, Released, Runtime, Genre, imdbRating, Plot, BoxOffice, tomatoMeter, tomatoUserMeter, tomatoRating, tomatoReviews, tomatoFresh, tomatoRotten, tomatoConsensus, tomatoUserRating, tomatoUserReviews, tomatoURL, Poster`;
+    const data = await pollinationsJson(prompt);
+    if (!data) {
+      const boxOffice = typeof tmdbDetails?.revenue === 'number' && tmdbDetails.revenue > 0 ? tmdbDetails.revenue : 0;
+      const formatted = boxOffice ? `$${Math.round(boxOffice).toLocaleString('en-US')}` : 'N/A';
+      const fallback: OMDbMovieDetails = {
+        Title: title,
+        Year: year,
+        imdbID: String(tmdbDetails?.imdb_id || ''),
+        Type: 'movie',
+        Poster: '',
+        Plot: tmdbDetails?.overview || '',
+        BoxOffice: formatted,
+        Response: 'True'
+      } as any;
+      return fallback;
     }
-    // Extract IMDb ID from TMDB details
-    const imdbId = tmdbDetails?.imdb_id;
-    
-    if (!imdbId) {
-      console.warn('No IMDb ID found in TMDB details');
-      return null;
-    }
-
-    // Use the OMDb service to get detailed information
-    const omdbData = await omdbService.getMovieById(imdbId);
-    
-    if (!omdbData) {
-      console.warn('No OMDb data found for IMDb ID:', imdbId);
-      return null;
-    }
-
-    // Return the OMDb data as OMDbMovieDetails
-    return omdbData as OMDbMovieDetails;
-  } catch (error) {
-    console.error('Error getting OMDb data from TMDB details:', error);
+    const mapped: OMDbMovieDetails = {
+      Title: String(data.Title || title),
+      Year: String(data.Year || year || ''),
+      imdbID: String(tmdbDetails?.imdb_id || data.imdbID || ''),
+      Type: 'movie',
+      Poster: String(data.Poster || ''),
+      Plot: data.Plot ? String(data.Plot) : tmdbDetails?.overview || '',
+      Rated: data.Rated ? String(data.Rated) : undefined,
+      Released: data.Released ? String(data.Released) : undefined,
+      Runtime: data.Runtime ? String(data.Runtime) : undefined,
+      Genre: data.Genre ? String(data.Genre) : undefined,
+      imdbRating: data.imdbRating ? String(data.imdbRating) : undefined,
+      BoxOffice: data.BoxOffice ? String(data.BoxOffice) : (typeof tmdbDetails?.revenue === 'number' && tmdbDetails.revenue > 0 ? `$${Math.round(tmdbDetails.revenue).toLocaleString('en-US')}` : 'N/A'),
+      tomatoMeter: data.tomatoMeter ? String(data.tomatoMeter) : undefined,
+      tomatoUserMeter: data.tomatoUserMeter ? String(data.tomatoUserMeter) : undefined,
+      tomatoRating: data.tomatoRating ? String(data.tomatoRating) : undefined,
+      tomatoReviews: data.tomatoReviews ? String(data.tomatoReviews) : undefined,
+      tomatoFresh: data.tomatoFresh ? String(data.tomatoFresh) : undefined,
+      tomatoRotten: data.tomatoRotten ? String(data.tomatoRotten) : undefined,
+      tomatoConsensus: data.tomatoConsensus ? String(data.tomatoConsensus) : undefined,
+      tomatoUserRating: data.tomatoUserRating ? String(data.tomatoUserRating) : undefined,
+      tomatoUserReviews: data.tomatoUserReviews ? String(data.tomatoUserReviews) : undefined,
+      tomatoURL: data.tomatoURL ? String(data.tomatoURL) : undefined,
+      Response: 'True'
+    } as any;
+    mapped.Ratings = Array.isArray(data.Ratings) ? data.Ratings : [{ Source: 'Rotten Tomatoes', Value: mapped.tomatoMeter ? `${mapped.tomatoMeter}%` : (mapped.tomatoUserMeter ? `${mapped.tomatoUserMeter}%` : 'N/A') }];
+    return mapped;
+  } catch {
     return null;
   }
 }
@@ -354,33 +384,27 @@ export async function getOMDbFromTMDBDetails(tmdbDetails: any): Promise<OMDbMovi
  */
 export function extractRottenTomatoesRating(movieData: OMDbMovieDetails): RottenTomatoesRating | null {
     try {
-      if (!movieData.Ratings || movieData.Ratings.length === 0) {
-        return null;
-      }
-
       const result: RottenTomatoesRating = {};
-
-      // Find Rotten Tomatoes ratings in the ratings array
-      for (const rating of movieData.Ratings) {
-        if (rating.Source === 'Rotten Tomatoes') {
-          // Parse the percentage value (e.g., "91%" -> 91)
-          const percentageMatch = rating.Value.match(/(\d+)%/);
-          if (percentageMatch) {
-            const score = parseInt(percentageMatch[1], 10);
-            result.tomatometer = score;
-            result.fresh = score >= 60; // Fresh if 60% or higher
-          }
+      const fromArray = (movieData.Ratings || []).find((r) => r.Source === 'Rotten Tomatoes');
+      if (fromArray && typeof fromArray.Value === 'string') {
+        const m = fromArray.Value.match(/(\d+)%/);
+        if (m) {
+          const score = parseInt(m[1], 10);
+          result.tomatometer = score;
+          result.fresh = score >= 60;
         }
       }
-
-      // Return null if no Rotten Tomatoes data found
       if (result.tomatometer === undefined) {
-        return null;
+        const t = movieData.tomatoMeter || movieData.tomatoUserMeter;
+        if (t && /\d+/.test(String(t))) {
+          const score = parseInt(String(t), 10);
+          result.tomatometer = score;
+          result.fresh = score >= 60;
+        }
       }
-
+      if (result.tomatometer === undefined) return null;
       return result;
-    } catch (error) {
-      console.error('Error extracting Rotten Tomatoes rating:', error);
+    } catch {
       return null;
     }
   }
@@ -406,38 +430,40 @@ export function extractRottenTomatoesConsensus(movieData: OMDbMovieDetails): str
  */
 export async function getMovieDetailsWithRatings(titleOrImdbId: string, year?: string): Promise<OMDbMovieDetails | null> {
   try {
-    let movieData: OMDbMovieData | null = null;
-
-    // Check if it's an IMDb ID (starts with 'tt')
-    if (titleOrImdbId.startsWith('tt')) {
-      movieData = await omdbService.getMovieById(titleOrImdbId);
-    } else {
-      movieData = await omdbService.searchMovie(titleOrImdbId, year);
-    }
-
-    if (!movieData) {
-      return null;
-    }
-
-    // Get full details with ratings by making another request with plot=full
-  const params = new URLSearchParams({
-    apikey: runtimeOMDbApiKey,
-    i: movieData.imdbID,
-    plot: 'full',
-    tomatoes: 'true'
-  });
-
-    const response = await fetch(`https://www.omdbapi.com/?${params}`);
-    const detailedResponse = await response.json();
-    
-    if (detailedResponse.Response === 'False') {
-      console.warn(`OMDb: Detailed movie data not found - ${detailedResponse.Error}`);
-      return movieData as OMDbMovieDetails;
-    }
-
-    return detailedResponse as OMDbMovieDetails;
-  } catch (error) {
-    console.error('OMDb getMovieDetailsWithRatings error:', error);
+    const isImdb = /^tt\d+/.test(titleOrImdbId);
+    const prompt = isImdb
+      ? `Return ONLY JSON for IMDb ${titleOrImdbId} with full keys Title, Year, Rated, Released, Runtime, Genre, imdbRating, Plot, BoxOffice, tomatoMeter, tomatoUserMeter, tomatoRating, tomatoReviews, tomatoFresh, tomatoRotten, tomatoConsensus, tomatoUserRating, tomatoUserReviews, tomatoURL, Poster`
+      : `Return ONLY JSON for movie ${titleOrImdbId}${year ? ' (' + year + ')' : ''} with full keys Title, Year, Rated, Released, Runtime, Genre, imdbRating, Plot, BoxOffice, tomatoMeter, tomatoUserMeter, tomatoRating, tomatoReviews, tomatoFresh, tomatoRotten, tomatoConsensus, tomatoUserRating, tomatoUserReviews, tomatoURL, Poster`;
+    const data = await pollinationsJson(prompt);
+    if (!data) return null;
+    const mapped: OMDbMovieDetails = {
+      Title: String(data.Title || ''),
+      Year: String(data.Year || year || ''),
+      imdbID: String(data.imdbID || (isImdb ? titleOrImdbId : '')),
+      Type: String(data.Type || 'movie'),
+      Poster: String(data.Poster || ''),
+      Plot: data.Plot ? String(data.Plot) : '',
+      Rated: data.Rated ? String(data.Rated) : undefined,
+      Released: data.Released ? String(data.Released) : undefined,
+      Runtime: data.Runtime ? String(data.Runtime) : undefined,
+      Genre: data.Genre ? String(data.Genre) : undefined,
+      imdbRating: data.imdbRating ? String(data.imdbRating) : undefined,
+      BoxOffice: data.BoxOffice ? String(data.BoxOffice) : 'N/A',
+      tomatoMeter: data.tomatoMeter ? String(data.tomatoMeter) : undefined,
+      tomatoUserMeter: data.tomatoUserMeter ? String(data.tomatoUserMeter) : undefined,
+      tomatoRating: data.tomatoRating ? String(data.tomatoRating) : undefined,
+      tomatoReviews: data.tomatoReviews ? String(data.tomatoReviews) : undefined,
+      tomatoFresh: data.tomatoFresh ? String(data.tomatoFresh) : undefined,
+      tomatoRotten: data.tomatoRotten ? String(data.tomatoRotten) : undefined,
+      tomatoConsensus: data.tomatoConsensus ? String(data.tomatoConsensus) : undefined,
+      tomatoUserRating: data.tomatoUserRating ? String(data.tomatoUserRating) : undefined,
+      tomatoUserReviews: data.tomatoUserReviews ? String(data.tomatoUserReviews) : undefined,
+      tomatoURL: data.tomatoURL ? String(data.tomatoURL) : undefined,
+      Response: 'True'
+    } as any;
+    mapped.Ratings = Array.isArray(data.Ratings) ? data.Ratings : [{ Source: 'Rotten Tomatoes', Value: mapped.tomatoMeter ? `${mapped.tomatoMeter}%` : (mapped.tomatoUserMeter ? `${mapped.tomatoUserMeter}%` : 'N/A') }];
+    return mapped;
+  } catch {
     return null;
   }
 }

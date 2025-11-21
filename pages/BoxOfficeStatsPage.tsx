@@ -6,7 +6,7 @@ import { LiquidPillNavigation } from '../components/LiquidPillNavigation';
 import { useNavigate } from 'react-router-dom';
 import BarChartRace from '../components/BarChartRace';
 import { discoverTopRevenueMovies, getMovieDetails, searchPerson, getActorTopRevenueMovies } from '../services/tmdbService';
-import { getOMDbFromTMDBDetails, hasOMDbKey } from '../services/omdbService';
+import { getOMDbFromTMDBDetails } from '../services/omdbService';
 
 type RankedItem = {
   id: number;
@@ -74,7 +74,6 @@ const Content: React.FC = () => {
   const [raceLoading, setRaceLoading] = useState(false);
   const [raceMode, setRaceMode] = useState<'global' | 'actor'>('global');
 
-  const hasOmdb = hasOMDbKey();
 
   const loadGlobal = useCallback(async () => {
     setGlobalLoading(true);
@@ -93,7 +92,7 @@ const Content: React.FC = () => {
         const base = (disc.results || []).slice(0, 30);
         const detailed = await Promise.all(base.map(async m => {
           const d = await getMovieDetails(apiKey, m.id);
-          const omdb = hasOmdb ? await getOMDbFromTMDBDetails(d) : null;
+          const omdb = await getOMDbFromTMDBDetails(d);
           return { id: d.id, title: d.title, revenue: d.revenue || 0, release_date: d.release_date, omdb } as RankedItem;
         }));
         items = detailed.filter(x => x.revenue > 0).sort((a, b) => b.revenue - a.revenue).slice(0, 15);
@@ -105,7 +104,7 @@ const Content: React.FC = () => {
     } finally {
       setGlobalLoading(false);
     }
-  }, [apiKey, hasOmdb]);
+  }, [apiKey]);
 
   const loadActor = useCallback(async () => {
     setActorLoading(true);
@@ -128,7 +127,7 @@ const Content: React.FC = () => {
           const agg = await getActorTopRevenueMovies(apiKey, pick.id, 15);
           const detailed = await Promise.all(agg.map(async r => {
             const d = r.movie;
-            const omdb = hasOmdb ? await getOMDbFromTMDBDetails(d) : null;
+            const omdb = await getOMDbFromTMDBDetails(d);
             return { id: d.id, title: d.title, revenue: r.revenue || 0, release_date: d.release_date, omdb } as RankedItem;
           }));
           items = detailed;
@@ -141,7 +140,7 @@ const Content: React.FC = () => {
     } finally {
       setActorLoading(false);
     }
-  }, [apiKey, actorName, hasOmdb]);
+  }, [apiKey, actorName]);
 
   useEffect(() => { loadGlobal(); }, [loadGlobal]);
   useEffect(() => { loadActor(); }, [loadActor]);
