@@ -96,7 +96,7 @@ const TrendingStrip: React.FC<TrendingStripProps> = ({ apiKey, onSelectItem, onI
                     <div
                         key={item.id}
                         onClick={() => onSelectItem(item)}
-                        className="flex-shrink-0 w-28 h-44 rounded-xl overflow-hidden cursor-pointer trending-card bg-glass"
+                        className="flex-shrink-0 w-24 h-36 md:w-28 md:h-44 rounded-xl overflow-hidden cursor-pointer trending-card bg-glass"
                         title={item.media_type === 'movie' ? item.title : (item as TVShow).name}
                     >
                         <img

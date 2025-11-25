@@ -5,15 +5,13 @@
  */
 
 import React, { useRef, useMemo, useEffect, useState, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
-import { Search, Home, Tv, Gamepad2, Heart, Settings as SettingsIcon, RefreshCw, Tag, Menu, Coins, Image as ImageIcon } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Search, Home, Tv, Gamepad2, Heart, RefreshCw, Tag, Menu, Coins, Image as ImageIcon } from 'lucide-react';
 import { ViewType } from '../App';
 import { useNavigate } from 'react-router-dom';
 import { useAppleTheme } from './AppleThemeProvider';
 import { LiquidGlassWrapper } from './LiquidGlassWrapper';
-import FluidCanvasLayer from './FluidCanvasLayer';
-import FluidGlass from './FluidGlass';
 import { defaultLiquidVisualTuning } from '../utils/liquidGlassUserTuning';
 import { useScrollVelocity } from '../utils/useScrollVelocity';
 import { useOcclusionTracker } from '../utils/useOcclusionTracker';
@@ -40,8 +38,7 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const navBarRef = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // Use portal to ensure global positioning above content
   const { velocityY } = useScrollVelocity();
   const occlusion = useOcclusionTracker(
     containerRef,
@@ -92,35 +89,35 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
     return 'balanced';
   }, [occlusion?.panelCoverageRatio, velocityY]);
 
-  // Aggressive, dynamic visual tuning driven by occlusion and scroll
+  // Moderate, responsive visual tuning to avoid excessive curvature
   const aggressiveTuning = useMemo(() => {
     const coverage = occlusion?.panelCoverageRatio ?? 0; // 0..1 portion of pill bar covered
     const speed = Math.min(2000, Math.abs(velocityY)); // px/s
     const speed01 = Math.min(1, speed / 1200);
     const isPortrait = typeof window !== 'undefined' ? window.matchMedia('(orientation: portrait)').matches : false;
 
-    // Push thickness to the upper bound for stronger displacement
-    const thickness = (isPortrait ? 42.0 : 44.0) - (1 - coverage) * 2.0; // clamp handled in wrapper
-
-    // Dynamically raise IOR for punchier refraction under motion/coverage
-    const refractionFactor = 1.58 + coverage * 0.06 + speed01 * 0.05; // ~1.58-1.69
-
-    // Max out dispersion gain multiplier (wrapper clamps internally)
-    const dispersionGain = 20.0 * (0.7 + 0.3 * speed01);
-
-    // Little to no frost: keep blur near zero
-    const blurRadius = 0.02;
+    const thickness = (isPortrait ? 30.0 : 32.0) + coverage * 4.0 + speed01 * 2.0;
+    const refractionFactor = 1.56 + coverage * 0.04 + speed01 * 0.03; // ~1.56-1.63
+    const dispersionGain = 12.0 * (0.8 + 0.2 * speed01);
+    const blurRadius = 0.03;
+    const glareIntensity = 28.0 + coverage * 8.0; // softer glare
+    const fresnelIntensity = 18.0 + speed01 * 6.0; // subtle rim
 
     return {
       ...defaultLiquidVisualTuning,
       thickness,
-      refractionFactor: Math.max(refractionFactor, 1.72),
+      refractionFactor,
       dispersionGain,
       blurRadius,
-      glareIntensity: 92.0,
-      fresnelIntensity: 48.0,
-      tint: '#ffffff00',
-      shadowIntensity: 8.0,
+      glareIntensity,
+      fresnelIntensity,
+      shadowIntensity: 6.0,
+      shadowPosition: { x: 0, y: 8 },
+      shadowExpand: 14.0,
+      glareAngle: 24.0,
+      glareSize: 28.0,
+      fresnelSize: 26.0,
+      fresnelHardness: 16.0,
     };
   }, [occlusion?.panelCoverageRatio, velocityY]);
 
@@ -128,7 +125,6 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
   const underlayTuning = useMemo(() => {
     return {
       ...defaultLiquidVisualTuning,
-      // High-impact, clear liquid tuning for visible refraction
       thickness: 58.0,
       refractionFactor: 1.68,
       dispersionGain: 22.0,
@@ -142,20 +138,140 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
       glareOppositeSide: 80.0,
       glareAngle: 30.0,
       blurRadius: 0.03,
-      tint: '#ffffff00',
-      // Soften and reposition shadow to avoid upper-left artifact
       shadowExpand: 18.0,
       shadowIntensity: 16.0,
       shadowPosition: { x: 0, y: 10 },
     };
   }, []);
+  const HOME_ICON_DATA_URL = useMemo(() => {
+    const svg = encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="url(#grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <defs>
+          <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#DADADA"/>
+            <stop offset="50%" stop-color="#9E9E9E"/>
+            <stop offset="100%" stop-color="#E6E6E6"/>
+          </linearGradient>
+        </defs>
+        <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+        <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      </svg>`
+    );
+    return `data:image/svg+xml;utf8,${svg}`;
+  }, []);
+
+  const HEART_ICON_DATA_URL = useMemo(() => {
+    const svg = encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="url(#stroke)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <defs>
+          <linearGradient id="stroke" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#DADADA"/>
+            <stop offset="50%" stop-color="#9E9E9E"/>
+            <stop offset="100%" stop-color="#E6E6E6"/>
+          </linearGradient>
+          <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#F3F3F3"/>
+            <stop offset="100%" stop-color="#E6E6E6"/>
+          </linearGradient>
+        </defs>
+        <path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" fill="url(#fill)" />
+      </svg>`
+    );
+    return `data:image/svg+xml;utf8,${svg}`;
+  }, []);
+
+  const APPS_ICON_DATA_URL = useMemo(() => {
+    const svg = encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="url(#stroke)" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round">
+        <defs>
+          <linearGradient id="stroke" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#DADADA"/>
+            <stop offset="50%" stop-color="#9E9E9E"/>
+            <stop offset="100%" stop-color="#E6E6E6"/>
+          </linearGradient>
+          <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#F3F3F3"/>
+            <stop offset="100%" stop-color="#E6E6E6"/>
+          </linearGradient>
+        </defs>
+        <rect x="3" y="3" rx="5" ry="5" width="18" height="18" fill="url(#fill)" stroke="url(#stroke)" />
+        <rect x="7" y="7" rx="2.5" ry="2.5" width="3" height="3" fill="#EDEDED" />
+        <rect x="11" y="7" rx="2.5" ry="2.5" width="3" height="3" fill="#EDEDED" />
+        <rect x="15" y="7" rx="2.5" ry="2.5" width="3" height="3" fill="#EDEDED" />
+        <rect x="7" y="11" rx="2.5" ry="2.5" width="3" height="3" fill="#EDEDED" />
+        <rect x="11" y="11" rx="2.5" ry="2.5" width="3" height="3" fill="#EDEDED" />
+        <rect x="15" y="11" rx="2.5" ry="2.5" width="3" height="3" fill="#EDEDED" />
+        <rect x="7" y="15" rx="2.5" ry="2.5" width="3" height="3" fill="#EDEDED" />
+        <rect x="11" y="15" rx="2.5" ry="2.5" width="3" height="3" fill="#EDEDED" />
+        <rect x="15" y="15" rx="2.5" ry="2.5" width="3" height="3" fill="#EDEDED" />
+      </svg>`
+    );
+    return `data:image/svg+xml;utf8,${svg}`;
+  }, []);
+
+  const SYNC_ICON_DATA_URL = useMemo(() => {
+    const svg = encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <defs>
+          <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#F3F3F3"/>
+            <stop offset="100%" stop-color="#E6E6E6"/>
+          </linearGradient>
+          <linearGradient id="stroke" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#DADADA"/>
+            <stop offset="50%" stop-color="#9E9E9E"/>
+            <stop offset="100%" stop-color="#E6E6E6"/>
+          </linearGradient>
+        </defs>
+        <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="url(#fill)" stroke="url(#stroke)" />
+        <rect x="6.5" y="8" width="5.2" height="7" rx="1" stroke="#6A6A6A" stroke-width="1.4" />
+        <rect x="12.8" y="7" width="4.7" height="8.6" rx="1" stroke="#6A6A6A" stroke-width="1.4" />
+        <path d="M12.3 12a3.6 3.6 0 0 1 3.4-2.6" stroke="#6A6A6A" stroke-width="1.4" fill="none"/>
+        <path d="M12.3 12a3.6 3.6 0 0 0-3.4 2.6" stroke="#6A6A6A" stroke-width="1.4" fill="none"/>
+        <path d="M15.8 9.4l-.9 1.7h2.1" stroke="#6A6A6A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M8.2 14.6l.9-1.7H7" stroke="#6A6A6A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`
+    );
+    return `data:image/svg+xml;utf8,${svg}`;
+  }, []);
+
+  const syncIconUrl = useMemo(() => {
+    try {
+      const runtime = (window as any)?.__attachedSyncIconUrl;
+      const stored = typeof window !== 'undefined' ? window.localStorage.getItem('syncIconUrl') : null;
+      const u = runtime || stored;
+      if (typeof u === 'string' && u.length > 0) return u;
+    } catch {}
+    return SYNC_ICON_DATA_URL;
+  }, [SYNC_ICON_DATA_URL]);
+
+  const SETTINGS_ICON_DATA_URL = useMemo(() => {
+    const svg = encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="none">
+        <defs>
+          <linearGradient id="gearStroke" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#DADADA"/>
+            <stop offset="50%" stop-color="#9E9E9E"/>
+            <stop offset="100%" stop-color="#E6E6E6"/>
+          </linearGradient>
+        </defs>
+        <g stroke="url(#gearStroke)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 8a4 4 0 1 1 0 8a4 4 0 0 1 0-8z" />
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+        </g>
+      </svg>`
+    );
+    return `data:image/svg+xml;utf8,${svg}`;
+  }, []);
+
+  
 
   const navigationItems = [
-    { id: 'screenSearch' as ViewType, icon: Home, label: 'Home' },
-    { id: 'likes' as ViewType, icon: Heart, label: 'Likes' },
-    { id: 'sync' as ViewType, icon: RefreshCw, label: 'Sync' },
-    { id: 'settings' as ViewType, icon: SettingsIcon, label: 'Settings' },
-    { id: 'prototype' as ViewType, label: 'More', isMenuButton: true },
+    { id: 'screenSearch' as ViewType, label: 'Home', imageUrl: HOME_ICON_DATA_URL },
+    { id: 'likes' as ViewType, label: 'Likes', imageUrl: HEART_ICON_DATA_URL },
+    { id: 'sync' as ViewType, label: 'Sync', imageUrl: syncIconUrl },
+    { id: 'settings' as ViewType, label: 'Settings', imageUrl: SETTINGS_ICON_DATA_URL },
+    { id: 'apps' as ViewType, label: 'Apps', imageUrl: APPS_ICON_DATA_URL },
   ];
 
   // Menu detachment motion values and glow mapping
@@ -181,6 +297,7 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
     { id: 'billionaire', label: 'Billionaire Sandbox', Icon: Coins, onClick: () => { try { navigate('/play/billionaire-sandbox'); } catch {} setPanelOpen(false); } },
     { id: 'game', label: 'Games', Icon: Gamepad2, onClick: () => { setView('game'); setPanelOpen(false); } },
     { id: 'live', label: 'Live', Icon: Tv, onClick: () => { setView('live'); setPanelOpen(false); } },
+    { id: 'appsPage', label: 'Apps', Icon: Menu, onClick: () => { setView('apps' as ViewType); setPanelOpen(false); } },
   ]), [navigate, setView]);
 
   useEffect(() => {
@@ -269,45 +386,33 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
   }, [setView, navigate]);
 
   return (
-    mounted ? createPortal(
+    createPortal(
     <>
     <motion.div
       ref={containerRef}
-      initial={{ y: 100, opacity: 0 }}
+      initial={{ y: 60, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={enableLiquidEffects ? { 
-        type: "spring",
-        stiffness: 360,
-        damping: 30,
-        mass: 0.6,
-        delay: 0.08
-      } : { type: 'tween', duration: 0.16 }}
+      transition={{ type: 'spring', stiffness: 360, damping: 30, mass: 0.6, delay: 0.08 }}
       style={{
         position: 'fixed',
-        bottom: 0,
+        bottom: `calc(${tokens.spacing.standard[2]}px + env(safe-area-inset-bottom, 0px))`,
         left: 0,
         right: 0,
-        zIndex: 10000,
-        pointerEvents: 'none',
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'flex-end',
-        transform: 'translate3d(0,0,0)',
-        padding: `0 ${tokens.spacing.standard[1]}px ${tokens.spacing.standard[1]}px`,
-        paddingBottom: `calc(${tokens.spacing.standard[1]}px + env(safe-area-inset-bottom))`,
+        zIndex: 200000,
+        pointerEvents: 'auto',
       }}
     >
       <div
         style={{
-          width: '100%',
+          width: 'auto',
           display: 'flex',
           justifyContent: 'center',
           pointerEvents: 'auto'
         }}
       >
-        {/* Navigation container */}
-        <motion.div
-          ref={navBarRef}
+        <div
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -319,33 +424,33 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
             minHeight: '44px',
             width: 'auto',
             maxWidth: 'min(800px, calc(100vw - 24px))',
-            background: 'rgba(255,255,255,0.08)',
-            backdropFilter: 'blur(6px) saturate(1.08) brightness(1.00) contrast(1.02)',
-            WebkitBackdropFilter: 'blur(6px) saturate(1.08) brightness(1.00) contrast(1.02)',
-            border: 'none',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
-            transformOrigin: 'right center',
-            willChange: 'transform',
-            scaleX: navScaleX as any
+            background: 'linear-gradient(180deg, rgba(20,24,32,0.30) 0%, rgba(20,24,32,0.22) 100%)',
+            backdropFilter: 'blur(16px) saturate(1.06) brightness(0.98) contrast(1.04)',
+            WebkitBackdropFilter: 'blur(16px) saturate(1.06) brightness(0.98) contrast(1.04)',
+            border: '1px solid rgba(255,255,255,0.28)',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+            opacity: 1,
+            visibility: 'visible',
           }}
         >
-          <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
-            <FluidGlass mode="bar" />
-          </div>
-          
-
-          {/* CPU-based canvas liquid layer */}
-          
-
-          
-
-          
-
-          {/* Ambient occlusion ring for slab read */}
-          
-
-          {/* Floor glow below pill for extra depth */}
-          
+          <motion.div
+            ref={navBarRef}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: 0,
+              borderRadius: 'inherit',
+              position: 'relative',
+              minHeight: '44px',
+              width: 'auto',
+              maxWidth: 'min(800px, calc(100vw - 24px))',
+              transformOrigin: 'center',
+              willChange: 'transform',
+              scaleX: navScaleX as any
+            }}
+          >
           {/* Navigation Items */}
           <nav 
             role="tablist"
@@ -399,7 +504,7 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
                         gap: '4px',
                         height: '44px',
                         padding: '0 8px',
-                        borderRadius: '12px',
+                        borderRadius: isActive ? 'inherit' : '12px',
                         background: 'rgba(255,255,255,0.008)',
                         backdropFilter: 'blur(0.5px)',
                         WebkitBackdropFilter: 'blur(0.5px)',
@@ -414,19 +519,12 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
                         textShadow: 'none'
                       }}
                     >
-                      <svg width="20" height="14" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                        <line x1="1" y1="2" x2="19" y2="2" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
-                        <line x1="1" y1="7" x2="19" y2="7" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
-                        <line x1="1" y1="12" x2="19" y2="12" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                      <span style={{
-                        fontSize: `${tokens.typography.sizes.caption2}px`,
-                        fontWeight: isActive ? tokens.typography.weights.semibold : tokens.typography.weights.medium,
-                        fontFamily: tokens.typography.families.text,
-                        lineHeight: 1
-                      }}>
-                        More
-                      </span>
+                      <img
+                        src={(item as any).imageUrl}
+                        alt={item.label}
+                        loading="lazy"
+                        style={{ height: '24px', width: 'auto' }}
+                      />
                     </motion.button>
                   </motion.div>
                 );
@@ -463,11 +561,11 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
                       padding: '0 8px',
                       borderRadius: '12px',
                       background: isActive 
-                        ? 'rgba(0, 114, 206, 0.18)'
+                        ? 'linear-gradient(180deg, rgba(20,24,32,0.30) 0%, rgba(20,24,32,0.22) 100%)'
                         : 'transparent',
-                      backdropFilter: isActive ? 'blur(4px) saturate(1.12) contrast(1.02)' : 'none',
-                      WebkitBackdropFilter: isActive ? 'blur(4px) saturate(1.12) contrast(1.02)' : 'none',
-                      border: isActive ? '1px solid rgba(0, 114, 206, 0.32)' : 'none',
+                      backdropFilter: isActive ? 'blur(10px) saturate(1.06) brightness(0.98) contrast(1.04)' : 'none',
+                      WebkitBackdropFilter: isActive ? 'blur(10px) saturate(1.06) brightness(0.98) contrast(1.04)' : 'none',
+                      border: isActive ? '1px solid rgba(255,255,255,0.28)' : 'none',
                       cursor: 'pointer',
                       transition: 'transform 250ms cubic-bezier(0.68, -0.55, 0.265, 1.55), box-shadow 220ms, color 220ms',
                       color: isActive ? '#FFFFFF' : tokens.colors.label.primary,
@@ -475,7 +573,7 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
                       boxShadow: isActive 
-                        ? '0 8px 24px rgba(0,0,0,0.18)'
+                        ? '0 10px 28px rgba(0,0,0,0.18)'
                         : 'none',
                       textShadow: isActive 
                         ? '0 1px 2px rgba(0, 0, 0, 0.2)'
@@ -497,22 +595,25 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
                         src={(item as any).imageUrl}
                         alt={item.label}
                         loading="lazy"
-                        style={{ height: '18px', width: 'auto', filter: isActive ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' : 'none' }}
+                        style={{ height: (item.id === 'screenSearch' || item.id === 'likes' || item.id === 'sync' || item.id === 'settings' || item.id === 'apps') ? '22px' : '18px', width: 'auto', filter: isActive ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' : 'none' }}
                       />
                     )}
-                    <span style={{
-                      fontSize: `${tokens.typography.sizes.caption2}px`,
-                      fontWeight: isActive ? tokens.typography.weights.semibold : tokens.typography.weights.medium,
-                      fontFamily: tokens.typography.families.text,
-                      lineHeight: 1
-                    }}>
-                      {item.label}
-                    </span>
+                    {(item.id !== 'screenSearch' && item.id !== 'likes' && item.id !== 'sync' && item.id !== 'settings' && item.id !== 'apps') && (
+                      <span style={{
+                        fontSize: `${tokens.typography.sizes.caption2}px`,
+                        fontWeight: isActive ? tokens.typography.weights.semibold : tokens.typography.weights.medium,
+                        fontFamily: tokens.typography.families.text,
+                        lineHeight: 1
+                      }}>
+                        {item.label}
+                      </span>
+                    )}
                   </motion.button>
               );
             })}
           </nav>
-        </motion.div>
+          </motion.div>
+        </div>
         
       </div>
     </motion.div>
@@ -540,7 +641,7 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
           exit={{ scale: 0.92, y: 20, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
           style={{
-            maxWidth: 320,
+            maxWidth: 520,
             width: '100%',
             borderRadius: 24,
             background: 'linear-gradient(180deg, rgba(20,24,32,0.30) 0%, rgba(20,24,32,0.18) 100%), rgba(255,255,255,0.22)',
@@ -548,10 +649,10 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
             WebkitBackdropFilter: 'blur(40px) saturate(1.10) brightness(0.97) contrast(1.06)',
             border: '1px solid rgba(255,255,255,0.26)',
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 20px 48px rgba(0,0,0,0.28)',
-            padding: 12,
+            padding: 16,
             display: 'flex',
             flexDirection: 'column',
-            gap: 8,
+            gap: 12,
             position: 'relative',
             outline: 'none'
           }}
@@ -559,6 +660,29 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
             aria-label="Navigation menu"
             tabIndex={-1}
           >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{
+                fontSize: 18,
+                fontWeight: 600,
+                color: '#FFFFFF',
+                fontFamily: tokens.typography.families.display
+              }}>Launchpad</span>
+              <button
+                onClick={() => setPanelOpen(false)}
+                aria-label="Close Launchpad"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  padding: 8,
+                  borderRadius: 12
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
             {panelRows.map((row, idx) => (
               <motion.button
                 key={row.id}
@@ -573,26 +697,30 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
                 onClick={(e) => { e.stopPropagation(); row.onClick(); }}
                 style={{
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  gap: 10,
-                  padding: '10px 12px',
-                  borderRadius: 14,
+                  justifyContent: 'center',
+                  gap: 8,
+                  padding: '14px 12px',
+                  minHeight: 112,
+                  borderRadius: 18,
                   border: '1px solid rgba(255,255,255,0.24)',
-                  background: 'transparent',
+                  background: 'rgba(255,255,255,0.08)',
                   color: '#ffffff',
                   cursor: 'pointer',
                 }}
-                whileHover={{ backgroundColor: 'rgba(255,255,255,0.20)' }}
+                whileHover={{ backgroundColor: 'rgba(255,255,255,0.18)', scale: 1.03 }}
               >
-                <row.Icon size={20} strokeWidth={2} />
-                <span style={{ fontSize: 18, fontWeight: 500, fontFamily: tokens.typography.families.text }}> {row.label} </span>
+                <row.Icon size={28} strokeWidth={2.2} />
+                <span style={{ fontSize: 14, fontWeight: 600, fontFamily: tokens.typography.families.text, opacity: 0.9 }}> {row.label} </span>
               </motion.button>
             ))}
+            </div>
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
-    </>, document.body) : null
+    </>, document.body)
   );
 };
 

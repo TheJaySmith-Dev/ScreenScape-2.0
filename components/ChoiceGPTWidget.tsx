@@ -321,7 +321,9 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
 
   const buildYouTubeEmbedHtml = (key: string, label: string) => {
     const safe = escapeHtml(label);
-    return `<div style="width:100%;max-width:520px;border-radius:12px;overflow:hidden;border:1px solid ${tokens.colors.separator.opaque};background:#000"><div style="position:relative;padding-top:56.25%"><iframe src="https://www.youtube.com/embed/${key}?rel=0" title="${safe}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div></div>`;
+    const border = tokens.colors.separator.opaque;
+    const link = `https://www.youtube.com/watch?v=${key}`;
+    return `<div style="width:100%;max-width:520px;border-radius:12px;overflow:hidden;border:1px solid ${border};background:#000"><div style="position:relative;padding-top:56.25%"><iframe src="https://www.youtube.com/embed/${key}?rel=0" title="${safe}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div><div style="display:flex;justify-content:center;gap:8px;padding:8px;background:rgba(255,255,255,0.06)"><span style="color:#fff;font-family:${tokens.typography.families.text};font-size:${tokens.typography.sizes.caption}">Playback restricted?</span><a href="${link}" target="_blank" rel="noopener noreferrer" style="color:#1f6feb;text-decoration:underline;font-family:${tokens.typography.families.text};font-size:${tokens.typography.sizes.caption}">Watch on YouTube</a></div></div>`;
   };
 
   const attemptEmbedTrailer = async (text: string, nextMessages: ChatMessage[]): Promise<boolean> => {
@@ -335,10 +337,20 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
       if (!hit || !hit.id) return false;
       const isTv = (hit as any).media_type === 'tv';
       let videoResp: any = isTv ? await getTVShowVideosImaxOnly(apiKey, (hit as any).id) : await getMovieVideosImaxOnly(apiKey, (hit as any).id);
-      let pick = Array.isArray(videoResp?.results) ? videoResp.results.find((v: any) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser')) : null;
+      const isRedBand = (v: any) => /red\s*band/i.test(String(v?.name || ''));
+      const vids: any[] = Array.isArray(videoResp?.results) ? videoResp.results.filter((v: any) => v.site === 'YouTube') : [];
+      const rank = (arr: any[]) => arr.filter((v: any) => !isRedBand(v));
+      let pick = rank(vids.filter((v: any) => v.type === 'Trailer' && v.official))[0]
+        || rank(vids.filter((v: any) => v.type === 'Trailer'))[0]
+        || rank(vids.filter((v: any) => v.type === 'Teaser'))[0]
+        || rank(vids)[0];
       if (!pick) {
         const fb = isTv ? await getTVShowVideos(apiKey, (hit as any).id) : await getMovieVideos(apiKey, (hit as any).id);
-        pick = Array.isArray(fb?.results) ? (fb.results.find((v: any) => v.site === 'YouTube' && v.type === 'Trailer') || fb.results.find((v: any) => v.site === 'YouTube')) : null;
+        const vids2: any[] = Array.isArray(fb?.results) ? fb.results.filter((v: any) => v.site === 'YouTube') : [];
+        pick = rank(vids2.filter((v: any) => v.type === 'Trailer' && v.official))[0]
+          || rank(vids2.filter((v: any) => v.type === 'Trailer'))[0]
+          || rank(vids2.filter((v: any) => v.type === 'Teaser'))[0]
+          || rank(vids2)[0];
       }
       if (!pick || !pick.key) return false;
       const label = ((hit as any).title || (hit as any).name || 'Trailer') as string;

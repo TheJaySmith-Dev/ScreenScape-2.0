@@ -12,6 +12,7 @@ import {
 } from '../services/tmdbService';
 import { Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import MediaTitleLogo from './MediaTitleLogo';
+import GlassPanel from './GlassPanel';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
 
@@ -33,6 +34,25 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
     const intervalRef = useRef<number | null>(null);
     const activeVideoUrlRef = useRef<string | null>(null);
     const { tokens } = useAppleTheme();
+    const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [heroHeight, setHeroHeight] = useState<number | null>(null);
+
+    useEffect(() => {
+        const updateHeight = () => {
+            try {
+                const el = containerRef.current;
+                if (!el) return;
+                const w = el.offsetWidth || 0;
+                const maxH = (typeof window !== 'undefined' ? window.innerHeight * 0.8 : 800);
+                const h = Math.min(w * (9 / 16), maxH);
+                setHeroHeight(h);
+            } catch {}
+        };
+        updateHeight();
+        window.addEventListener('resize', updateHeight, { passive: true });
+        return () => window.removeEventListener('resize', updateHeight);
+    }, []);
 
     // 1. Data Fetching
     useEffect(() => {
@@ -152,10 +172,10 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                     : await getTVShowVideos(apiKey, activeItem.id);
 
                 const vids = res.results || [];
-                // Priority: TV Spot > Official Trailer > Trailer
-                const video = vids.find(v => v.site === 'YouTube' && (v.type === 'TV Spot' || /tv\s*spot/i.test(v.name || '')))
-                    || vids.find(v => v.site === 'YouTube' && v.type === 'Trailer' && v.official)
-                    || vids.find(v => v.site === 'YouTube' && v.type === 'Trailer');
+                // Priority: Official Trailer > Trailer > TV Spot
+                const video = vids.find(v => v.site === 'YouTube' && v.type === 'Trailer' && (v as any).official)
+                    || vids.find(v => v.site === 'YouTube' && v.type === 'Trailer')
+                    || vids.find(v => v.site === 'YouTube' && (((v.type as string) === 'TV Spot') || /tv\s*spot/i.test(v.name || '')));
 
                 if (video?.key && !cancelled) {
                     const url = `https://www.youtube.com/embed/${video.key}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${video.key}`;
@@ -204,15 +224,21 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
     }
 
     return (
+        <>
         <div
-            className="relative w-screen h-screen md:h-[95vh] overflow-hidden group"
+            ref={containerRef}
+            className="relative w-full mx-auto max-w-6xl overflow-hidden group rounded-3xl"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             style={{
-                marginLeft: 'calc(-50vw + 50%)',
-                marginRight: 'calc(-50vw + 50%)',
-                width: '100vw',
-                background: '#000'
+                background: '#000',
+                border: '1px solid rgba(255,255,255,0.12)',
+                boxShadow: '0 30px 80px rgba(0,0,0,0.45), 0 12px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10)',
+                filter: 'drop-shadow(0 28px 48px rgba(0,0,0,0.55)) drop-shadow(0 10px 24px rgba(0,0,0,0.40))',
+                marginTop: isMobile ? '40px' : '32px',
+                aspectRatio: '16 / 9',
+                maxHeight: '80vh',
+                height: heroHeight ?? undefined
             }}
         >
             {/* Slides */}
@@ -247,45 +273,66 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                             </div>
                         )}
 
-                        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/35 to-transparent" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
                     </div>
                 );
             })}
 
+            {activeItem && (
+                <>
+                    <div className="hidden sm:block" style={{ position: 'absolute', left: 24, top: 'calc(50% + 24px)', transform: 'translateY(-50%)', zIndex: 30 }}>
+                        <MediaTitleLogo
+                            media={activeItem}
+                            apiKey={apiKey}
+                            size="large"
+                            fallbackToText={true}
+                            style={{ maxWidth: 240, maxHeight: 100, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))' }}
+                        />
+                    </div>
+                    <div className="hidden sm:block" style={{ position: 'absolute', left: 24, top: 'calc(50% + 84px)', zIndex: 30 }}>
+                        <button
+                            onClick={() => onSelectItem(activeItem)}
+                            style={{
+                                cursor: 'pointer',
+                                padding: '10px 16px',
+                                borderRadius: 16,
+                                background: 'rgba(255,255,255,0.12)',
+                                color: 'white',
+                                border: '1px solid rgba(255,255,255,0.22)',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.25)'
+                            }}
+                        >
+                            Info
+                        </button>
+                    </div>
+                </>
+            )}
+
             {/* Content Layer (Z-20) */}
             <div className="absolute inset-0 z-20 pointer-events-none flex flex-col justify-center px-8 sm:px-16">
                 {activeItem && (
-                    <div className="max-w-2xl space-y-6 pointer-events-auto animate-slideUp">
-                        {/* Badge */}
-                        <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-white uppercase tracking-wider shadow-lg">
-                            {activeItem.heroType}
-                        </div>
-
-                        {/* Title / Logo */}
-                        <div className="origin-left transform scale-100">
-                            <MediaTitleLogo
-                                media={activeItem}
-                                apiKey={apiKey}
-                                size="large"
-                                fallbackToText={true}
-                                style={{ maxWidth: '400px', maxHeight: '150px' }}
-                            />
-                        </div>
-
-                        {/* Overview (Optional, short) */}
-                        <p className="text-white/80 text-sm sm:text-base line-clamp-3 max-w-xl drop-shadow-md">
-                            {activeItem.overview}
-                        </p>
-
-                        {/* Action Button */}
-                        <button
-                            onClick={() => onSelectItem(activeItem)}
-                            className="flex items-center gap-2 bg-white text-black px-6 py-3 rounded-full font-bold hover:bg-gray-200 transition-colors shadow-xl"
+                    <div className="max-w-2xl pointer-events-auto animate-slideUp">
+                        <GlassPanel
+                            variant="primary"
+                            material="regular"
+                            padding="large"
+                            borderRadius="large"
+                            className="space-y-6 backdrop-blur-3xl"
                         >
-                            <Info className="w-5 h-5" />
-                            More Info
-                        </button>
+                            {/* Badge */}
+                            <div className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-white uppercase tracking-wider shadow-lg">
+                                {activeItem.heroType}
+                            </div>
+
+                            
+
+                            {/* Overview (Optional, short) */}
+                            <p className="text-white/90 text-sm sm:text-base line-clamp-3 max-w-xl drop-shadow-md font-medium">
+                                {activeItem.overview}
+                            </p>
+
+                            
+                        </GlassPanel>
                     </div>
                 )}
             </div>
@@ -314,14 +361,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
             </button>
 
             {/* Bottom Blend to Page */}
-            <div
-                aria-hidden
-                className="absolute left-0 right-0 bottom-0 z-20 pointer-events-none"
-                style={{
-                    height: '18vh',
-                    background: `linear-gradient(to bottom, rgba(0,0,0,0) 0%, ${tokens?.colors?.background?.primary || '#000000'} 100%)`
-                }}
-            />
+            
 
             {/* Indicators (Z-30) */}
             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex gap-2">
@@ -336,6 +376,32 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
                 ))}
             </div>
         </div>
+        {activeItem && (
+            <div className="sm:hidden" style={{ marginTop: 24, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+                <MediaTitleLogo
+                    media={activeItem}
+                    apiKey={apiKey}
+                    size="medium"
+                    fallbackToText={true}
+                    style={{ maxWidth: 180, maxHeight: 80, filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.5))' }}
+                />
+                <button
+                    onClick={() => onSelectItem(activeItem)}
+                    style={{
+                        cursor: 'pointer',
+                        padding: '10px 16px',
+                        borderRadius: 16,
+                        background: 'rgba(255,255,255,0.12)',
+                        color: 'white',
+                        border: '1px solid rgba(255,255,255,0.22)',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.25)'
+                    }}
+                >
+                    Info
+                </button>
+            </div>
+        )}
+        </>
     );
 };
 

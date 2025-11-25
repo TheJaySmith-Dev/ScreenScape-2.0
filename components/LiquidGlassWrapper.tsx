@@ -262,8 +262,8 @@ export const LiquidGlassWrapper: React.FC<LiquidGlassWrapperProps> = ({
     const shadowAlpha = Math.max(0, Math.min(1, (tuning.shadowIntensity ?? 0) / 100));
     const boxShadow = `${tuning.shadowPosition.x}px ${tuning.shadowPosition.y}px ${tuning.shadowExpand}px rgba(0,0,0,${shadowAlpha})`;
     const baseStyle: React.CSSProperties = {
-      ...(style || {}),
       ...(tintColor ? { backgroundColor: tintColor } : (tuning.tint ? { backgroundColor: tuning.tint } : {})),
+      ...(style || {}),
       borderRadius: `${(liquidConfig?.cornerRadius ?? 0) || (style?.borderRadius as any) || 0}px`,
       WebkitFontSmoothing: 'antialiased',
       MozOsxFontSmoothing: 'grayscale',
@@ -271,11 +271,13 @@ export const LiquidGlassWrapper: React.FC<LiquidGlassWrapperProps> = ({
       transform: 'translateZ(0)',
       willChange: 'transform, filter',
     };
-    // Optional Gaussian blur masking to soften edges
-    const blurRadius = Math.max(0, Math.min(tuning.blurRadius ?? 0, 24));
-    const maskGradient = `radial-gradient(closest-side, rgba(0,0,0,1) ${Math.max(0, 100 - blurRadius * 4)}%, rgba(0,0,0,0) 100%)`;
-    (baseStyle as any).WebkitMaskImage = maskGradient;
-    (baseStyle as any).maskImage = maskGradient;
+    // Apply soft edge mask only when effects are active
+    if (liquidConfig) {
+      const blurRadius = Math.max(0, Math.min(tuning.blurRadius ?? 0, 24));
+      const maskGradient = `radial-gradient(closest-side, rgba(0,0,0,1) ${Math.max(0, 100 - blurRadius * 4)}%, rgba(0,0,0,0) 100%)`;
+      (baseStyle as any).WebkitMaskImage = maskGradient;
+      (baseStyle as any).maskImage = maskGradient;
+    }
     // Superellipse clip-path if requested
     if (shape === 'superellipse' && clipPath) {
       (baseStyle as any).clipPath = `path('${clipPath}')`;

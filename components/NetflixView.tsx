@@ -647,64 +647,78 @@ const ExploreView: React.FC<ExploreViewProps> = ({ apiKey, searchQuery, onSelect
 
             {/* Hero Carousel - Only show when not searching */}
             {!currentSearchQuery && (
-                <div style={{ marginBottom: `${tokens.spacing.standard[2]}px` }}>
-        <GlassHero
-          apiKey={apiKey}
-          onSelectItem={onSelectItem}
-          onInvalidApiKey={onInvalidApiKey}
-        />
+                <div style={{ marginBottom: 0, position: 'relative', zIndex: 1, marginTop: 24 }}>
+                    <GlassHero
+                        apiKey={apiKey}
+                        onSelectItem={onSelectItem}
+                        onInvalidApiKey={onInvalidApiKey}
+                    />
                 </div>
             )}
 
             {/* Content Rows - Only show when not searching */}
             {!currentSearchQuery && (
                 <>
-                    <div style={{ marginBottom: `${tokens.spacing.standard[2]}px` }}>
-                        <h2 className="apple-title-2" style={{ 
-                            color: '#FFFFFF',
-                            margin: `0 0 ${tokens.spacing.standard[0]}px 0`,
-                            textShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                        }}>
-                            Recommendations
-                        </h2>
-                        <div style={{ display: 'flex', gap: tokens.spacing.standard[0], alignItems: 'center' }}>
-                            <button
-                                onClick={() => { try { window.dispatchEvent(new Event('openChoiceGPT')); } catch {} }}
-                                className="apple-glass-regular"
-                                style={{
-                                    borderRadius: '16px',
-                                    border: '1px solid rgba(255,255,255,0.2)',
-                                    padding: `${tokens.spacing.micro[1]}px ${tokens.spacing.standard[0]}px`,
-                                    color: tokens.colors.label.primary,
-                                    cursor: 'pointer',
-                                    background: 'rgba(255,255,255,0.08)'
-                                }}
-                            >
-                                Ask ChoiceGPT for picks
-                            </button>
-                            {filterError && (
-                                <div style={{ color: '#ff6b6b' }}>
-                                    {filterError}
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    
 
                     {/* Trending This Week */}
                     {(activeHub ? filtered.trending.length > 0 : trending.length > 0) && (
-                        <div style={{ marginBottom: `${tokens.spacing.standard[2]}px` }}>
+                        <div style={{ 
+                            marginBottom: `${tokens.spacing.standard[2]}px`, 
+                            marginTop: (() => {
+                                try {
+                                    const s = (tokens as any)?.spacing?.standard;
+                                    const base = typeof s?.[3] === 'number' 
+                                        ? s[3] 
+                                        : (typeof s?.[3] === 'string' ? parseFloat(s[3]) : (typeof s?.[2] === 'number' ? s[2] : parseFloat(String(s?.[2] || '32'))));
+                                    const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+                                    const extra = isMobile ? 36 : 24;
+                                    const val = (typeof base === 'number' ? base : parseFloat(String(base))) + extra;
+                                    return isNaN(val) ? (isMobile ? 72 : 56) : val;
+                                } catch { return 72; }
+                            })()
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: tokens.spacing.standard[0], marginBottom: tokens.spacing.micro[0] }}>
+                                <button
+                                    onClick={() => { try { window.dispatchEvent(new Event('openChoiceGPT')); } catch {} }}
+                                    className="apple-glass-regular"
+                                    style={{
+                                        borderRadius: '16px',
+                                        border: '1px solid rgba(255,255,255,0.2)',
+                                        padding: `${tokens.spacing.micro[1]}px ${tokens.spacing.standard[0]}px`,
+                                        color: tokens.colors.label.primary,
+                                        cursor: 'pointer',
+                                        background: 'rgba(255,255,255,0.08)'
+                                    }}
+                                >
+                                    Ask ChoiceGPT for picks
+                                </button>
+                                {filterError && (
+                                    <div style={{ color: '#ff6b6b' }}>
+                                        {filterError}
+                                    </div>
+                                )}
+                            </div>
                             <h2 className="apple-title-2" style={{ 
                                 color: '#FFFFFF',
-                                margin: `0 0 ${tokens.spacing.standard[0]}px 0`,
+                                margin: `0 0 ${tokens.spacing.micro[0]}px 0`,
                                 textShadow: '0 2px 4px rgba(0,0,0,0.3)'
                             }}>
                                 Trending This Week
                             </h2>
+                            <div style={{ display: 'flex', gap: tokens.spacing.standard[0], alignItems: 'center', marginBottom: tokens.spacing.micro[0] }}>
+                                {filterError && (
+                                    <div style={{ color: '#ff6b6b' }}>
+                                        {filterError}
+                                    </div>
+                                )}
+                            </div>
                             <MediaRow
-                                title="Trending This Week"
+                                title=""
                                 items={activeHub ? filtered.trending : trending}
                                 onSelectItem={onSelectItem}
                                 apiKey={apiKey}
+                                titleStyle={{ margin: 0 }}
                             />
                         </div>
                     )}

@@ -163,44 +163,44 @@ export const appleTokens = {
   materials: {
     glass: {
       ultraThin: {
-        opacity: 0.0025,
-        blur: 0.5,
+        opacity: 0.1,
+        blur: 25,
         brightness: 1.08,
         saturation: 1.18,
-        borderOpacity: 0.012,
-        shadowIntensity: 0.08,
-      },
-      thin: {
-        opacity: 0.006,
-        blur: 0.5,
-        brightness: 1.1,
-        saturation: 1.22,
-        borderOpacity: 0.015,
+        borderOpacity: 0.15,
         shadowIntensity: 0.1,
       },
+      thin: {
+        opacity: 0.15,
+        blur: 35,
+        brightness: 1.1,
+        saturation: 1.22,
+        borderOpacity: 0.2,
+        shadowIntensity: 0.15,
+      },
       regular: {
-        opacity: 0.009,
-        blur: 0.5,
+        opacity: 0.2,
+        blur: 45,
         brightness: 1.12,
         saturation: 1.25,
-        borderOpacity: 0.018,
-        shadowIntensity: 0.12,
+        borderOpacity: 0.25,
+        shadowIntensity: 0.2,
       },
       thick: {
-        opacity: 0.012,
-        blur: 0.5,
+        opacity: 0.25,
+        blur: 55,
         brightness: 1.14,
         saturation: 1.28,
-        borderOpacity: 0.02,
-        shadowIntensity: 0.14,
+        borderOpacity: 0.3,
+        shadowIntensity: 0.25,
       },
       prominent: {
-        opacity: 0.015,
-        blur: 0.5,
+        opacity: 0.3,
+        blur: 65,
         brightness: 1.15,
         saturation: 1.3,
-        borderOpacity: 0.022,
-        shadowIntensity: 0.16,
+        borderOpacity: 0.35,
+        shadowIntensity: 0.3,
       },
     },
     // Enhanced pill button materials
@@ -395,7 +395,7 @@ export const useAppleTheme = () => {
   if (context === undefined) {
     // Provide fallback tokens to prevent crashes during development
     console.warn('useAppleTheme must be used within an AppleThemeProvider. Using fallback tokens.');
-    return { tokens: appleTokens, mode: 'light', setMode: () => {} } as AppleThemeContextType;
+    return { tokens: appleTokens, mode: 'light', setMode: () => { } } as AppleThemeContextType;
   }
   return context;
 };

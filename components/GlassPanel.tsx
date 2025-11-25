@@ -2,7 +2,7 @@ import React from 'react';
 import styled, { css, keyframes } from 'styled-components';
 import { useAppleTheme } from './AppleDesignSystem';
 
-interface GlassPanelProps {
+interface GlassPanelProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   variant?: 'primary' | 'secondary' | 'accent' | 'destructive';
   material?: 'ultraThin' | 'thin' | 'regular' | 'thick' | 'prominent';
@@ -42,9 +42,9 @@ const StyledPanel = styled.div<{
   /* Apple Design Foundation */
   position: relative;
   overflow: hidden;
-  cursor: ${({ $interactive, $disabled }) => 
-    $disabled ? 'not-allowed' : 
-    $interactive ? 'pointer' : 'default'
+  cursor: ${({ $interactive, $disabled }) =>
+    $disabled ? 'not-allowed' :
+      $interactive ? 'pointer' : 'default'
   };
   
   /* Apple Material System */
@@ -135,8 +135,8 @@ const StyledPanel = styled.div<{
   }}
   
   /* Apple Animation System */
-  transition: all ${({ $tokens }) => $tokens.animations.easeInOut.duration}s ${({ $tokens }) => $tokens.animations.easeInOut.easing};
-  will-change: transform, backdrop-filter, background, box-shadow;
+  transition: all ${({ $tokens }) => $tokens.animations.softSpring.duration}s ${({ $tokens }) => $tokens.animations.softSpring.easing};
+  will-change: transform, backdrop-filter, background, box-shadow, opacity;
   transform: translateZ(0);
   backface-visibility: hidden;
   
@@ -167,16 +167,22 @@ const StyledPanel = styled.div<{
   /* Interactive States */
   ${({ $interactive, $disabled, $tokens }) => $interactive && !$disabled && css`
     &:hover {
-      transform: translateY(-2px) translateZ(0);
-      box-shadow: ${() => {
-        const depth = $tokens.materials.depth.layer3;
-        return `${depth.shadowOffset.x}px ${depth.shadowOffset.y}px ${depth.shadowBlur}px rgba(0, 0, 0, ${depth.shadowOpacity})`;
-      }};
+      transform: scale(1.02) translateZ(0);
+      box-shadow: 
+        0 30px 60px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+      z-index: 10;
     }
     
     &:active {
-      transform: translateY(-1px) scale(0.995) translateZ(0);
-      transition: all ${$tokens.animations.spring.duration}s ${$tokens.animations.spring.easing};
+      transform: scale(0.98) translateZ(0);
+      box-shadow: 
+        0 10px 30px rgba(0, 0, 0, 0.2),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.2);
     }
     
     &:focus-visible {
@@ -184,6 +190,29 @@ const StyledPanel = styled.div<{
       outline-offset: 2px;
     }
   `}
+
+  /* Open/Close Animations */
+  &.panel-enter {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  
+  &.panel-enter-active {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  
+  &.panel-exit {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  
+  &.panel-exit-active {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
   
   /* Loading State */
   ${({ $loading }) => $loading && css`
@@ -234,21 +263,21 @@ const StyledPanel = styled.div<{
     `}
     
     ${({ $padding, $tokens }) => {
-      switch ($padding) {
-        case 'small':
-          return css`
+    switch ($padding) {
+      case 'small':
+        return css`
             padding: ${$tokens.spacing.micro[2]}px;
           `;
-        case 'large':
-          return css`
+      case 'large':
+        return css`
             padding: ${$tokens.spacing.standard[2]}px;
           `;
-        default:
-          return css`
+      default:
+        return css`
             padding: ${$tokens.spacing.standard[1]}px;
           `;
-      }
-    }}
+    }
+  }}
   }
 `;
 

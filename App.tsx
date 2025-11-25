@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Tag, Image as ImageIcon, Coins, Gamepad2, Tv, RefreshCw, Settings as SettingsIcon, Film } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { MediaItem } from './types';
  
@@ -24,7 +25,6 @@ import LiquidGlassPillMenuDemo from './pages/LiquidGlassPillMenuDemo';
 // Hubs now live inside the IMAX page only
 import ImaxView from './components/ImaxView';
 import { MDBLIST_API_KEY } from './utils/genscapeKeys';
-import TopNavigation from './components/TopNavigation';
 
 import { useAuth } from './contexts/AuthContext';
 import { ImageGeneratorProvider } from './contexts/ImageGeneratorContext';
@@ -32,7 +32,7 @@ import { AppleThemeProvider, useAppleTheme } from './components/AppleThemeProvid
 import FluidGlass from './components/FluidGlass';
 // ScrollLiquidPanel demo removed; effect now lives in pill navigation
 
-export type ViewType = 'screenSearch' | 'search' | 'live' | 'likes' | 'game' | 'settings' | 'sync' | 'prototype' | 'genres' | 'liquidGlassDemo' | 'imax';
+export type ViewType = 'screenSearch' | 'search' | 'live' | 'likes' | 'game' | 'settings' | 'sync' | 'prototype' | 'genres' | 'liquidGlassDemo' | 'imax' | 'apps';
 
 type SyncViewType = 'none' | 'selector' | 'export' | 'import';
 
@@ -188,6 +188,62 @@ const AppContent: React.FC = () => {
                 return <ImaxView apiKey={apiKey!} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} />;
             case 'liquidGlassDemo':
                 return <LiquidGlassPillMenuDemo />;
+            case 'apps':
+                return (
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: tokens.spacing.standard[2]
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{
+                                fontSize: 22,
+                                fontWeight: tokens.typography.weights.semibold,
+                                color: tokens.colors.label.primary,
+                                fontFamily: tokens.typography.families.display
+                            }}>Apps</span>
+                        </div>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                            gap: tokens.spacing.standard[1]
+                        }}>
+                            {[
+                                { id: 'boxoffice', label: 'Box Office', Icon: Tag, onClick: () => { try { navigate('/Stats/BoxOffice'); } catch { setView('genres' as ViewType); } } },
+                                { id: 'choice', label: 'Choice (Text/Image)', Icon: ImageIcon, onClick: () => { try { window.dispatchEvent(new Event('openChoiceGPT')); } catch {} } },
+                                { id: 'coffee', label: 'Buy Me A Coffee', Icon: Tag, onClick: () => { try { window.open('https://buymeacoffee.com/jasonforreels', '_blank', 'noopener,noreferrer'); } catch {} } },
+                                { id: 'billionaire', label: 'Billionaire Sandbox', Icon: Coins, onClick: () => { try { navigate('/play/billionaire-sandbox'); } catch {} } },
+                                { id: 'game', label: 'Games', Icon: Gamepad2, onClick: () => { setView('game'); } },
+                                { id: 'live', label: 'Live', Icon: Tv, onClick: () => { setView('live'); } },
+                                { id: 'settings', label: 'Settings', Icon: SettingsIcon, onClick: () => { setView('settings'); } },
+                                { id: 'sync', label: 'Sync', Icon: RefreshCw, onClick: () => { setSyncView('selector'); } },
+                                { id: 'imax', label: 'IMAX', Icon: Film, onClick: () => { setView('imax'); } },
+                            ].map((row, idx) => (
+                                <button
+                                    key={row.id}
+                                    onClick={row.onClick}
+                                    style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 8,
+                                        padding: '16px 12px',
+                                        minHeight: 128,
+                                        borderRadius: 18,
+                                        border: '1px solid rgba(255,255,255,0.24)',
+                                        background: 'rgba(255,255,255,0.08)',
+                                        color: '#ffffff',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <row.Icon size={28} strokeWidth={2.2} />
+                                    <span style={{ fontSize: 14, fontWeight: 600, fontFamily: tokens.typography.families.text, opacity: 0.9 }}> {row.label} </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                );
             default:
                 return <NetflixView apiKey={apiKey!} searchQuery={searchQuery} onSelectItem={handleSelectItem} onInvalidApiKey={handleInvalidApiKey} onNavigateProvider={() => {}} />;
         }
@@ -233,13 +289,7 @@ const AppContent: React.FC = () => {
                     />
                 )}
 
-                <TopNavigation
-                    onSettingsClick={() => setView('settings')}
-                    onSyncClick={() => setSyncView('selector')}
-                    onImaxClick={!selectedItem && view !== 'imax' ? () => setView('imax') : undefined}
-                    onChoiceBotClick={() => setShowChoiceGPT(true)}
-                    preferPerformance={performanceMode}
-                />
+                
 
                 
 

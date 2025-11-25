@@ -24,6 +24,7 @@ const ImaxView: React.FC<ImaxViewProps> = ({ apiKey, onSelectItem }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedVideoKey, setExpandedVideoKey] = useState<string | null>(null);
+  const [expandedCandidateKeys, setExpandedCandidateKeys] = useState<string[] | null>(null);
   const [expandedTitle, setExpandedTitle] = useState<string | null>(null);
   const [expandedBackdropUrl, setExpandedBackdropUrl] = useState<string | null>(null);
   const [trailerLoading, setTrailerLoading] = useState<boolean>(false);
@@ -161,6 +162,7 @@ const ImaxView: React.FC<ImaxViewProps> = ({ apiKey, onSelectItem }) => {
       const curatedKey = getCuratedTrailerKeyForItem(item);
       if (curatedKey) {
         setExpandedVideoKey(curatedKey);
+        setExpandedCandidateKeys([curatedKey]);
         setExpandedTitle((item as any).title || (item as any).name || null);
         // Build backdrop URL for 16:9 expansion using TMDb path if present
         const path = (item as any).backdrop_path as string | null;
@@ -183,6 +185,10 @@ const ImaxView: React.FC<ImaxViewProps> = ({ apiKey, onSelectItem }) => {
         const first = resp && resp.results && resp.results.length > 0 ? resp.results[0] : null;
         if (first && first.key) {
           setExpandedVideoKey(first.key);
+          try {
+            const keys = (resp?.results || []).map(r => r.key).filter(k => typeof k === 'string');
+            setExpandedCandidateKeys(keys.length ? keys : [first.key]);
+          } catch { setExpandedCandidateKeys([first.key]); }
           setExpandedTitle((item as any).title || (item as any).name || null);
           const path = (item as any).backdrop_path as string | null;
           let url: string | null = null;
@@ -314,6 +320,8 @@ const ImaxView: React.FC<ImaxViewProps> = ({ apiKey, onSelectItem }) => {
                 onEnd={() => {}}
                 loop={false}
                 boostAudio={true}
+                fallbackKeys={expandedCandidateKeys || undefined}
+                onAlternateSelected={(k) => { try { setExpandedVideoKey(k); } catch {} }}
               />
             </>
           )}

@@ -203,7 +203,7 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
     
     return (
         <div 
-            className="group/card flex-shrink-0 w-40 md:w-48 transition-all duration-300 group-hover/row:opacity-70 hover:!opacity-100" 
+            className="group/card flex-shrink-0 w-32 sm:w-36 md:w-48 transition-all duration-300 group-hover/row:opacity-70 hover:!opacity-100" 
             onClick={() => onSelectItem(item)}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}

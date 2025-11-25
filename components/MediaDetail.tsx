@@ -22,7 +22,6 @@ import Loader from './Loader';
 import { useAppleTheme } from './AppleThemeProvider';
 import { useAppleAnimationEffects } from '../hooks/useAppleAnimationEffects';
 import { Star, Heart, ThumbsDown, X, Play } from 'lucide-react';
-import { LiquidGlassWrapper } from './LiquidGlassWrapper';
 import BoxOfficeSection from './BoxOfficeSection';
 import {
     getAvailabilityBuckets,
@@ -543,11 +542,14 @@ const TrailerModalOverlay: React.FC<{ children: React.ReactNode; onClick: () => 
     const { tokens } = useAppleTheme();
     return (
         <div 
-            className="fixed inset-0 flex items-center justify-center"
+            className="fixed inset-0 flex justify-center"
             style={{
                 background: `${tokens.colors.background.overlay}CC`,
                 zIndex: 1000,
-                padding: tokens.spacing.xlarge
+                alignItems: 'flex-start',
+                paddingTop: tokens.spacing.large,
+                paddingLeft: tokens.spacing.large,
+                paddingRight: tokens.spacing.large
             }}
             onClick={onClick}
         >
@@ -1720,6 +1722,21 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
     };
 
     const [mainTrailerKey, setMainTrailerKey] = useState<string | null>(null);
+    const trailerCandidates = React.useMemo(() => {
+        const list: string[] = [];
+        try {
+            const vids = (details as any)?.videos?.results || [];
+            const redBand = (v: any) => /red\s*band/i.test(String(v?.name || ''));
+            const select = (fn: (v: any) => boolean) => vids.filter((v: any) => v.site === 'YouTube' && fn(v)).filter((v: any) => !redBand(v)).map((v: any) => v.key);
+            const append = (arr: string[]) => { for (const k of arr) { if (k && !list.includes(k)) list.push(k); } };
+            append(select((v: any) => v.type === 'Trailer' && v.official));
+            append(select((v: any) => v.type === 'Trailer'));
+            append(select((v: any) => v.type === 'Teaser'));
+            append(vids.filter((v: any) => v.site === 'YouTube' && !redBand(v)).map((v: any) => v.key));
+        } catch {}
+        if (mainTrailerKey && !list.includes(mainTrailerKey)) list.unshift(mainTrailerKey);
+        return list;
+    }, [details, mainTrailerKey]);
     useEffect(() => {
         // Prefer curated trailer key for curated IMAX titles
         const curatedKey = getCuratedTrailerKeyForItem(item);
@@ -3066,12 +3083,15 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                         <div style={{ display: 'flex', alignItems: 'center', gap: tokens.spacing.small }}>
                             {(() => {
                                 const showImaxLogo = preferImaxTrailer || isCuratedImaxTitle(item);
+                                const primaryStreamProvider = availabilityBuckets.stream.find(p => p.logo_path);
+                                const streamingLogoUrl = primaryStreamProvider ? `${IMAGE_BASE_URL}w154${primaryStreamProvider.logo_path}` : null;
+                                const shouldUseCompactTitle = showImaxLogo || !!streamingLogoUrl;
                                 return (
                                     <MediaTitleLogo
                                         media={item}
                                         apiKey={apiKey}
-                                        size={showImaxLogo ? 'medium' : 'large'}
-                                        maxHeightPx={showImaxLogo ? 28 : undefined}
+                                        size={shouldUseCompactTitle ? 'medium' : 'large'}
+                                        maxHeightPx={shouldUseCompactTitle ? 28 : undefined}
                                         className="leading-tight"
                                         style={{
                                             textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
@@ -3080,17 +3100,40 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                                     />
                                 );
                             })()}
-                            {(preferImaxTrailer || isCuratedImaxTitle(item)) && (
+                            {(preferImaxTrailer || isCuratedImaxTitle(item)) ? (
                                 <>
                                     <span style={{ opacity: 0.7 }}>|</span>
                                     <img
                                         src={'https://i.ibb.co/G47CHyhg/toppng-com-imax-michael-jackson-thriller-imax-445x87.png'}
                                         alt="IMAX"
-                                        style={{ height: '28px', width: 'auto' }}
+                                        style={{ height: '28px', width: 'auto', background: 'transparent' }}
                                         loading="lazy"
                                     />
                                 </>
-                            )}
+                            ) : (() => {
+                                const p = availabilityBuckets.stream.find(sp => sp.logo_path);
+                                if (!p) return null;
+                                const providerName = (p.provider_name || '').toLowerCase();
+                                const appleOverride = providerName.includes('apple tv') || providerName.includes('apple tv+') || providerName.includes('apple tv plus')
+                                  ? 'https://crystalpng.com/wp-content/uploads/2025/11/apple-tv-logo.png'
+                                  : null;
+                                const disneyOverride = providerName.includes('disney+') || providerName.includes('disney plus') || providerName.includes('disney')
+                                  ? 'https://lumiere-a.akamaihd.net/v1/images/d_banner_-_nba_mobile_size_500x250_504bc71b.png'
+                                  : null;
+                                const logoUrl = appleOverride || disneyOverride || `${IMAGE_BASE_URL}w154${p.logo_path}`;
+                                const isDisneyOverride = Boolean(disneyOverride);
+                                return (
+                                    <>
+                                        <span style={{ opacity: 0.7 }}>|</span>
+                                        <img
+                                            src={logoUrl}
+                                            alt={p.provider_name}
+                                            style={{ height: '44px', width: 'auto', background: 'transparent', objectFit: 'contain', objectPosition: 'top center', clipPath: isDisneyOverride ? 'inset(0 0 28% 0)' : 'none' }}
+                                            loading="lazy"
+                                        />
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                     
@@ -3359,35 +3402,35 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
             {showTrailerModal && mainTrailerKey && (
                 <TrailerModalOverlay onClick={handleCloseTrailerModal}>
                     <TrailerModalContent onClick={(e) => e.stopPropagation()}>
-                        <LiquidGlassWrapper
-                            componentType="button"
-                            intensity="prominent"
-                            effect="regular"
-                            shape="circle"
-                            refractionQuality="high"
-                            artifactReduction="mild"
+                        <button
                             onClick={handleCloseTrailerModal}
-                            className="absolute top-4 right-4 z-50"
+                            className="absolute top-3 right-3 z-50"
+                            aria-label="Close trailer"
                             style={{
-                                width: 44,
-                                height: 44,
+                                width: 36,
+                                height: 36,
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 border: '1px solid rgba(255,255,255,0.22)',
+                                background: tokens?.materials?.pill?.primary?.background || 'rgba(255,255,255,0.1)',
+                                backdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(12px)',
+                                WebkitBackdropFilter: tokens?.materials?.pill?.primary?.backdropFilter || 'blur(12px)',
                                 boxShadow: '0 10px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.2)',
                                 color: tokens.colors.text.primary,
+                                borderRadius: '50%',
                                 cursor: 'pointer'
                             }}
-                            aria-label="Close trailer"
                         >
-                            <X size={20} />
-                        </LiquidGlassWrapper>
+                            <X size={18} />
+                        </button>
                         <TrailerVideoContainer>
                             <VideoPlayer
                                 videoKey={mainTrailerKey}
                                 isMuted={isMuted}
                                 onEnd={handleCloseTrailerModal}
+                                fallbackKeys={trailerCandidates}
+                                onAlternateSelected={(k) => { try { setMainTrailerKey(k); } catch {} }}
                             />
                         </TrailerVideoContainer>
                     </TrailerModalContent>

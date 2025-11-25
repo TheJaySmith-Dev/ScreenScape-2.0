@@ -116,6 +116,7 @@ export interface AppleDesignTokens {
     easeInOut: AnimationConfig;
     gentle: AnimationConfig;
     snappy: AnimationConfig;
+    softSpring: AnimationConfig;
   };
 }
 
@@ -237,34 +238,34 @@ const lightThemeTokens: AppleDesignTokens = {
   materials: {
     glass: {
       ultraThin: {
-        opacity: 0.05,
-        blur: 20,
-        borderOpacity: 0.1,
+        opacity: 0.1,
+        blur: 25,
+        borderOpacity: 0.15,
         shadowIntensity: 0.1,
       },
       thin: {
-        opacity: 0.08,
-        blur: 25,
-        borderOpacity: 0.12,
-        shadowIntensity: 0.12,
-      },
-      regular: {
-        opacity: 0.1,
-        blur: 30,
-        borderOpacity: 0.15,
-        shadowIntensity: 0.15,
-      },
-      thick: {
         opacity: 0.15,
         blur: 35,
-        borderOpacity: 0.18,
-        shadowIntensity: 0.18,
+        borderOpacity: 0.2,
+        shadowIntensity: 0.15,
+      },
+      regular: {
+        opacity: 0.2,
+        blur: 45,
+        borderOpacity: 0.25,
+        shadowIntensity: 0.2,
+      },
+      thick: {
+        opacity: 0.25,
+        blur: 55,
+        borderOpacity: 0.3,
+        shadowIntensity: 0.25,
       },
       prominent: {
-        opacity: 0.2,
-        blur: 40,
-        borderOpacity: 0.2,
-        shadowIntensity: 0.2,
+        opacity: 0.3,
+        blur: 65,
+        borderOpacity: 0.35,
+        shadowIntensity: 0.3,
       },
     },
     depth: {
@@ -318,6 +319,12 @@ const lightThemeTokens: AppleDesignTokens = {
     snappy: {
       duration: 0.3,
       easing: 'cubic-bezier(0.4, 0, 0.6, 1)',
+    },
+    softSpring: {
+      duration: 0.8,
+      easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+      damping: 0.8,
+      stiffness: 120,
     },
   },
 };

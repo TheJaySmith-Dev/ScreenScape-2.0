@@ -1,16 +1,16 @@
 /* General Body & Root Styles */
 :root {
   --color-primary: #0a0a0f;
-  --color-glass-edge: rgba(255, 255, 255, 0.1);
-  --color-glow: 0 0 10px var(--color-accent-400) 10px 0 20px var(--color-accent-500);
+  --color-glass-edge: rgba(255, 255, 255, 0.15);
+  --color-glow: 0 0 20px var(--color-accent-400) 15px 0 30px var(--color-accent-500);
   /* Liquid Glass Variables */
-  --glass-gradient-start: #E8EAF0;
-  --glass-gradient-end: #C9CCD8;
+  --glass-gradient-start: rgba(232, 234, 240, 0.05);
+  --glass-gradient-end: rgba(201, 204, 216, 0.02);
   --glass-blue-violet-start: #6B73FF;
   --glass-blue-violet-end: #000DFF;
   --icon-gradient-start: #8BB6FF;
   --icon-gradient-end: #C6B3FF;
-  --spotlight-color: rgba(255, 255, 255, 0.35);
+  --spotlight-color: rgba(255, 255, 255, 0.15);
 }
 
 /* Liquid Glass Utility Classes */
@@ -78,9 +78,9 @@ body.voice-mode-active {
   /* Base gradient background - made darker for better readability */
   background:
     linear-gradient(135deg, var(--glass-gradient-start) 0%, var(--glass-gradient-end) 100%),
-    rgba(20, 20, 30, 0.9);
-  backdrop-filter: blur(25px) saturate(180%);
-  -webkit-backdrop-filter: blur(25px) saturate(180%);
+    rgba(20, 20, 30, 0.6);
+  backdrop-filter: blur(45px) saturate(180%);
+  -webkit-backdrop-filter: blur(45px) saturate(180%);
   border: 1px solid var(--color-glass-edge);
 
   /* Glass panel configuration */
@@ -90,12 +90,32 @@ body.voice-mode-active {
   position: relative;
   box-shadow:
     /* Main drop shadow with luminous glow */
-    0 8px 40px rgba(107, 115, 255, 0.2),
-    0 0 0 1px rgba(0, 13, 255, 0.1),
+    0 20px 50px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
     /* Inner highlight from top for glass sheen */
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
     /* Bottom vignette for depth */
-    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.glass-panel:hover {
+  transform: scale(1.02);
+  box-shadow:
+    0 30px 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+}
+
+.glass-panel:active {
+  transform: scale(0.98);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
 }
 
 
