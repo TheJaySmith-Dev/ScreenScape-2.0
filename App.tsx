@@ -373,6 +373,28 @@ const AppContent: React.FC = () => {
                 {showChoiceGPT && (
                     <ChoiceGPTWidget onClose={() => setShowChoiceGPT(false)} modes={['image','text']} />
                 )}
+
+                <div
+                    className="cfr-app-badge"
+                >
+                    <img
+                        src="https://i.ibb.co/QFRhk6HQ/Choice-For-Reels-App-logo-2.png"
+                        alt="CFR App"
+                        loading="lazy"
+                        decoding="async"
+                        style={{ height: 28, width: 'auto' }}
+                    />
+                    <span
+                        style={{
+                            fontSize: 14,
+                            fontWeight: 600,
+                            color: '#FFFFFF',
+                            opacity: 0.9
+                        }}
+                    >
+                        CFR App Coming Soon
+                    </span>
+                </div>
             </div>
         </ImageGeneratorProvider>
     );

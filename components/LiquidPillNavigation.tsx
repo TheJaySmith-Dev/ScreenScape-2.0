@@ -264,10 +264,26 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
     return `data:image/svg+xml;utf8,${svg}`;
   }, []);
 
-  
+  const LIVE_ICON_DATA_URL = useMemo(() => {
+    const svg = encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="url(#grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <defs>
+          <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#DADADA"/>
+            <stop offset="50%" stop-color="#9E9E9E"/>
+            <stop offset="100%" stop-color="#E6E6E6"/>
+          </linearGradient>
+        </defs>
+        <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
+        <polyline points="17 2 12 7 7 2" />
+      </svg>`
+    );
+    return `data:image/svg+xml;utf8,${svg}`;
+  }, []);
 
   const navigationItems = [
     { id: 'screenSearch' as ViewType, label: 'Home', imageUrl: HOME_ICON_DATA_URL },
+    { id: 'live' as ViewType, label: 'Live', imageUrl: LIVE_ICON_DATA_URL },
     { id: 'likes' as ViewType, label: 'Likes', imageUrl: HEART_ICON_DATA_URL },
     { id: 'sync' as ViewType, label: 'Sync', imageUrl: syncIconUrl },
     { id: 'settings' as ViewType, label: 'Settings', imageUrl: SETTINGS_ICON_DATA_URL },
@@ -419,7 +435,7 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
             justifyContent: 'center',
             gap: '8px',
             padding: '8px',
-            borderRadius: '24px',
+            borderRadius: '9999px',
             position: 'relative',
             minHeight: '44px',
             width: 'auto',

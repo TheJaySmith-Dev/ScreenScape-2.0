@@ -85,7 +85,7 @@ const StyledButton = styled.button<{
           padding: 0 ${$tokens.spacing.standard[1]}px;
           font-size: ${$tokens.typography.sizes.caption1}px;
           line-height: ${$tokens.typography.lineHeights.caption1};
-          border-radius: ${$tokens.spacing.standard[1]}px;
+          border-radius: 9999px;
         `;
       case 'medium':
         return css`
@@ -93,15 +93,15 @@ const StyledButton = styled.button<{
           padding: 0 ${$tokens.spacing.standard[2]}px;
           font-size: ${$tokens.typography.sizes.body}px;
           line-height: ${$tokens.typography.lineHeights.body};
-          border-radius: ${$tokens.spacing.standard[1] + $tokens.spacing.micro[1]}px;
+          border-radius: 9999px;
         `;
       case 'large':
         return css`
           height: ${$tokens.spacing.standard[3]}px;
-          padding: 0 ${$tokens.spacing.standard[2] + $tokens.spacing.micro[1]}px;
-          font-size: ${$tokens.typography.sizes.headline}px;
-          line-height: ${$tokens.typography.lineHeights.headline};
-          border-radius: ${$tokens.spacing.standard[2]}px;
+          padding: 0 ${$tokens.spacing.standard[3]}px;
+          font-size: ${$tokens.typography.sizes.title3}px;
+          line-height: ${$tokens.typography.lineHeights.title3};
+          border-radius: 9999px;
         `;
       default:
         return '';
