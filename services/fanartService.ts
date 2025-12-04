@@ -7,6 +7,7 @@ export interface FanArtImage {
   url: string;
   lang?: string | null;
   likes?: number;
+  id?: string;
 }
 
 export interface FanArtMovieResponse {
@@ -16,8 +17,8 @@ export interface FanArtMovieResponse {
   hdmovielogo?: FanArtImage[]; // logos
   movielogo?: FanArtImage[];
   movieposter?: FanArtImage[]; // posters
-  moviebackground?: FanArtImage[]; // backdrops
-  moviethumb?: FanArtImage[]; // backdrops/thumbs
+  moviebackground?: FanArtImage[]; // backdrops (plain)
+  moviethumb?: FanArtImage[]; // backdrops with text/logos (16:9)
   moviebanner?: FanArtImage[];
 }
 
@@ -45,6 +46,17 @@ export function selectBestBackdrop(art: FanArtMovieResponse | null): string | nu
   return bg || null;
 }
 
+// Select backdrop with text/logo (for hero carousels) - English only
+export function selectBestBackdropWithText(art: FanArtMovieResponse | null): string | null {
+  if (!art) return null;
+  // moviethumb contains backdrops with title text/logos - filter for English
+  const englishThumbs = (art.moviethumb || []).filter(img => 
+    !img.lang || img.lang === 'en' || img.lang === '00' // '00' means language-neutral
+  );
+  const thumb = englishThumbs.sort(sortByLikes)[0]?.url || null;
+  return thumb;
+}
+
 export function selectBestPoster(art: FanArtMovieResponse | null): string | null {
   if (!art) return null;
   const poster = (art.movieposter || []).sort(sortByLikes)[0]?.url || null;
@@ -70,7 +82,8 @@ export interface FanArtTVResponse {
   hdtvlogo?: FanArtImage[];
   clearlogo?: FanArtImage[];
   tvposter?: FanArtImage[];
-  showbackground?: FanArtImage[];
+  showbackground?: FanArtImage[]; // backdrops with text (16:9)
+  tvthumb?: FanArtImage[]; // alternative TV thumbs
 }
 
 export async function getTVArtByTvdbId(tvdbId: string): Promise<FanArtTVResponse | null> {
@@ -90,6 +103,17 @@ export function selectBestTVBackdrop(art: FanArtTVResponse | null): string | nul
   if (!art) return null;
   const bg = (art.showbackground || []).sort(sortByLikes)[0]?.url || null;
   return bg || null;
+}
+
+// Select TV backdrop with text/logo (for hero carousels) - English only
+export function selectBestTVBackdropWithText(art: FanArtTVResponse | null): string | null {
+  if (!art) return null;
+  // showbackground for TV shows typically includes text - filter for English
+  const englishBackgrounds = (art.showbackground || []).filter(img => 
+    !img.lang || img.lang === 'en' || img.lang === '00' // '00' means language-neutral
+  );
+  const bg = englishBackgrounds.sort(sortByLikes)[0]?.url || null;
+  return bg;
 }
 
 export function selectBestTVPoster(art: FanArtTVResponse | null): string | null {

@@ -28,7 +28,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
     const [items, setItems] = useState<HeroItem[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
-    const [tmdbBackdrops, setTmdbBackdrops] = useState<Record<number, string | null>>({});
+    const [textBackdrops, setTextBackdrops] = useState<Record<number, string | null>>({});
     const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
     const [shouldPlayVideo, setShouldPlayVideo] = useState<boolean>(false);
     const intervalRef = useRef<number | null>(null);
@@ -118,7 +118,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
         return () => { isMounted = false; };
     }, [apiKey, onInvalidApiKey]);
 
-    // 2. Resolve Backdrops (High Quality)
+    // 2. Resolve Backdrops with English Text from TMDB
     useEffect(() => {
         if (items.length === 0) return;
         let cancelled = false;
@@ -127,22 +127,31 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
             for (const item of items) {
                 try {
                     let url: string | null = null;
-                    // Try to get better backdrops
+                    // Get TMDB images and look for backdrops with English text
                     if (item.media_type === 'movie') {
                         const imgs = await getMovieImages(apiKey, item.id);
-                        const best = imgs.backdrops?.[0];
+                        // Filter for backdrops with English text (iso_639_1 === 'en' means text overlay in English)
+                        const englishBackdrops = imgs.backdrops?.filter(b => b.iso_639_1 === 'en') || [];
+                        // Sort by vote average and get the best one
+                        const best = englishBackdrops.sort((a, b) => b.vote_average - a.vote_average)[0]
+                            || imgs.backdrops?.[0]; // fallback to any backdrop
                         if (best?.file_path) url = `${IMAGE_BASE_URL}${best.file_path}`;
                     } else if (item.media_type === 'tv') {
                         const imgs = await getTVShowImages(apiKey, item.id);
-                        const best = imgs.backdrops?.[0];
+                        // Filter for backdrops with English text (iso_639_1 === 'en' means text overlay in English)
+                        const englishBackdrops = imgs.backdrops?.filter(b => b.iso_639_1 === 'en') || [];
+                        // Sort by vote average and get the best one
+                        const best = englishBackdrops.sort((a, b) => b.vote_average - a.vote_average)[0]
+                            || imgs.backdrops?.[0]; // fallback to any backdrop
                         if (best?.file_path) url = `${IMAGE_BASE_URL}${best.file_path}`;
                     }
                     updates[item.id] = url;
-                } catch {
+                } catch (e) {
+                    console.warn('Failed to fetch backdrop for item', item.id, e);
                     updates[item.id] = null;
                 }
             }
-            if (!cancelled) setTmdbBackdrops(prev => ({ ...prev, ...updates }));
+            if (!cancelled) setTextBackdrops(prev => ({ ...prev, ...updates }));
         };
         resolveImages();
         return () => { cancelled = true; };
@@ -244,7 +253,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ apiKey, onSelectItem, onInv
             {/* Slides */}
             {items.map((item, index) => {
                 const isActive = index === currentIndex;
-                const backdrop = tmdbBackdrops[item.id]
+                const backdrop = textBackdrops[item.id]
                     || (item.backdrop_path ? `${IMAGE_BASE_URL}${item.backdrop_path}` : null);
 
                 return (

@@ -329,12 +329,14 @@ const AppContent: React.FC = () => {
                 </div>
 
                 {/* Bottom Pill Navigation */}
-                <LiquidPillNavigation
-                    view={view}
-                    setView={setView}
-                    onSearchClick={() => { setView('search'); }}
-                    enableLiquidEffects={!performanceMode}
-                />
+                {!showChoiceGPT && (
+                    <LiquidPillNavigation
+                        view={view}
+                        setView={setView}
+                        onSearchClick={() => { setView('search'); }}
+                        enableLiquidEffects={!performanceMode}
+                    />
+                )}
 
 
 
@@ -374,8 +376,12 @@ const AppContent: React.FC = () => {
                     <ChoiceGPTWidget onClose={() => setShowChoiceGPT(false)} modes={['image','text']} />
                 )}
 
-                <div
+                <a
+                    href="https://cfr.jasonforreels.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="cfr-app-badge"
+                    style={{ textDecoration: 'none' }}
                 >
                     <img
                         src="https://i.ibb.co/QFRhk6HQ/Choice-For-Reels-App-logo-2.png"
@@ -394,7 +400,7 @@ const AppContent: React.FC = () => {
                     >
                         CFR App Coming Soon
                     </span>
-                </div>
+                </a>
             </div>
         </ImageGeneratorProvider>
     );

@@ -11,7 +11,7 @@ export interface ImaxCuratedEntry {
 
 // User-requested curated IMAX titles with explicit YouTube links
 const CURATED_ENTRIES: ImaxCuratedEntry[] = [
-  { title: 'Superman', youtubeUrl: 'http://www.youtube.com/watch?v=OfpXgjP4AOs' },
+  { title: 'Superman', youtubeUrl: 'http://www.youtube.com/watch?v=OfpXgjP4AOs', posterUrl: 'https://www.imax.com/_next/image?url=https%3A%2F%2Fimages.ctfassets.net%2Fc4ucztjx9pmu%2F5Jc2OeFHT0Xv5u2n4UcMGY%2F6403d941e117b1f83c525e574e210e46%2FIMAX_Exclusive_Artwork_Superman.jpg&w=1920&q=75' },
   { title: 'Avatar: The Way of Water', youtubeUrl: 'http://www.youtube.com/watch?v=a6VVrAZUnsc' },
   { title: 'Predator: Badlands', youtubeUrl: 'http://www.youtube.com/watch?v=5Iikh-x2W8k' },
   { title: 'Tron: Ares', youtubeUrl: 'http://www.youtube.com/watch?v=h8VJ0LSi5gQ' },
@@ -80,7 +80,7 @@ export const getCuratedTrailerKeyForItem = (item: MediaItem | { title?: string; 
 export const getImaxCuratedEntries = (): ImaxCuratedEntry[] => CURATED_ENTRIES.slice();
 
 export const resolveCuratedMediaItems = async (apiKey: string): Promise<MediaItem[]> => {
-  const CACHE_KEY = 'imaxCuratedItemsV2';
+  const CACHE_KEY = 'imaxCuratedItemsV3';
   const TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
   try {

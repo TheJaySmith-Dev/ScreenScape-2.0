@@ -4,11 +4,10 @@ import { useAppleTheme } from './AppleThemeProvider';
 import { useAppleAnimationEffects } from '../hooks/useAppleAnimationEffects';
 import { ChevronLeft, ChevronRight, Star, Play, Info } from 'lucide-react';
 import BackdropOverlay from './BackdropOverlay';
-import TrailerPlayer from './TrailerPlayer';
 import { mediaHoverService } from '../services/mediaHoverService';
 import RottenTomatoesRating from './RottenTomatoesRating';
 import { getOMDbFromTMDBDetails, extractRottenTomatoesRating, OMDbMovieDetails } from '../services/omdbService';
-import { getMovieExternalIds, getMovieImages, getTVShowImages, getMovieVideosImaxOnly, getTVShowVideosImaxOnly } from '../services/tmdbService';
+import { getMovieExternalIds, getMovieImages, getTVShowImages } from '../services/tmdbService';
 // FanArt removed: posters now resolved via TMDb images with OMDb fallback for movies
 
 // Use smaller poster size for rows to improve load speed
@@ -32,15 +31,12 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
     // Hover state management
     const [isHovered, setIsHovered] = useState(false);
     const [showBackdrop, setShowBackdrop] = useState(false);
-    const [showTrailer, setShowTrailer] = useState(false);
     const [backdropUrl, setBackdropUrl] = useState<string>('');
-    const [trailerUrl, setTrailerUrl] = useState<string>('');
     const [omdbData, setOmdbData] = useState<OMDbMovieDetails | null>(null);
     const [isDesktop, setIsDesktop] = useState(false);
     const [posterUrl, setPosterUrl] = useState<string | null>(null);
     
     const hoverTimeoutRef = useRef<NodeJS.Timeout>();
-    const trailerTimeoutRef = useRef<NodeJS.Timeout>();
     
     // Check if device supports hover (desktop)
     useEffect(() => {
@@ -110,7 +106,6 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
         
         // Clear any existing timeouts
         if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-        if (trailerTimeoutRef.current) clearTimeout(trailerTimeoutRef.current);
         
         // Start loading media data after 300ms delay
         hoverTimeoutRef.current = setTimeout(async () => {
@@ -120,30 +115,6 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
                 if (mediaData.backdropUrl) {
                     setBackdropUrl(mediaData.backdropUrl);
                     setShowBackdrop(true);
-                }
-                
-                // Trailer selection: prefer IMAX-only in IMAX mode, else use generic
-                let resolvedTrailerUrl: string | null = mediaData.trailerUrl;
-                if (imaxOnlyTrailers) {
-                    try {
-                        const imaxResp = item.media_type === 'movie'
-                            ? await getMovieVideosImaxOnly(apiKey, item.id)
-                            : await getTVShowVideosImaxOnly(apiKey, item.id);
-                        const first = (imaxResp?.results || [])[0];
-                        if (first && first.key) {
-                            resolvedTrailerUrl = `https://www.youtube.com/embed/${first.key}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;
-                        }
-                    } catch (_) {
-                        // ignore IMAX-only failures; fallback stays null or generic
-                    }
-                }
-
-                if (resolvedTrailerUrl) {
-                    setTrailerUrl(resolvedTrailerUrl);
-                    // Start trailer after additional 2s delay
-                    trailerTimeoutRef.current = setTimeout(() => {
-                        setShowTrailer(true);
-                    }, 2000);
                 }
                 
                 // Fetch OMDb data for Rotten Tomatoes rating (only for movies)
@@ -170,21 +141,17 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
         
         setIsHovered(false);
         setShowBackdrop(false);
-        setShowTrailer(false);
         setBackdropUrl('');
-        setTrailerUrl('');
         setOmdbData(null);
         
         // Clear timeouts
         if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-        if (trailerTimeoutRef.current) clearTimeout(trailerTimeoutRef.current);
     }, [isDesktop]);
     
     // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-            if (trailerTimeoutRef.current) clearTimeout(trailerTimeoutRef.current);
         };
     }, []);
     
@@ -219,15 +186,6 @@ const MediaCard: React.FC<{ item: MediaItem; onSelectItem: (item: MediaItem) => 
                     />
                 )}
                 
-                {/* Trailer Player - Desktop Only */}
-                {isDesktop && (
-                    <TrailerPlayer
-                        trailerUrl={trailerUrl}
-                        isVisible={showTrailer}
-                        autoplayDelay={0} // Already delayed in hover logic
-                        className="desktop-only-hover"
-                    />
-                )}
                 {(() => {
                     const posterSrc = posterUrl
                         || (item.poster_path

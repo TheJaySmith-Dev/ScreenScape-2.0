@@ -1,7 +1,9 @@
+import { POLLINATIONS_API_KEY } from '../utils/genscapeKeys';
+
 // Pollinations.ai API service for image generation
 const POLLINATIONS_IMAGE_API_BASE = "https://image.pollinations.ai/prompt";
 const POLLINATIONS_MODELS_API = "https://image.pollinations.ai/models";
-const POLLINATIONS_API_TOKEN = "tDzPgGrPAJZL059l";
+// Removed hardcoded token in favor of imported key
 
 export interface ImageGenerationRequest {
   model: string;
@@ -34,7 +36,7 @@ export async function fetchAvailableModels(): Promise<string[]> {
   }
 
   try {
-    const url = `${POLLINATIONS_MODELS_API}?token=${POLLINATIONS_API_TOKEN}&referrer=ScreenScape`;
+    const url = `${POLLINATIONS_MODELS_API}?key=${POLLINATIONS_API_KEY}&referrer=ScreenScape`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -71,7 +73,7 @@ export async function generateImage(request: ImageGenerationRequest): Promise<Im
     // Build the API URL with parameters
     const params = new URLSearchParams({
       model: request.model,
-      token: POLLINATIONS_API_TOKEN,
+      key: POLLINATIONS_API_KEY,
       referrer: "ScreenScape",
       nologo: "true", // Remove watermark since we have a token
       width: String(request.width || 1024),

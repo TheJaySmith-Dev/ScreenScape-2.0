@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MediaItem, Movie, MovieDetails, TVShowDetails, WatchProvider, WatchProviderCountry } from '../types';
 import { getMovieDetails as getTMDbMovieDetails, getTVShowDetails as getTMDbTVShowDetails, getMovieCredits, getTVShowCredits, getMovieImages, getTVShowImages } from '../services/tmdbService';
 import { getMovieRecommendations } from '../services/tmdbService';
-import { getMovieWatchProviders, getTVShowWatchProviders, getMovieVideos, getTVShowVideos, getTVSeasonDetails, filterImaxVideos } from '../services/tmdbService';
+import { getMovieWatchProviders, getTVShowWatchProviders, getMovieVideos, getTVShowVideos, getTVSeasonDetails, filterImaxVideos, getFanArtLogoBackdrop } from '../services/tmdbService';
 import { isCuratedImaxTitle, getCuratedTrailerKeyForItem } from '../services/imaxCuratedService';
 import { getOMDbFromTMDBDetails, OMDbMovieDetails, extractRottenTomatoesRating, extractRottenTomatoesConsensus, hasOMDbKey } from '../services/omdbService';
 import { fetchRtCriticReviews, RtCriticReview } from '../services/rottenTomatoesService';
@@ -29,8 +29,11 @@ import {
     hasAvailability,
 } from '../utils/streamingAvailability';
 import MediaTitleLogo from './MediaTitleLogo';
- 
-// FanArt removed: backdrops resolved via TMDb image APIs
+import { FANART_API_KEY } from '../utils/genscapeKeys';
+
+// FanArt API integrated for logo backdrops (moviethumb/tvthumb)
+// Prioritizes FanArt images if available, otherwise falls back to TMDb
+
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 // Official IMAX YouTube trailer IDs (curated; update as new IMAX trailers release)
@@ -1580,16 +1583,28 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
         return () => { isMounted = false; };
     }, [item.id, item.media_type, apiKey, onInvalidApiKey, country.code]);
 
-    // Resolve backdrop using TMDb images and set fallback immediately
+    // Resolve backdrop: FanArt Logo > TMDb High Res > TMDb Fallback
     useEffect(() => {
         let cancelled = false;
         const resolveBackdrop = async () => {
             if (!details) return;
-            // Set TMDb fallback immediately
-            const tmdbFallback = details.backdrop_path ? `${IMAGE_BASE_URL}original${details.backdrop_path}` : '';
-            if (!cancelled) setBackdropUrl(tmdbFallback);
+            
+            // TEST MODE: TMDb backdrops disabled to verify FanArt integration
+            // 1. Set TMDb fallback immediately so user sees something
+            // const tmdbFallback = details.backdrop_path ? `${IMAGE_BASE_URL}original${details.backdrop_path}` : '';
+            // if (!cancelled) setBackdropUrl(tmdbFallback);
 
             try {
+                // 2. Try FanArt for a backdrop with logo
+                const fanArtBackdrop = await getFanArtLogoBackdrop(apiKey, FANART_API_KEY, item);
+                if (!cancelled && fanArtBackdrop) {
+                    setBackdropUrl(fanArtBackdrop);
+                    return; // Found the best option, stop here
+                }
+
+                // 3. If no FanArt, try to find best TMDb backdrop (highest rated/res)
+                // TEST MODE: Disabled TMDb fallback search
+                /*
                 if (item.media_type === 'movie') {
                     const images = await getMovieImages(apiKey, item.id);
                     const backdrops = Array.isArray(images?.backdrops) ? images.backdrops : [];
@@ -1614,13 +1629,14 @@ const MediaDetail: React.FC<MediaDetailProps> = ({ item, apiKey, onClose, onSele
                         }
                     }
                 }
+                */
             } catch (err) {
-                console.warn('Failed to resolve backdrop; using TMDb fallback:', err);
+                console.warn('Failed to resolve backdrop; keeping fallback:', err);
             }
         };
         resolveBackdrop();
         return () => { cancelled = true; };
-    }, [details, item.media_type, item.id, apiKey]);
+    }, [details, item.media_type, item.id, apiKey, item]);
 
     const handleGenerateStoryScape = async () => {
         if (!details) return;

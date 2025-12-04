@@ -3,8 +3,8 @@ import { PaginatedResponse, Movie, TVShow, Video, WatchProviderResponse, MediaIt
 const API_BASE_URL = 'https://api.themoviedb.org/3';
 
 const apiFetch = async <T>(
-  apiKey: string, 
-  endpoint: string, 
+  apiKey: string,
+  endpoint: string,
   params: Record<string, string | number | boolean> = {},
   retries: number = 2
 ): Promise<T> => {
@@ -18,13 +18,13 @@ const apiFetch = async <T>(
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
+
       const response = await fetch(url.toString(), {
         signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error("Invalid API Key");
@@ -36,7 +36,7 @@ const apiFetch = async <T>(
         }
         throw new Error(`TMDb API error: ${response.status} ${response.statusText}`);
       }
-      
+
       return response.json();
     } catch (error) {
       // Handle network errors
@@ -48,12 +48,12 @@ const apiFetch = async <T>(
         }
         throw new Error(`Network error: Unable to reach TMDb API after ${retries + 1} attempts`);
       }
-      
+
       // Re-throw other errors immediately
       throw error;
     }
   }
-  
+
   throw new Error(`Failed to fetch after ${retries + 1} attempts`);
 };
 
@@ -105,11 +105,11 @@ export const getTVShowWatchProviders = async (apiKey: string, tvId: number, regi
 };
 
 // VIDEO/TRAILER FUNCTIONS (kept for fallback)
-export const getMovieVideos = (apiKey: string, movieId: number): Promise<{results: Video[]}> => {
+export const getMovieVideos = (apiKey: string, movieId: number): Promise<{ results: Video[] }> => {
   return apiFetch(apiKey, `/movie/${movieId}/videos`);
 };
 
-export const getTVShowVideos = (apiKey: string, tvId: number): Promise<{results: Video[]}> => {
+export const getTVShowVideos = (apiKey: string, tvId: number): Promise<{ results: Video[] }> => {
   return apiFetch(apiKey, `/tv/${tvId}/videos`);
 };
 
@@ -261,18 +261,117 @@ export const getTVExternalIds = (apiKey: string, tvId: number): Promise<{
   return apiFetch(apiKey, `/tv/${tvId}/external_ids`);
 };
 
+// FANART API INTEGRATION
+const proxyFanArtImage = (url: string): string => {
+  if (import.meta.env.DEV && url.startsWith('https://assets.fanart.tv')) {
+    return url.replace('https://assets.fanart.tv', '/fanart_assets');
+  }
+  return url;
+};
+
+export const getFanArtLogoBackdrop = async (tmdbApiKey: string, fanArtApiKey: string, mediaItem: MediaItem): Promise<string | null> => {
+  if (!fanArtApiKey || fanArtApiKey === 'YOUR_FANART_API_KEY') return null;
+
+  try {
+    let searchId: string | number | null = null;
+    const isMovie = mediaItem.media_type === 'movie';
+
+    // Try to use external IDs for better match
+    if (isMovie) {
+      const externalIds = await getMovieExternalIds(tmdbApiKey, mediaItem.id);
+      searchId = externalIds.imdb_id || externalIds.id; // Use IMDB or fallback to TMDB ID
+    } else {
+      const externalIds = await getTVExternalIds(tmdbApiKey, mediaItem.id);
+      searchId = externalIds.tvdb_id || externalIds.imdb_id || externalIds.id; // Prefer TVDB, then IMDB, then TMDB
+    }
+
+    if (!searchId) return null;
+
+    const endpoint = isMovie ? 'movies' : 'tv';
+    // Use local proxy in dev to avoid CORS, fallback to direct URL in prod
+    const baseUrl = import.meta.env.DEV ? '/fanart' : 'https://webservice.fanart.tv';
+    const response = await fetch(`${baseUrl}/v3/${endpoint}/${searchId}?api_key=${fanArtApiKey}`);
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+
+    // Look for backdrops with logos (moviethumb/tvthumb are 16:9 with logo)
+    let images: any[] = [];
+    if (isMovie) {
+      images = data.moviethumb || [];
+    } else {
+      images = data.tvthumb || [];
+    }
+
+    if (images.length > 0) {
+      // Return the highest rated one (usually first)
+      return proxyFanArtImage(images[0].url);
+    }
+
+    return null;
+
+  } catch (error) {
+    console.warn('FanArt API fetch failed:', error);
+    return null;
+  }
+};
+
+export const getFanArtLogo = async (tmdbApiKey: string, fanArtApiKey: string, mediaItem: MediaItem): Promise<string | null> => {
+  if (!fanArtApiKey || fanArtApiKey === 'YOUR_FANART_API_KEY') return null;
+
+  try {
+    let searchId: string | number | null = null;
+    const isMovie = mediaItem.media_type === 'movie';
+
+    // Try to use external IDs for better match
+    if (isMovie) {
+      const externalIds = await getMovieExternalIds(tmdbApiKey, mediaItem.id);
+      searchId = externalIds.imdb_id || externalIds.id;
+    } else {
+      const externalIds = await getTVExternalIds(tmdbApiKey, mediaItem.id);
+      searchId = externalIds.tvdb_id || externalIds.imdb_id || externalIds.id;
+    }
+
+    if (!searchId) return null;
+
+    const endpoint = isMovie ? 'movies' : 'tv';
+    const baseUrl = import.meta.env.DEV ? '/fanart' : 'https://webservice.fanart.tv';
+    const response = await fetch(`${baseUrl}/v3/${endpoint}/${searchId}?api_key=${fanArtApiKey}`);
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+
+    let logos: any[] = [];
+    if (isMovie) {
+      logos = data.hdmovieclearart || data.movieclearart || [];
+    } else {
+      logos = data.hdtvlogo || data.clearart || [];
+    }
+
+    if (logos.length > 0) {
+      return proxyFanArtImage(logos[0].url);
+    }
+
+    return null;
+  } catch (error) {
+    return null;
+  }
+};
+
 // RECOMMENDATIONS
 export const getMovieRecommendations = async (apiKey: string, movieId: number): Promise<PaginatedResponse<Movie>> => {
-    const response = await apiFetch<PaginatedResponse<Movie>>(apiKey, `/movie/${movieId}/recommendations`);
-    response.results = response.results.map(movie => ({ ...movie, media_type: 'movie' }));
-    return response;
+  const response = await apiFetch<PaginatedResponse<Movie>>(apiKey, `/movie/${movieId}/recommendations`);
+  response.results = response.results.map(movie => ({ ...movie, media_type: 'movie' }));
+  return response;
 };
 
 // TV SHOW RECOMMENDATIONS
 export const getTVShowRecommendations = async (apiKey: string, tvId: number): Promise<PaginatedResponse<TVShow>> => {
-    const response = await apiFetch<PaginatedResponse<TVShow>>(apiKey, `/tv/${tvId}/recommendations`);
-    response.results = response.results.map(tv => ({ ...tv, media_type: 'tv' }));
-    return response;
+  const response = await apiFetch<PaginatedResponse<TVShow>>(apiKey, `/tv/${tvId}/recommendations`);
+  response.results = response.results.map(tv => ({ ...tv, media_type: 'tv' }));
+  return response;
 };
 
 // TRENDING

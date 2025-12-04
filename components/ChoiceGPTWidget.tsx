@@ -3,6 +3,7 @@ import { Settings as SettingsIcon } from 'lucide-react';
 import { LiquidGlassPillButton } from './LiquidGlassPillButton';
 import { searchMulti, getMovieVideosImaxOnly, getTVShowVideosImaxOnly, getMovieVideos, getTVShowVideos } from '../services/tmdbService';
 import { useAppleTheme } from './AppleThemeProvider';
+import { POLLINATIONS_API_KEY } from '../utils/genscapeKeys';
 
 type Citation = { index: number; url: string; title: string };
 type ChatMessage = { role: 'user' | 'assistant'; content: string; html?: string; citations?: Citation[] };
@@ -30,7 +31,7 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
     return () => window.removeEventListener('resize', check);
   }, []);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', content: 'Hi, I am ChoiceGPT. Ask me anything about movies, TV, streaming, and availability.' }
+    { role: 'assistant', content: 'Hi, I am Mr. Reeler. Ask me anything about movies, TV, streaming, and availability.' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -250,6 +251,9 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
     const qs = new URLSearchParams();
     if (m) qs.set('model', m);
     if (s) qs.set('seed', s);
+    if (POLLINATIONS_API_KEY) qs.set('key', POLLINATIONS_API_KEY);
+    qs.set('nologo', 'true');
+    qs.set('private', 'true');
     if (r && h) {
       const { width, height } = ratioToWH(r, h);
       qs.set('width', String(width));
@@ -420,7 +424,7 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
       const payload = {
         model: 'openai',
         messages: [
-          { role: 'system', content: 'You are ChoiceGPT, a helpful assistant for movies, TV, streaming availability, and recommendations.' },
+          { role: 'system', content: 'You are Mr. Reeler, a helpful assistant for movies, TV, streaming availability, and recommendations.' },
           ...(rememberedCountry ? [{ role: 'system', content: `For availability queries, assume the country is ${rememberedCountry} unless the user specifies otherwise.` }] : []),
           ...nextMessages.map(m => ({ role: m.role, content: m.content }))
         ],
@@ -542,8 +546,8 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
         overflow: 'hidden'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 10, borderBottom: '1px solid rgba(255,255,255,0.18)' }}>
-          <img src="https://pollinations.ai/icon-512.png" alt="ChoiceGPT" style={{ height: 18, width: 18, borderRadius: 4 }} />
-          <span style={{ fontFamily: tokens.typography.families.display, fontSize: tokens.typography.sizes.caption1, fontWeight: tokens.typography.weights.semibold, color: tokens.colors.label.primary }}>ChoiceGPT</span>
+          <img src="https://i.ibb.co/0V8BT780/image-Mr-Reeler-2.png" alt="Mr. Reeler" style={{ height: 28, width: 28, borderRadius: 4 }} />
+          <span style={{ fontFamily: tokens.typography.families.display, fontSize: tokens.typography.sizes.caption1, fontWeight: tokens.typography.weights.semibold, color: tokens.colors.label.primary }}>Mr. Reeler</span>
           <span style={{ marginLeft: 'auto', color: tokens.colors.label.secondary, fontSize: tokens.typography.sizes.caption2 }}>Pollinations AI</span>
           {availableModes.length > 1 && (
             <div style={{ display: 'flex', gap: 8, marginLeft: 8 }}>
@@ -727,7 +731,7 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') (searchMode ? runSearch() : sendMessage()); }}
-                placeholder={searchMode ? 'Search (web + AI)…' : 'Ask ChoiceGPT…'}
+                placeholder={searchMode ? 'Search (web + AI)…' : 'Ask Mr. Reeler…'}
                 style={{ padding: '10px 12px', borderRadius: 12, border: `1px solid ${tokens.colors.separator.opaque}`, background: tokens.colors.background.secondary, color: tokens.colors.label.primary, minWidth: 0 }}
               />
               <button 
@@ -767,8 +771,10 @@ const ChoiceGPTWidget: React.FC<ChoiceGPTWidgetProps> = ({ onClose, inline, mode
   }
 
   return (
-    <div style={{ position: 'fixed', bottom: isMobile ? 'calc(8px + env(safe-area-inset-bottom))' : 16, left: isMobile ? 8 : 'auto', right: isMobile ? 8 : 16, zIndex: 10050, display: 'flex', justifyContent: 'center' }}>
-      {container}
+    <div style={{ position: 'fixed', bottom: isMobile ? 'calc(24px + env(safe-area-inset-bottom))' : 32, left: 0, right: 0, zIndex: 10050, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+      <div style={{ pointerEvents: 'auto' }}>
+        {container}
+      </div>
     </div>
   );
 };

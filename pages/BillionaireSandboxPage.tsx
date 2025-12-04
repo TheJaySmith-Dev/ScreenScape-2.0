@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AppleThemeProvider, useAppleTheme } from '../components/AppleThemeProvider';
 import { Link, useNavigate } from 'react-router-dom';
+import { POLLINATIONS_API_KEY } from '../utils/genscapeKeys';
 
 type BillionaireProfile = {
   name: string;
@@ -83,7 +84,7 @@ const SandboxContent: React.FC = () => {
   };
 
   const portraitUrl = selected
-    ? `https://image.pollinations.ai/prompt/${encodeURIComponent(selected.prompt)}`
+    ? `https://image.pollinations.ai/prompt/${encodeURIComponent(selected.prompt)}?nologo=true&private=true&key=${POLLINATIONS_API_KEY}`
     : '';
 
   const appendEvent = (label: string, delta: number) => {

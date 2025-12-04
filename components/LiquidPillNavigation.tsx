@@ -283,6 +283,7 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
 
   const navigationItems = [
     { id: 'screenSearch' as ViewType, label: 'Home', imageUrl: HOME_ICON_DATA_URL },
+    { id: 'search' as ViewType, label: 'Search', icon: Search, isSearchButton: true },
     { id: 'live' as ViewType, label: 'Live', imageUrl: LIVE_ICON_DATA_URL },
     { id: 'likes' as ViewType, label: 'Likes', imageUrl: HEART_ICON_DATA_URL },
     { id: 'sync' as ViewType, label: 'Sync', imageUrl: syncIconUrl },
@@ -611,10 +612,10 @@ const LiquidPillNavigation: React.FC<LiquidPillNavigationProps> = ({
                         src={(item as any).imageUrl}
                         alt={item.label}
                         loading="lazy"
-                        style={{ height: (item.id === 'screenSearch' || item.id === 'likes' || item.id === 'sync' || item.id === 'settings' || item.id === 'apps') ? '22px' : '18px', width: 'auto', filter: isActive ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' : 'none' }}
+                        style={{ height: (item.id === 'screenSearch' || item.id === 'search' || item.id === 'likes' || item.id === 'sync' || item.id === 'settings' || item.id === 'apps') ? '22px' : '18px', width: 'auto', filter: isActive ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' : 'none' }}
                       />
                     )}
-                    {(item.id !== 'screenSearch' && item.id !== 'likes' && item.id !== 'sync' && item.id !== 'settings' && item.id !== 'apps') && (
+                    {(item.id !== 'screenSearch' && item.id !== 'search' && item.id !== 'likes' && item.id !== 'sync' && item.id !== 'settings' && item.id !== 'apps') && (
                       <span style={{
                         fontSize: `${tokens.typography.sizes.caption2}px`,
                         fontWeight: isActive ? tokens.typography.weights.semibold : tokens.typography.weights.medium,

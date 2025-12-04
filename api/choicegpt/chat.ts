@@ -5,7 +5,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   try {
-    const apiKey = process.env.POLLINATIONS_API_KEY || process.env.VITE_POLLINATIONS_API_KEY || '';
+    const apiKey = process.env.POLLINATIONS_API_KEY || process.env.VITE_POLLINATIONS_API_KEY || 'plln_sk_lBikUu7qswK4bzb5QMk1CfNtnTcmJMJ8';
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     const referer = (req.headers['referer'] as string) || process.env.PUBLIC_ORIGIN || '';
     const resp = await fetch('https://text.pollinations.ai/openai', {
